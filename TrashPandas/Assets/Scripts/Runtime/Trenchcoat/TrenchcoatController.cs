@@ -41,10 +41,51 @@ namespace TrashPandas.Runtime.Trenchcoat
         bool? _armsCamera;
         HandGrabber _grabber;
         bool _showHelp = true;
+        readonly List<RaccoonController> _botRaccoons = new List<RaccoonController>();
+
+        public static TrenchcoatController Instance { get; private set; }
+        /// <summary>The player the person at the keyboard controls (offline debug).</summary>
+        public int LocalPlayerId => _possession != null ? _possession.ActivePlayerId : 0;
+        public int PlayerCountInRound => _slots != null ? _slots.SlotCount : 0;
+        bool _burst;
+
+        /// <summary>RUN!: everyone still inside pops out as a raccoon, flung outward.</summary>
+        public void BurstAll()
+        {
+            if (_burst) return;
+            _burst = true;
+            StopRecording(Time.time);
+            Vector3 center = Body.transform.position;
+            for (int player = 0; player < _slots.SlotCount; player++)
+            {
+                if (!_slots.SlotOf(player).HasValue) continue;
+                _slots.Leave(player);
+                float angle = player * Mathf.PI * 2f / _slots.SlotCount;
+                var dir = new Vector3(Mathf.Cos(angle), 0f, Mathf.Sin(angle));
+                var raccoon = Instantiate(RaccoonPrefab, center + dir * 0.8f + Vector3.up * 0.5f, Quaternion.LookRotation(dir));
+                raccoon.PlayerId = player;
+                raccoon.ApplyHit(dir * 5f, 0.6f);
+                if (player == _possession.ActivePlayerId)
+                {
+                    _raccoon = raccoon;
+                    CameraRig.SetTarget(raccoon.transform, RaccoonCameraRadius, RaccoonLookHeight);
+                }
+                else _botRaccoons.Add(raccoon);
+            }
+            Body.Explode();
+        }
+
+        /// <summary>The local raccoon was removed (escaped or caught): watch the garden from above.</summary>
+        public void ShowOverview(Transform overview)
+        {
+            _raccoon = null;
+            if (overview) CameraRig.SetTarget(overview, 16f, 0f);
+        }
         bool _botHopped;
 
         void Awake()
         {
+            Instance = this;
             // This is the single-person debug mode; online play is driven by OnlinePlayerController.
             var nm = Unity.Netcode.NetworkManager.Singleton;
             if (nm && nm.IsListening) { enabled = false; return; }
@@ -95,6 +136,7 @@ namespace TrashPandas.Runtime.Trenchcoat
 
             if (_possession.ActiveIsOutside)
             {
+                if (!_raccoon) { Body.SetIntent(default); return; }
                 var raccoonMove = Net.DevAutomation.Bot == "hop" ? new Vector2(0f, 1f) : _reader.CameraRelativeMove(CameraRig); // dev: run toward the tables
                 _raccoon.SetInput(raccoonMove, _reader.JumpPressed, _reader.JumpHeld, _reader.CrouchHeld);
             }
@@ -158,14 +200,16 @@ namespace TrashPandas.Runtime.Trenchcoat
             if (!_possession.ActiveIsOutside)
             {
                 StopRecording(now);
-                if (!_possession.LeaveCoat()) return;
+                if (_burst || !_possession.LeaveCoat()) return;
                 Vector3 spawn = Body.transform.position + Body.transform.right * 0.9f + Vector3.up * 0.2f;
                 _raccoon = Instantiate(RaccoonPrefab, spawn, Body.transform.rotation);
+                _raccoon.PlayerId = _possession.ActivePlayerId;
                 CameraRig.SetTarget(_raccoon.transform, RaccoonCameraRadius, RaccoonLookHeight);
                 _status = "";
                 return;
             }
 
+            if (_burst || !_raccoon) return; // no getting back in once the coat has burst
             float distance = Vector3.Distance(_raccoon.transform.position, Body.transform.position);
             if (distance > ReturnDistance) { _status = "Too far from the coat"; return; }
             if (!_possession.ReturnToCoat()) { _status = "No free slot"; return; }

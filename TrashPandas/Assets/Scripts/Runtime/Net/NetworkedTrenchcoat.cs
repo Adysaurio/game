@@ -26,6 +26,7 @@ namespace TrashPandas.Runtime.Net
 
         readonly NetworkVariable<BodyVisualState> _visual = new NetworkVariable<BodyVisualState>();
         readonly NetworkVariable<SlotsSnapshot> _slots = new NetworkVariable<SlotsSnapshot>();
+        readonly NetworkVariable<bool> _burst = new NetworkVariable<bool>();
         readonly Dictionary<int, SlotInput> _latestInput = new Dictionary<int, SlotInput>();
         readonly InputSequencer _sequencer = new InputSequencer();
         readonly JumpStampRebaser _jumpStamps = new JumpStampRebaser();
@@ -42,6 +43,8 @@ namespace TrashPandas.Runtime.Net
         public override void OnNetworkSpawn()
         {
             Instance = this;
+            _burst.OnValueChanged += (_, burst) => { if (burst) Body.Explode(); };
+            if (_burst.Value) Body.Explode();
             if (!IsServer)
             {
                 Body.VisualOnly = true;
@@ -76,12 +79,43 @@ namespace TrashPandas.Runtime.Net
             ulong client = rpcParams.Receive.SenderClientId;
             var roster = SessionHost.Instance ? SessionHost.Instance.Roster : null;
             int? player = roster?.PlayerIdOf(client);
-            if (!player.HasValue || roster.Slots == null || !roster.Slots.Leave(player.Value)) return;
+            if (_burst.Value || !player.HasValue || roster.Slots == null || !roster.Slots.Leave(player.Value)) return;
             _latestInput.Remove(player.Value);
+            SpawnRaccoon(player.Value, client, Core.Trenchcoat.CoatSeating.SpawnBeside(transform.position, transform.rotation), transform.rotation);
+        }
 
-            var raccoon = Instantiate(RaccoonPrefab, Core.Trenchcoat.CoatSeating.SpawnBeside(transform.position, transform.rotation), transform.rotation);
-            raccoon.SpawnWithOwnership(client, destroyWithScene: true);
-            _raccoons[player.Value] = raccoon;
+        NetworkObject SpawnRaccoon(int player, ulong owner, Vector3 position, Quaternion rotation)
+        {
+            var raccoon = Instantiate(RaccoonPrefab, position, rotation);
+            raccoon.GetComponent<Raccoon.RaccoonController>().PlayerId = player;
+            raccoon.SpawnWithOwnership(owner, destroyWithScene: true);
+            _raccoons[player] = raccoon;
+            return raccoon;
+        }
+
+        /// <summary>Host, RUN!: every seated player pops out as a raccoon, flung outward; the coat disappears.</summary>
+        public void BurstAll()
+        {
+            if (!IsServer || _burst.Value) return;
+            var roster = SessionHost.Instance ? SessionHost.Instance.Roster : null;
+            var slots = roster?.Slots;
+            if (slots != null)
+            {
+                for (int seat = 0; seat < slots.SlotCount; seat++)
+                {
+                    var player = slots.OccupantOf(seat);
+                    if (!player.HasValue) continue;
+                    var client = roster.ClientOf(player.Value);
+                    slots.Leave(player.Value);
+                    _latestInput.Remove(player.Value);
+                    if (!client.HasValue) continue;
+                    float angle = seat * Mathf.PI * 2f / slots.SlotCount;
+                    var dir = new Vector3(Mathf.Cos(angle), 0f, Mathf.Sin(angle));
+                    var raccoon = SpawnRaccoon(player.Value, client.Value, transform.position + dir * 0.8f + Vector3.up * 0.5f, Quaternion.LookRotation(dir));
+                    raccoon.GetComponent<NetworkedRaccoon>().HitRpc(dir * 5f, 0.6f);
+                }
+            }
+            _burst.Value = true;
         }
 
         /// <summary>Hop back in if your raccoon is next to the coat and a seat is free.</summary>
@@ -90,7 +124,7 @@ namespace TrashPandas.Runtime.Net
         {
             var roster = SessionHost.Instance ? SessionHost.Instance.Roster : null;
             int? player = roster?.PlayerIdOf(rpcParams.Receive.SenderClientId);
-            if (!player.HasValue || roster.Slots == null || !_raccoons.TryGetValue(player.Value, out var raccoon) || !raccoon) return;
+            if (_burst.Value || !player.HasValue || roster.Slots == null || !_raccoons.TryGetValue(player.Value, out var raccoon) || !raccoon) return;
             if (!Core.Trenchcoat.CoatSeating.TryReturn(roster.Slots, player.Value, raccoon.transform.position, transform.position, ReturnDistance, out _)) return;
             _raccoons.Remove(player.Value);
             raccoon.Despawn(destroy: true);

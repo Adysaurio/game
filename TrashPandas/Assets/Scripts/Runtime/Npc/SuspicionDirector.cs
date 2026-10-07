@@ -27,6 +27,8 @@ namespace TrashPandas.Runtime.Npc
         public float WanderRadius = 2.5f;
 
         public static SuspicionDirector Instance { get; private set; }
+        /// <summary>Set by the panic director: humans are no longer guests, they're chasers.</summary>
+        public bool Suspended { get; set; }
 
         readonly NetworkVariable<float> _suspicion = new NetworkVariable<float>();
         readonly NetworkVariable<bool> _caught = new NetworkVariable<bool>();
@@ -75,7 +77,7 @@ namespace TrashPandas.Runtime.Npc
 
         void Update()
         {
-            if (!SimulationAuthority.IsSimulating || !Coat) return;
+            if (!SimulationAuthority.IsSimulating || !Coat || Suspended) return;
             float dt = Time.deltaTime, now = Time.time;
 
             if (now >= _nextRaccoonScan)
@@ -112,6 +114,7 @@ namespace TrashPandas.Runtime.Npc
                 var state = brain.Guest.Update(dt, seen, seenRaccoon);
                 // Only once the guest has actually registered the raccoon (not on a split-second glimpse).
                 if (seenRaccoon && state == GuestState.Alarmed) _model.ReportRaccoonSighting(brain.Id, now);
+                if (seenRaccoon) brain.LastSeenRaccoon = seenRaccoon.transform.position;
                 if (seesCoat) { frame.CoatWitnessed = true; frame.SeenWeirdness = Mathf.Max(frame.SeenWeirdness, weirdness); }
 
                 pawn.SetMood((byte)state);
@@ -167,6 +170,8 @@ namespace TrashPandas.Runtime.Npc
         public readonly int Id;
         public readonly GuestMind Guest;
         public readonly CatMind Cat;
+        /// <summary>Where this guest last saw a loose raccoon (alarmed guests go and look).</summary>
+        public Vector3? LastSeenRaccoon;
         readonly Vector3 _home;
         readonly float _wander;
         readonly Vector3[] _route;
@@ -189,7 +194,14 @@ namespace TrashPandas.Runtime.Npc
         public void Stroll(float dt, GuestState state)
         {
             if (Pawn.Seated || Time.time < _nextStroll) return;
-            if (state == GuestState.Alarmed) { _nextStroll = Time.time + 1f; return; } // freeze and stare
+            if (state == GuestState.Alarmed)
+            {
+                // Before RUN nobody attacks, but alarmed guests go and see what that was.
+                if (LastSeenRaccoon.HasValue) Pawn.GoTo(LastSeenRaccoon.Value);
+                _nextStroll = Time.time + 0.5f;
+                return;
+            }
+            if (state == GuestState.Calm) LastSeenRaccoon = null;
             if (_route != null && _route.Length > 0)
             {
                 if ((new Vector2(Pawn.transform.position.x - _route[_routeIndex].x, Pawn.transform.position.z - _route[_routeIndex].z)).magnitude < 0.8f)

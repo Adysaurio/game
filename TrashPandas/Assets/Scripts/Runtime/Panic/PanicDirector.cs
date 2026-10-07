@@ -1,0 +1,232 @@
+using System.Collections.Generic;
+using TrashPandas.Core.Panic;
+using TrashPandas.Runtime.Net;
+using TrashPandas.Runtime.Npc;
+using TrashPandas.Runtime.Raccoon;
+using TrashPandas.Runtime.Trenchcoat;
+using Unity.Netcode;
+using UnityEngine;
+using UnityEngine.SceneManagement;
+
+namespace TrashPandas.Runtime.Panic
+{
+    public enum RoundPhase : byte { Infiltration, Panic, Results }
+
+    /// <summary>
+    /// RUN!: when suspicion maxes out, bursts the coat, arms the humans, has them chase and whack raccoons
+    /// (3 hits = caught), lets raccoons escape through the exits, and ends the round. Simulated on the host
+    /// (or offline); clients get the phase and a per-player snapshot.
+    /// </summary>
+    public sealed class PanicDirector : NetworkBehaviour
+    {
+        public Vector3[] Exits = new Vector3[0];
+        public string[] ExitNames = new string[0];
+        public float ExitRadius = 1.3f;
+        public float TimeLimit = 90f;
+        public float ChaserSpeed = 3.3f;
+        public float CatSpeed = 4.2f;
+        public float HitImpulse = 5.5f;
+        public float CatPushImpulse = 3.5f;
+        public Transform Overview;
+
+        public static PanicDirector Instance { get; private set; }
+
+        readonly NetworkVariable<byte> _phase = new NetworkVariable<byte>();
+        readonly NetworkVariable<PanicSnapshot> _snapshot = new NetworkVariable<PanicSnapshot>();
+        RoundPhase _offlinePhase;
+        PanicSnapshot _offlineSnapshot;
+
+        readonly HitTracker _hits = new HitTracker();
+        readonly RoundOutcome _outcome = new RoundOutcome();
+        readonly List<Chaser> _chasers = new List<Chaser>();
+        readonly List<ChaseTarget> _targets = new List<ChaseTarget>();
+        readonly Dictionary<int, RaccoonController> _raccoonOf = new Dictionary<int, RaccoonController>();
+        readonly Dictionary<int, float> _missingSince = new Dictionary<int, float>();
+        readonly List<int> _players = new List<int>();
+
+        sealed class Chaser
+        {
+            public NpcBrain Brain;
+            public ChaserMind Mind = new ChaserMind();
+            public PanicWeapon Weapon;
+            public bool IsCat => Brain.Pawn.Kind == NpcKind.Cat;
+        }
+
+        public RoundPhase Phase => SimulationAuthority.IsOnline ? (RoundPhase)_phase.Value : _offlinePhase;
+        public PanicSnapshot Snapshot => SimulationAuthority.IsOnline ? _snapshot.Value : _offlineSnapshot;
+
+        /// <summary>The player at this keyboard, or null if unknown.</summary>
+        public int? LocalPlayer
+        {
+            get
+            {
+                if (!SimulationAuthority.IsOnline) return TrenchcoatController.Instance ? TrenchcoatController.Instance.LocalPlayerId : (int?)null;
+                return Snapshot.PlayerOfClient(NetworkManager.Singleton.LocalClientId);
+            }
+        }
+
+        void Awake() => Instance = this;
+
+        public override void OnDestroy()
+        {
+            if (Instance == this) Instance = null;
+            base.OnDestroy();
+        }
+
+        void SetPhase(RoundPhase p)
+        {
+            _offlinePhase = p;
+            if (IsSpawned && IsServer) _phase.Value = (byte)p;
+        }
+
+        void Update()
+        {
+            if (!SimulationAuthority.IsSimulating) return;
+            var suspicion = SuspicionDirector.Instance;
+            if (Phase == RoundPhase.Infiltration && suspicion && suspicion.Caught) BeginPanic(suspicion);
+            if (Phase == RoundPhase.Panic) TickPanic();
+        }
+
+        void BeginPanic(SuspicionDirector suspicion)
+        {
+            SetPhase(RoundPhase.Panic);
+            suspicion.Suspended = true;
+
+            _players.Clear();
+            if (SimulationAuthority.IsOnline)
+            {
+                var roster = SessionHost.Instance ? SessionHost.Instance.Roster : null;
+                if (roster != null) for (int p = 0; p < roster.Clients.Count + 5; p++) if (roster.ClientOf(p).HasValue) _players.Add(p);
+                if (NetworkedTrenchcoat.Instance) NetworkedTrenchcoat.Instance.BurstAll();
+            }
+            else if (TrenchcoatController.Instance)
+            {
+                for (int p = 0; p < TrenchcoatController.Instance.PlayerCountInRound; p++) _players.Add(p);
+                TrenchcoatController.Instance.BurstAll();
+            }
+
+            _hits.Reset();
+            _missingSince.Clear();
+            _outcome.Begin(_players, Time.time, TimeLimit);
+
+            _chasers.Clear();
+            foreach (var brain in suspicion.Brains)
+            {
+                if (!brain.Pawn) continue;
+                brain.Pawn.Panic(brain.Pawn.Kind == NpcKind.Cat ? CatSpeed : ChaserSpeed);
+                brain.Pawn.SetMood((byte)Core.Npc.GuestState.Alarmed);
+                _chasers.Add(new Chaser { Brain = brain });
+            }
+
+            // Everyone but the cat runs for the nearest free weapon.
+            var weapons = new List<PanicWeapon>(FindObjectsByType<PanicWeapon>(FindObjectsSortMode.InstanceID));
+            var humans = _chasers.FindAll(c => !c.IsCat);
+            var assignment = WeaponAssigner.Assign(humans.ConvertAll(c => c.Brain.Pawn.transform.position), weapons.ConvertAll(w => w.transform.position));
+            for (int i = 0; i < humans.Count; i++) if (assignment[i] >= 0) humans[i].Weapon = weapons[assignment[i]];
+            Publish();
+        }
+
+        void TickPanic()
+        {
+            float now = Time.time, dt = Time.deltaTime;
+
+            _raccoonOf.Clear();
+            foreach (var r in FindObjectsByType<RaccoonController>(FindObjectsSortMode.None))
+                if (r && r.PlayerId >= 0) _raccoonOf[r.PlayerId] = r;
+
+            _targets.Clear();
+            foreach (int p in _players)
+            {
+                if (_outcome.StatusOf(p) != PlayerOutcome.Running) continue;
+                if (!_raccoonOf.TryGetValue(p, out var r))
+                {
+                    // Disconnected (or otherwise gone) for a moment: counts as caught so the round can end.
+                    if (!_missingSince.ContainsKey(p)) _missingSince[p] = now;
+                    else if (now - _missingSince[p] > 1f) _outcome.MarkCaught(p);
+                    continue;
+                }
+                _missingSince.Remove(p);
+                if (ExitZones.Contains(Exits, r.transform.position, ExitRadius) >= 0)
+                {
+                    _outcome.MarkEscaped(p);
+                    Remove(r);
+                    continue;
+                }
+                _targets.Add(new ChaseTarget { Id = p, Position = r.transform.position });
+            }
+
+            foreach (var c in _chasers)
+            {
+                var pawn = c.Brain.Pawn;
+                if (!pawn) continue;
+                bool hasWeapon = c.Weapon && c.Weapon.Holder == pawn;
+                if (c.Weapon && c.Weapon.Holder && c.Weapon.Holder != pawn) c.Weapon = null; // someone else got it
+                Vector3? weaponPos = !c.IsCat && c.Weapon && !hasWeapon ? c.Weapon.transform.position : (Vector3?)null;
+
+                var o = c.Mind.Update(dt, pawn.transform.position, hasWeapon, weaponPos, _targets);
+                if (o.State == ChaserState.FetchWeapon && Vector3.Distance(pawn.transform.position, o.Destination) < 1.1f) c.Weapon.PickUp(pawn);
+                pawn.GoTo(o.Destination);
+                pawn.LookAt(o.State == ChaserState.Chase ? o.Destination : (Vector3?)null);
+
+                if (!o.Swing || !_raccoonOf.TryGetValue(o.TargetId, out var target)) continue;
+                Vector3 to = target.transform.position - pawn.transform.position;
+                to.y = 0f;
+                if (to.magnitude > c.Mind.SwingRange + 0.3f) continue;
+                Vector3 dir = to.sqrMagnitude > 1e-4f ? to.normalized : pawn.transform.forward;
+
+                if (c.IsCat) { Push(target, dir * CatPushImpulse, 0.4f); continue; }
+                if (c.Weapon) c.Weapon.PlaySwing();
+                var result = _hits.TryHit(o.TargetId, now);
+                if (result == HitResult.Ignored) continue;
+                Push(target, dir * HitImpulse, 1f);
+                if (result == HitResult.Caught && _outcome.MarkCaught(o.TargetId)) Freeze(target);
+            }
+
+            _outcome.Tick(now);
+            if (_outcome.IsOver) SetPhase(RoundPhase.Results);
+            Publish();
+        }
+
+        void Publish()
+        {
+            var snap = new PanicSnapshot { SecondsLeft = _outcome.SecondsLeft(Time.time) };
+            var roster = SimulationAuthority.IsOnline && SessionHost.Instance ? SessionHost.Instance.Roster : null;
+            foreach (int p in _players) snap.Set(p, roster?.ClientOf(p), _outcome.StatusOf(p), _hits.Hits(p));
+            _offlineSnapshot = snap;
+            if (IsSpawned && IsServer && !snap.Equals(_snapshot.Value)) _snapshot.Value = snap;
+        }
+
+        static void Push(RaccoonController r, Vector3 impulse, float stun)
+        {
+            var net = r.GetComponent<NetworkedRaccoon>();
+            if (SimulationAuthority.IsOnline && net && net.IsSpawned) net.HitRpc(impulse, stun);
+            else r.ApplyHit(impulse, stun);
+        }
+
+        static void Freeze(RaccoonController r)
+        {
+            var net = r.GetComponent<NetworkedRaccoon>();
+            if (SimulationAuthority.IsOnline && net && net.IsSpawned) net.FreezeRpc();
+            else r.Frozen = true;
+        }
+
+        void Remove(RaccoonController r)
+        {
+            var net = r.GetComponent<NetworkObject>();
+            if (SimulationAuthority.IsOnline && net && net.IsSpawned) { net.Despawn(destroy: true); return; }
+            if (TrenchcoatController.Instance && r.PlayerId == TrenchcoatController.Instance.LocalPlayerId) TrenchcoatController.Instance.ShowOverview(Overview);
+            Destroy(r.gameObject);
+        }
+
+        /// <summary>Results screen button: host (online) or the single player (offline) starts a fresh round.</summary>
+        public void PlayAgain()
+        {
+            if (SimulationAuthority.IsOnline)
+            {
+                if (SessionHost.Instance && SessionHost.Instance.IsHost) SessionHost.Instance.RestartRound();
+                return;
+            }
+            SceneManager.LoadScene(SceneManager.GetActiveScene().name);
+        }
+    }
+}

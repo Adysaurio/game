@@ -23,6 +23,13 @@ namespace TrashPandas.Runtime.Raccoon
         public float StandHeight = 0.6f;
         public float CrouchHeight = 0.3f;
 
+        /// <summary>Which player this raccoon belongs to (set where the simulation runs).</summary>
+        public int PlayerId = -1;
+        /// <summary>Caught in the panic: no more control.</summary>
+        public bool Frozen;
+        public bool IsStunned => Time.time < _stunnedUntil;
+        float _stunnedUntil;
+
         readonly JumpAssist _jump = new JumpAssist();
         CharacterController _cc;
         Vector2 _move;
@@ -32,8 +39,17 @@ namespace TrashPandas.Runtime.Raccoon
         float _verticalVelocity;
 
         /// <param name="worldMove">World XZ direction (camera-relative), magnitude 0..1.</param>
+        /// <summary>Knocked by a broom (or the cat): flung along <paramref name="impulse"/> and dizzy for a moment.</summary>
+        public void ApplyHit(Vector3 impulse, float stunSeconds)
+        {
+            _planar = new Vector3(impulse.x, 0f, impulse.z);
+            _verticalVelocity = Mathf.Max(_verticalVelocity, 3f);
+            _stunnedUntil = Mathf.Max(_stunnedUntil, Time.time + stunSeconds);
+        }
+
         public void SetInput(Vector2 worldMove, bool jumpPressed, bool jumpHeld, bool crouchHeld)
         {
+            if (Frozen || IsStunned) { _move = Vector2.zero; _jumpHeld = false; return; }
             _move = worldMove;
             if (jumpPressed) _jump.Press(Time.time);
             _jumpHeld = jumpHeld;
@@ -52,10 +68,12 @@ namespace TrashPandas.Runtime.Raccoon
             bool grounded = _cc.isGrounded;
             _jump.SetGrounded(grounded, Time.time);
 
+            if (Frozen) { _move = Vector2.zero; }
             Vector3 wish = new Vector3(_move.x, 0f, _move.y) * (_crouchHeld ? RunSpeed * 0.5f : RunSpeed);
-            float rate = wish.sqrMagnitude > _planar.sqrMagnitude ? Acceleration : Deceleration;
+            float rate = IsStunned ? Deceleration * 0.25f : wish.sqrMagnitude > _planar.sqrMagnitude ? Acceleration : Deceleration;
             _planar = Vector3.MoveTowards(_planar, wish, rate * (grounded ? 1f : AirControl) * dt);
-            if (wish.sqrMagnitude > 0.01f)
+            if (IsStunned) transform.Rotate(0f, 720f * dt, 0f); // dizzy spin
+            else if (wish.sqrMagnitude > 0.01f)
                 transform.rotation = Quaternion.RotateTowards(transform.rotation, Quaternion.LookRotation(wish), TurnSpeed * dt);
 
             bool climbing = wish.sqrMagnitude > 0.01f && IsFacingClimbable();

@@ -17,6 +17,8 @@ namespace TrashPandas.Runtime.Npc
         public Transform Head;
         public bool Seated;
         public float EyeHeight = 1.6f;
+        /// <summary>Where a held weapon sits.</summary>
+        public Transform Hand;
 
         readonly NetworkVariable<byte> _mood = new NetworkVariable<byte>();
         byte _offlineMood;
@@ -46,6 +48,19 @@ namespace TrashPandas.Runtime.Npc
                 _agent.Warp(hit.position);
                 _agent.enabled = true;
             }
+        }
+
+        /// <summary>Panic: seated guests jump to their feet and everyone runs faster.</summary>
+        public void Panic(float speed)
+        {
+            if (Seated)
+            {
+                Seated = false;
+                transform.position += Vector3.up * 0.2f;
+                foreach (var col in GetComponents<CapsuleCollider>()) { col.height = 1.75f; col.center = new Vector3(0f, 0.875f, 0f); }
+            }
+            EnableNavigation();
+            if (_agent) { _agent.speed = speed; _agent.acceleration = 20f; }
         }
 
         public void GoTo(Vector3 destination)

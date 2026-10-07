@@ -80,6 +80,15 @@ namespace TrashPandas.Runtime.Net
             NetworkManager.Singleton.SceneManager.LoadScene(GameScene, LoadSceneMode.Single);
         }
 
+        /// <summary>Host: everyone still connected plays a fresh round of the game scene.</summary>
+        public void RestartRound()
+        {
+            if (!IsHost) return;
+            Roster.EndRound();
+            Roster.StartRound();
+            NetworkManager.Singleton.SceneManager.LoadScene(GameScene, LoadSceneMode.Single);
+        }
+
         /// <summary>Leave on purpose (menu button, F10, or a connection error shown by the menu).</summary>
         public Task LeaveAsync(string message = null)
         {

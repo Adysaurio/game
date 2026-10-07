@@ -62,6 +62,21 @@ namespace TrashPandas.Runtime.Trenchcoat
         public Vector3 ShoulderWorld(bool left) => transform.TransformPoint(left ? LeftShoulder : RightShoulder);
         public Vector3 ChestWorld => transform.TransformPoint(new Vector3(0f, 1.3f, 0f));
 
+        public bool Exploded { get; private set; }
+
+        /// <summary>RUN!: the coat bursts open — hide it and stop simulating it.</summary>
+        public void Explode()
+        {
+            if (Exploded) return;
+            Exploded = true;
+            VisualOnly = true;
+            var grabber = GetComponent<TrashPandas.Runtime.Grabbing.HandGrabber>();
+            if (grabber) grabber.ReleaseAll();
+            if (_rb) { _rb.linearVelocity = Vector3.zero; _rb.isKinematic = true; }
+            foreach (var c in GetComponentsInChildren<Collider>()) c.enabled = false;
+            foreach (var r in GetComponentsInChildren<Renderer>()) r.enabled = false;
+        }
+
         /// <summary>What the body is doing right now (what onlookers see).</summary>
         public BodyIntent CurrentIntent => _intent;
 
