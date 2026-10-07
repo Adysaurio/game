@@ -87,7 +87,7 @@ namespace TrashPandas.EditorTools
             var hedgeClimb = Box("Hedge_Climbable", new Vector3(8f, 1f, -8f), new Vector3(1f, 2f, 1f), hedge);
             hedgeClimb.AddComponent<Climbable>();
 
-            var body = BuildTrenchcoat(coat, skin, pants);
+            var body = BuildTrenchcoat(coat, skin, pants, raccoonPrefab);
 
             var camGo = new GameObject("Main Camera");
             camGo.tag = "MainCamera";
@@ -164,7 +164,7 @@ namespace TrashPandas.EditorTools
             return rig;
         }
 
-        static TrenchcoatBody BuildTrenchcoat(Material coat, Material skin, Material pants)
+        static TrenchcoatBody BuildTrenchcoat(Material coat, Material skin, Material pants, RaccoonController raccoonPrefab)
         {
             var root = new GameObject("Trenchcoat");
             root.transform.position = new Vector3(0f, 0.05f, 0f);
@@ -197,7 +197,7 @@ namespace TrashPandas.EditorTools
             netTransform.SyncScaleX = netTransform.SyncScaleY = netTransform.SyncScaleZ = false;
             netTransform.Interpolate = true;
             root.AddComponent<NetworkRigidbody>();
-            root.AddComponent<NetworkedTrenchcoat>();
+            root.AddComponent<NetworkedTrenchcoat>().RaccoonPrefab = raccoonPrefab.GetComponent<NetworkObject>();
             body.Torso = torso;
             body.Head = head;
             body.LeftHand = left;
@@ -229,9 +229,20 @@ namespace TrashPandas.EditorTools
             Visual(PrimitiveType.Capsule, "Body", root.transform, new Vector3(0f, 0.3f, 0f), new Vector3(0.4f, 0.3f, 0.4f), fur);
             Visual(PrimitiveType.Sphere, "Snout", root.transform, new Vector3(0f, 0.4f, 0.22f), Vector3.one * 0.12f, fur);
             root.AddComponent<RaccoonController>();
+            root.AddComponent<NetworkObject>();
+            var nt = root.AddComponent<NetworkTransform>();
+            nt.AuthorityMode = NetworkTransform.AuthorityModes.Owner; // the owner moves it, instantly
+            nt.SyncScaleX = nt.SyncScaleY = nt.SyncScaleZ = false;
+            root.AddComponent<NetworkedRaccoon>();
 
             var prefab = PrefabUtility.SaveAsPrefabAsset(root, PrefabPath);
             Object.DestroyImmediate(root);
+            // Prefab NetworkObjects take their id from the saved asset: validate and save again.
+            var validate = typeof(NetworkObject).GetMethod("OnValidate",
+                System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Public);
+            validate?.Invoke(prefab.GetComponent<NetworkObject>(), null);
+            EditorUtility.SetDirty(prefab);
+            PrefabUtility.SavePrefabAsset(prefab);
             return prefab.GetComponent<RaccoonController>();
         }
 

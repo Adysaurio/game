@@ -15,11 +15,13 @@ namespace TrashPandas.Runtime.Net
         public PlayerCameraRig CameraRig;
         public float SendRate = 30f;
         public float CoatCameraRadius = 5.5f, CoatLookHeight = 1.4f, ArmsCameraRadius = 3.2f, ArmsLookHeight = 1.7f;
+        public float RaccoonCameraRadius = 3f, RaccoonLookHeight = 0.4f;
 
         readonly DebugInputReader _reader = new DebugInputReader();
         uint _sequence;
         float _nextSend;
         bool? _armsCamera;
+        NetworkedRaccoon _cameraOnRaccoon;
         NetworkedTrenchcoat _coat;
 
         static bool Online => NetworkManager.Singleton && NetworkManager.Singleton.IsListening;
@@ -36,6 +38,25 @@ namespace TrashPandas.Runtime.Net
             float now = nm.ServerTime.TimeAsFloat;
             var snapshot = _coat.Slots;
             int? slot = snapshot.SlotOfClient(nm.LocalClientId);
+
+            var raccoon = NetworkedRaccoon.LocalOwned;
+            if (_reader.TogglePressed)
+            {
+                if (slot.HasValue) _coat.RequestLeaveRpc();
+                else if (raccoon) _coat.RequestReturnRpc();
+            }
+
+            if (raccoon && !slot.HasValue)
+            {
+                if (_cameraOnRaccoon != raccoon)
+                {
+                    _cameraOnRaccoon = raccoon;
+                    CameraRig.SetTarget(raccoon.transform, RaccoonCameraRadius, RaccoonLookHeight);
+                }
+                raccoon.Controller.SetInput(_reader.CameraRelativeMove(CameraRig), _reader.JumpPressed, _reader.JumpHeld, _reader.CrouchHeld);
+                return;
+            }
+            if (_cameraOnRaccoon) { _cameraOnRaccoon = null; _armsCamera = null; }
 
             if (slot.HasValue)
             {
@@ -72,7 +93,9 @@ namespace TrashPandas.Runtime.Net
                 seats += $"[{snapshot.PartsOf(i)}] {who}   ";
             }
             int? mine = snapshot.SlotOfClient(nm.LocalClientId);
-            string hint = mine.HasValue ? DebugInputReader.HintFor(snapshot.PartsOf(mine.Value)) : "Waiting for a seat…";
+            string hint = mine.HasValue ? DebugInputReader.HintFor(snapshot.PartsOf(mine.Value)) + "   E: hop out"
+                        : NetworkedRaccoon.LocalOwned ? "RACCOON  Mouse camera · WASD run · Space jump · Ctrl crouch · E next to the coat: hop back in"
+                        : "Waiting for a seat…";
             string room = SessionHost.Instance && !string.IsNullOrEmpty(SessionHost.Instance.RoomCode) ? $"Room {SessionHost.Instance.RoomCode} · " : "";
             var lines = new[] { $"{room}ONLINE · {(nm.IsHost ? "host" : "client")}   {seats}", hint };
             float h = lines.Length * 18f + 8f;
