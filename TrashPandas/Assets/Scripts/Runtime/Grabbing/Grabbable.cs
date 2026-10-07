@@ -20,10 +20,18 @@ namespace TrashPandas.Runtime.Grabbing
         void Awake()
         {
             Body = GetComponent<Rigidbody>();
+            // If a released item ends up overlapping something, ease it apart instead of exploding.
+            Body.maxDepenetrationVelocity = 2f;
             Colliders = GetComponentsInChildren<Collider>();
         }
 
-        void OnEnable() => s_All.Add(this);
+        void OnEnable()
+        {
+            // With domain reload disabled, statics survive play sessions: drop destroyed leftovers.
+            s_All.RemoveAll(g => !g);
+            if (!s_All.Contains(this)) s_All.Add(this);
+        }
+
         void OnDisable() => s_All.Remove(this);
     }
 }

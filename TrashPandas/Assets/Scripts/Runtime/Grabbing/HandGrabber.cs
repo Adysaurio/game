@@ -24,6 +24,8 @@ namespace TrashPandas.Runtime.Grabbing
         Vector3 _lastLeft, _lastRight;
         Vector3 _leftVelocity, _rightVelocity;
         readonly Collider[] _hits = new Collider[16];
+        readonly System.Collections.Generic.Dictionary<Grabbable, Transform> _holders = new System.Collections.Generic.Dictionary<Grabbable, Transform>();
+        readonly System.Collections.Generic.Dictionary<Grabbable, Quaternion> _grabRotationOffset = new System.Collections.Generic.Dictionary<Grabbable, Quaternion>();
 
         public Grabbable HeldLeft => _left;
         public Grabbable HeldRight => _right;
@@ -60,6 +62,13 @@ namespace TrashPandas.Runtime.Grabbing
                 TryGrab(ref _both, _twoHandAnchor, TwoHandGrabRadius, bigOnly: true);
             if (!_both && leftReach && !_left) TryGrab(ref _left, _body.LeftHand, GrabRadius, bigOnly: false);
             if (!_both && rightReach && !_right) TryGrab(ref _right, _body.RightHand, GrabRadius, bigOnly: false);
+
+            // Carried items follow their holder (hand or two-hand anchor), keeping their own scale.
+            foreach (var pair in _holders)
+            {
+                if (!pair.Key || !pair.Value) continue;
+                pair.Key.transform.SetPositionAndRotation(pair.Value.position, transform.rotation * _grabRotationOffset[pair.Key]);
+            }
         }
 
         void TryGrab(ref Grabbable slot, Transform holder, float radius, bool bigOnly)
@@ -75,20 +84,23 @@ namespace TrashPandas.Runtime.Grabbing
             }
         }
 
-        static void Attach(Grabbable g, Transform holder)
+        void Attach(Grabbable g, Transform holder)
         {
             g.IsHeld = true;
             g.Body.isKinematic = true;
             foreach (var c in g.Colliders) c.enabled = false;
-            g.transform.SetParent(holder, true);
-            g.transform.localPosition = Vector3.zero;
+            // Never parent to the hand: re-parenting rescales the item through the hierarchy. We follow instead.
+            _holders[g] = holder;
+            _grabRotationOffset[g] = Quaternion.Inverse(transform.rotation) * g.transform.rotation;
         }
 
         void Release(ref Grabbable slot, Vector3 handVelocity)
         {
             var g = slot;
             slot = null;
-            g.transform.SetParent(null, true);
+            _holders.Remove(g);
+            _grabRotationOffset.Remove(g);
+            if (!g) return;
             g.Body.isKinematic = false;
             foreach (var c in g.Colliders) c.enabled = true;
             g.Body.linearVelocity = Vector3.ClampMagnitude(handVelocity * ThrowMultiplier, MaxThrowSpeed);

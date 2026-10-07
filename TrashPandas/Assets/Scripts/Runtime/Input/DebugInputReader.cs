@@ -88,7 +88,7 @@ namespace TrashPandas.Runtime.Input
             _candidates.Clear();
             var all = Grabbable.All;
             for (int i = 0; i < all.Count; i++)
-                if (!all[i].IsHeld) _candidates.Add(new GrabCandidate { Id = i, Position = all[i].transform.position });
+                if (all[i] && !all[i].IsHeld) _candidates.Add(new GrabCandidate { Id = i, Position = all[i].transform.position });
 
             int? pick = GrabTargeting.Pick(cam.position, cam.forward, _candidates, body.ChestWorld, AssistReach, AssistConeDegrees);
             AssistTarget = pick.HasValue ? all[pick.Value] : null;
