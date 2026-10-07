@@ -43,6 +43,9 @@ namespace TrashPandas.Runtime.Trenchcoat
 
         void Awake()
         {
+            // This is the single-person debug mode; online play is driven by OnlinePlayerController.
+            var nm = Unity.Netcode.NetworkManager.Singleton;
+            if (nm && nm.IsListening) { enabled = false; return; }
             Time.fixedDeltaTime = 1f / 60f; // physics at 60 Hz: smoother follow on common displays
             _slots = new SlotSystem(Mathf.Clamp(PlayerCount, SlotLayout.MinPlayers, SlotLayout.MaxPlayers));
             _possession = new DebugPossessionModel(_slots);

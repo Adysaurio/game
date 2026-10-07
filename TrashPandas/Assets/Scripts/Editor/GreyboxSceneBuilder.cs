@@ -1,6 +1,9 @@
 using System.IO;
 using TrashPandas.Runtime.Cameras;
 using TrashPandas.Runtime.Grabbing;
+using TrashPandas.Runtime.Net;
+using Unity.Netcode;
+using Unity.Netcode.Components;
 using TrashPandas.Runtime.Raccoon;
 using TrashPandas.Runtime.Trenchcoat;
 using Unity.Cinemachine;
@@ -101,10 +104,31 @@ namespace TrashPandas.EditorTools
             controller.RaccoonPrefab = raccoonPrefab;
             controller.CameraRig = rig;
 
+            var online = new GameObject("OnlinePlayerController").AddComponent<OnlinePlayerController>();
+            online.CameraRig = rig;
+
             EditorSceneManager.SaveScene(scene, ScenePath);
+            AssignNetworkIds(scene);
             EditorBuildSettings.scenes = new[] { new EditorBuildSettingsScene(ScenePath, true) };
             AssetDatabase.SaveAssets();
             Debug.Log($"[GreyboxSceneBuilder] Built {ScenePath}");
+        }
+
+        /// <summary>
+        /// In-scene NetworkObjects get their GlobalObjectIdHash from the saved scene's object ids, which only
+        /// exist after the first save: validate them now and save again.
+        /// </summary>
+        static void AssignNetworkIds(UnityEngine.SceneManagement.Scene scene)
+        {
+            var validate = typeof(NetworkObject).GetMethod("OnValidate",
+                System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Public);
+            foreach (var no in Object.FindObjectsByType<NetworkObject>(FindObjectsInactive.Include, FindObjectsSortMode.None))
+            {
+                validate?.Invoke(no, null);
+                EditorUtility.SetDirty(no);
+            }
+            EditorSceneManager.MarkSceneDirty(scene);
+            EditorSceneManager.SaveScene(scene, ScenePath);
         }
 
         static PlayerCameraRig BuildPlayerCamera(Camera output, Transform target)
@@ -144,6 +168,7 @@ namespace TrashPandas.EditorTools
         {
             var root = new GameObject("Trenchcoat");
             root.transform.position = new Vector3(0f, 0.05f, 0f);
+            root.AddComponent<NetworkObject>();
             var rb = root.AddComponent<Rigidbody>();
             rb.mass = 60f;
             var col = root.AddComponent<CapsuleCollider>();
@@ -166,6 +191,13 @@ namespace TrashPandas.EditorTools
 
             var body = root.AddComponent<TrenchcoatBody>();
             root.AddComponent<HandGrabber>();
+
+            // Online: the host simulates; clients get position/rotation interpolated plus a visual state.
+            var netTransform = root.AddComponent<NetworkTransform>();
+            netTransform.SyncScaleX = netTransform.SyncScaleY = netTransform.SyncScaleZ = false;
+            netTransform.Interpolate = true;
+            root.AddComponent<NetworkRigidbody>();
+            root.AddComponent<NetworkedTrenchcoat>();
             body.Torso = torso;
             body.Head = head;
             body.LeftHand = left;

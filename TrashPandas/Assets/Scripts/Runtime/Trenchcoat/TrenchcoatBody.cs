@@ -51,6 +51,10 @@ namespace TrashPandas.Runtime.Trenchcoat
         BodyIntent _intent;
         bool _jumpWasRequested;
         float _wobblePhase;
+        Vector3 _lastPosition;
+
+        /// <summary>Online clients only animate: the host simulates, NetworkTransform moves us.</summary>
+        public bool VisualOnly { get; set; }
 
         public bool LeftReachActive => _intent.LeftReach && !_intent.LeftArmLimp;
         public bool RightReachActive => _intent.RightReach && !_intent.RightArmLimp;
@@ -60,7 +64,7 @@ namespace TrashPandas.Runtime.Trenchcoat
 
         public void SetIntent(BodyIntent intent)
         {
-            if (intent.Jump && !_jumpWasRequested) _jump.Press(Time.time);
+            if (intent.Jump && !_jumpWasRequested && !VisualOnly) _jump.Press(Time.time);
             _jumpWasRequested = intent.Jump;
             _intent = intent;
         }
@@ -74,6 +78,7 @@ namespace TrashPandas.Runtime.Trenchcoat
 
         void FixedUpdate()
         {
+            if (VisualOnly || _rb.isKinematic) return;
             float dt = Time.fixedDeltaTime;
             _jump.SetGrounded(IsGrounded(), Time.time);
 
@@ -102,7 +107,9 @@ namespace TrashPandas.Runtime.Trenchcoat
         void Update()
         {
             float dt = Time.deltaTime;
-            Vector3 v = _rb ? _rb.linearVelocity : Vector3.zero;
+            // Online clients have a kinematic body moved by NetworkTransform: derive speed from movement.
+            Vector3 v = _rb && !_rb.isKinematic ? _rb.linearVelocity : (transform.position - _lastPosition) / Mathf.Max(dt, 1e-4f);
+            _lastPosition = transform.position;
             float motion = Mathf.Clamp01(new Vector2(v.x, v.z).magnitude / Mathf.Max(0.01f, MoveSpeed));
             _wobblePhase += dt * (2f + motion * 8f);
 
