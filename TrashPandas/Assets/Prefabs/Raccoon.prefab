@@ -178,6 +178,8 @@ MonoBehaviour:
   ClimbSpeed: 2.5
   StandHeight: 0.6
   CrouchHeight: 0.3
+  PlayerId: -1
+  Frozen: 0
 --- !u!114 &3046514747817809011
 MonoBehaviour:
   m_ObjectHideFlags: 0

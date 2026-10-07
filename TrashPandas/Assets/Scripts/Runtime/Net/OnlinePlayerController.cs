@@ -47,7 +47,7 @@ namespace TrashPandas.Runtime.Net
             int? slot = snapshot.SlotOfClient(nm.LocalClientId);
 
             var raccoon = NetworkedRaccoon.LocalOwned;
-            if (DevAutomation.Bot == "hop" && slot.HasValue && Time.realtimeSinceStartup > _botHopAt) { _botHopAt = float.MaxValue; _coat.RequestLeaveRpc(); }
+            if ((DevAutomation.Bot == "hop" || DevAutomation.Bot == "hopflee") && slot.HasValue && Time.realtimeSinceStartup > _botHopAt) { _botHopAt = float.MaxValue; _coat.RequestLeaveRpc(); }
             if (_reader.TogglePressed)
             {
                 if (slot.HasValue) _coat.RequestLeaveRpc();
@@ -61,7 +61,9 @@ namespace TrashPandas.Runtime.Net
                     _cameraOnRaccoon = raccoon;
                     CameraRig.SetTarget(raccoon.transform, RaccoonCameraRadius, RaccoonLookHeight);
                 }
-                raccoon.Controller.SetInput(_reader.CameraRelativeMove(CameraRig), _reader.JumpPressed, _reader.JumpHeld, _reader.CrouchHeld);
+                var move = DevAutomation.FleeMove(raccoon.transform.position)
+                    ?? (DevAutomation.Bot == "hopflee" ? new Vector2(0f, 1f) : _reader.CameraRelativeMove(CameraRig)); // dev bots
+                raccoon.Controller.SetInput(move, _reader.JumpPressed, _reader.JumpHeld, _reader.CrouchHeld);
                 return;
             }
             if (_cameraOnRaccoon) { _cameraOnRaccoon = null; _armsCamera = null; }

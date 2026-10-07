@@ -3,6 +3,7 @@ using TrashPandas.Runtime.Cameras;
 using TrashPandas.Runtime.Grabbing;
 using TrashPandas.Runtime.Net;
 using TrashPandas.Runtime.Npc;
+using TrashPandas.Runtime.Panic;
 using Unity.AI.Navigation;
 using UnityEngine.AI;
 using Unity.Netcode;
@@ -225,6 +226,80 @@ namespace TrashPandas.EditorTools
             d.Coat = coat;
             d.Navigation = nav;
             new GameObject("SuspicionHud").AddComponent<SuspicionHud>();
+            BuildPanic();
+        }
+
+        /// <summary>Stage 4: weapons to grab, the four exits, an overview point for spectators, the panic director + HUD.</summary>
+        static void BuildPanic()
+        {
+            var wood = Mat("BroomWood", new Color(0.65f, 0.48f, 0.3f));
+            var straw = Mat("BroomStraw", new Color(0.9f, 0.78f, 0.4f));
+            var metal = Mat("Pan", new Color(0.25f, 0.25f, 0.28f));
+            var chairMat = Mat("Chair", new Color(0.8f, 0.72f, 0.6f));
+            var silver = Mat("Tray", new Color(0.82f, 0.84f, 0.88f));
+
+            for (int i = 0; i < 3; i++)
+            {
+                var broom = Weapon($"Broom_{i}", WeaponKind.Broom, new Vector3(-11f + i * 0.6f, 0.6f, 10f));
+                Visual(PrimitiveType.Cylinder, "Stick", broom.transform, new Vector3(0f, 0.6f, 0f), new Vector3(0.05f, 0.6f, 0.05f), wood);
+                Visual(PrimitiveType.Cube, "Bristles", broom.transform, new Vector3(0f, 1.25f, 0f), new Vector3(0.3f, 0.2f, 0.08f), straw);
+            }
+            for (int i = 0; i < 2; i++)
+            {
+                var pan = Weapon($"Pan_{i}", WeaponKind.Pan, new Vector3(-14f + i * 1f, 0.1f, 10.2f));
+                Visual(PrimitiveType.Cylinder, "Pan", pan.transform, new Vector3(0f, 0.55f, 0f), new Vector3(0.35f, 0.02f, 0.35f), metal);
+                Visual(PrimitiveType.Cylinder, "Handle", pan.transform, new Vector3(0f, 0.25f, 0f), new Vector3(0.04f, 0.25f, 0.04f), metal);
+            }
+            for (int i = 0; i < 6; i++)
+            {
+                var t = new Vector3(-6f + (i % 3) * 6f, 0f, 4f + (i / 3) * 5f);
+                var chair = Weapon($"Chair_{i}", WeaponKind.Chair, t + new Vector3(1.4f, 0f, -0.9f));
+                Visual(PrimitiveType.Cube, "Seat", chair.transform, new Vector3(0f, 0.45f, 0f), new Vector3(0.45f, 0.06f, 0.45f), chairMat);
+                Visual(PrimitiveType.Cube, "Back", chair.transform, new Vector3(0f, 0.75f, -0.2f), new Vector3(0.45f, 0.6f, 0.05f), chairMat);
+            }
+            var tray = Weapon("Tray", WeaponKind.Tray, new Vector3(-12.5f, 0.05f, 8.8f));
+            Visual(PrimitiveType.Cylinder, "Tray", tray.transform, new Vector3(0f, 0.4f, 0f), new Vector3(0.45f, 0.015f, 0.45f), silver);
+
+            // Exits: hedge gap (crouch through), sewer grate, the catering van, the fountain.
+            var gold = Mat("Exit", new Color(1f, 0.82f, 0.2f));
+            var grate = Mat("Grate", new Color(0.2f, 0.2f, 0.22f));
+            var van = Mat("Van", new Color(0.92f, 0.92f, 0.95f));
+            var water = Mat("Water", new Color(0.45f, 0.7f, 0.95f));
+            Box("CateringVan", new Vector3(-17.5f, 1.1f, 14f), new Vector3(2.4f, 2.2f, 4.6f), van);
+            var fountain = Visual(PrimitiveType.Cylinder, "Fountain", null, new Vector3(16f, 0.35f, 8f), new Vector3(3f, 0.35f, 3f), water);
+            fountain.gameObject.AddComponent<BoxCollider>();
+            Visual(PrimitiveType.Cylinder, "SewerGrate", null, new Vector3(-15f, 0.01f, -5f), new Vector3(1.2f, 0.01f, 1.2f), grate);
+            var exits = new[] { new Vector3(0f, 0f, -9.6f), new Vector3(-15f, 0f, -5f), new Vector3(-15.6f, 0f, 14f), new Vector3(14f, 0f, 8f) };
+            var names = new[] { "Hedge gap (crouch!)", "Sewer", "Catering van", "Fountain" };
+            for (int i = 0; i < exits.Length; i++)
+                Visual(PrimitiveType.Cylinder, $"ExitRing_{i}", null, exits[i] + Vector3.up * 0.02f, new Vector3(2.4f, 0.005f, 2.4f), gold);
+
+            var overview = new GameObject("Overview").transform;
+            overview.position = new Vector3(0f, 0f, 3f);
+
+            var go = new GameObject("PanicDirector");
+            go.AddComponent<NetworkObject>();
+            var pd = go.AddComponent<PanicDirector>();
+            pd.Exits = exits;
+            pd.ExitNames = names;
+            pd.Overview = overview;
+            new GameObject("PanicHud").AddComponent<PanicHud>();
+        }
+
+        static PanicWeapon Weapon(string name, WeaponKind kind, Vector3 position)
+        {
+            var go = new GameObject(name);
+            go.transform.position = position;
+            var col = go.AddComponent<BoxCollider>();
+            col.center = new Vector3(0f, 0.5f, 0f);
+            col.size = new Vector3(0.4f, 1f, 0.4f);
+            go.AddComponent<NetworkObject>();
+            var nt = go.AddComponent<NetworkTransform>();
+            nt.SyncScaleX = nt.SyncScaleY = nt.SyncScaleZ = false;
+            IgnoreForNavigation(go);
+            var weapon = go.AddComponent<PanicWeapon>();
+            weapon.Kind = kind;
+            return weapon;
         }
 
         static NpcPawn Person(string name, NpcKind kind, Vector3 position, float yaw, Color outfit, Material skin, bool seated)
@@ -268,6 +343,10 @@ namespace TrashPandas.EditorTools
             pawn.Head = head;
             pawn.Seated = seated;
             pawn.EyeHeight = head.localPosition.y;
+            var hand = new GameObject("Hand").transform;
+            hand.SetParent(root.transform, false);
+            hand.localPosition = cat ? new Vector3(0f, 0.25f, 0.3f) : new Vector3(0.32f, height * 0.6f, 0.2f);
+            pawn.Hand = hand;
             return pawn;
         }
 

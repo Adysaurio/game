@@ -68,7 +68,7 @@ namespace TrashPandas.Runtime.Npc
             }
             GUI.color = Color.white;
 
-            if (d.Caught && _caughtAt >= 0f && Time.time - _caughtAt < 4f)
+            if (d.Caught && _caughtAt >= 0f && Time.time - _caughtAt < 4f && !TrashPandas.Runtime.Panic.PanicDirector.Instance)
             {
                 GUI.color = new Color(1f, 0.3f, 0.25f);
                 GUI.Label(new Rect(0, UiScale.Height * 0.3f, UiScale.Width, 120), "¡¡RUUUN!!", _banner);

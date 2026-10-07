@@ -18,6 +18,16 @@ namespace TrashPandas.Runtime.Net
     public sealed class DevAutomation : MonoBehaviour
     {
         public static string Bot { get; private set; }
+
+        /// <summary>Dev bots: once the panic starts, run for the sewer exit (index 1, an open path).</summary>
+        public static Vector2? FleeMove(Vector3 from)
+        {
+            if (Bot != "hopflee" && Bot != "flee") return null;
+            var pd = TrashPandas.Runtime.Panic.PanicDirector.Instance;
+            if (!pd || pd.Phase != TrashPandas.Runtime.Panic.RoundPhase.Panic || pd.Exits.Length < 2) return null;
+            Vector3 to = pd.Exits[1] - from;
+            return new Vector2(to.x, to.z).normalized;
+        }
         static string[] Args => Environment.GetCommandLineArgs();
 
         int _autoStart;
@@ -98,7 +108,18 @@ namespace TrashPandas.Runtime.Net
                 if (s == TrashPandas.Core.Npc.GuestState.Alarmed) alarmed++;
             }
             var f = d.LastFrame;
-            return $" suspicion={d.Suspicion:F1} caught={d.Caught} curious={curious} alarmed={alarmed} cat={cat} frame[missing={f.MissingParts} seen={f.CoatWitnessed} weird={f.SeenWeirdness:F2} hiss={f.CatHissing}] dt={Time.deltaTime:F3}";
+            var pd = TrashPandas.Runtime.Panic.PanicDirector.Instance;
+            string panic = "";
+            if (pd)
+            {
+                var snap = pd.Snapshot;
+                panic = $" phase={pd.Phase} me={pd.LocalPlayer}";
+                for (int p = 0; p < snap.Count; p++) panic += $" P{p}={snap.OutcomeOf(p)}/{snap.HitsOf(p)}hits";
+                int armed = 0;
+                foreach (var w in UnityEngine.Object.FindObjectsByType<TrashPandas.Runtime.Panic.PanicWeapon>(FindObjectsSortMode.None)) if (w.Holder) armed++;
+                panic += $" armed={armed} left={snap.SecondsLeft:F0}s";
+            }
+            return panic + $" suspicion={d.Suspicion:F1} caught={d.Caught} curious={curious} alarmed={alarmed} cat={cat} frame[missing={f.MissingParts} seen={f.CoatWitnessed} weird={f.SeenWeirdness:F2} hiss={f.CatHissing}] dt={Time.deltaTime:F3}";
         }
 
         static void LogTelemetry()
