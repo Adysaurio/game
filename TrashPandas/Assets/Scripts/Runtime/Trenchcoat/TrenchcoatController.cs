@@ -145,7 +145,7 @@ namespace TrashPandas.Runtime.Trenchcoat
                     lines.Add("RACCOON  Mouse camera · WASD run · Space jump (hold=higher) · Ctrl crouch · walk into red curtain to climb · E near coat");
                 else
                     lines.Add(DebugInputReader.HintFor(_slots.PartsOf(_slots.SlotOf(_possession.ActivePlayerId).Value)));
-                lines.Add("Tab/1-5 switch · E out/in · R record ghost · Backspace clear ghosts · Esc free mouse · F1 hide help");
+                lines.Add($"Tab/1-5 switch · E out/in · R record ghost · Backspace clear ghosts · [ ] camera speed ({CameraRig.Sensitivity:F2}) · ←→ orbit · Esc free mouse · F1 hide help");
             }
             if (_status.Length > 0) lines.Add(_status);
 

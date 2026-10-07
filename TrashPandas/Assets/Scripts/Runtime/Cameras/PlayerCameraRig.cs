@@ -16,12 +16,16 @@ namespace TrashPandas.Runtime.Cameras
         public CinemachineRotationComposer Composer;
         public Camera OutputCamera;
 
-        [Tooltip("Degrees of orbit per pixel of mouse movement.")]
-        public float Sensitivity = 0.12f;
+        [Tooltip("Degrees of orbit per pixel of mouse movement. [ and ] adjust it in play; saved between sessions.")]
+        public float Sensitivity = LookSensitivity.Default;
+        [Tooltip("Degrees per second when orbiting with the arrow keys.")]
+        public float KeyOrbitSpeed = 140f;
         public bool InvertY;
         public Vector2 PitchRange = new Vector2(-20f, 70f);
 
+        const string SensitivityPrefKey = "TrashPandas.LookSensitivity";
         readonly MouseLookFilter _filter = new MouseLookFilter();
+        LookSensitivity _sensitivity;
         bool _locked;
 
         public bool CursorFreed { get; private set; }
@@ -47,10 +51,33 @@ namespace TrashPandas.Runtime.Cameras
             if (Composer) Composer.TargetOffset = new Vector3(0f, lookHeight, 0f);
         }
 
+        void Awake()
+        {
+            _sensitivity = new LookSensitivity(PlayerPrefs.GetFloat(SensitivityPrefKey, Sensitivity));
+            Sensitivity = _sensitivity.Value;
+        }
+
         void Update()
         {
             var keyboard = Keyboard.current;
             var mouse = Mouse.current;
+
+            if (keyboard != null && (keyboard.rightBracketKey.wasPressedThisFrame || keyboard.leftBracketKey.wasPressedThisFrame))
+            {
+                _sensitivity = new LookSensitivity(Sensitivity); // pick up inspector edits
+                if (keyboard.rightBracketKey.wasPressedThisFrame) _sensitivity.Increase();
+                else _sensitivity.Decrease();
+                Sensitivity = _sensitivity.Value;
+                PlayerPrefs.SetFloat(SensitivityPrefKey, Sensitivity);
+            }
+
+            if (keyboard != null)
+            {
+                float keyOrbit = (keyboard.rightArrowKey.isPressed ? 1f : 0f) - (keyboard.leftArrowKey.isPressed ? 1f : 0f);
+                float keyPitch = (keyboard.downArrowKey.isPressed ? 1f : 0f) - (keyboard.upArrowKey.isPressed ? 1f : 0f);
+                Orbit.HorizontalAxis.Value = Mathf.Repeat(Orbit.HorizontalAxis.Value + keyOrbit * KeyOrbitSpeed * Time.deltaTime + 180f, 360f) - 180f;
+                Orbit.VerticalAxis.Value = Mathf.Clamp(Orbit.VerticalAxis.Value + keyPitch * KeyOrbitSpeed * 0.5f * Time.deltaTime, PitchRange.x, PitchRange.y);
+            }
             if (keyboard != null && keyboard.escapeKey.wasPressedThisFrame) CursorFreed = true;
             else if (CursorFreed && mouse != null && mouse.leftButton.wasPressedThisFrame) CursorFreed = false;
 
