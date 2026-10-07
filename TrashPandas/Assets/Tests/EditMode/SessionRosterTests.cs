@@ -107,5 +107,18 @@ namespace TrashPandas.Tests
             CollectionAssert.AreEqual(new ulong[] { 1, 2 }, roster.Clients);
             Assert.IsTrue(roster.Join(4), "lobby is open again");
         }
+    
+        [Test]
+        public void CanStart_NeedsTwoConnectedPlayers()
+        {
+            var roster = new SessionRoster();
+            roster.Join(1);
+            Assert.IsFalse(roster.CanStart);
+            roster.Join(2);
+            Assert.IsTrue(roster.CanStart);
+            roster.StartRound();
+            roster.Leave(2);
+            Assert.IsFalse(roster.CanStart, "a restart needs two players still connected");
+        }
     }
 }

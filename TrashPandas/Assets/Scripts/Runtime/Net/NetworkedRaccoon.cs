@@ -22,6 +22,14 @@ namespace TrashPandas.Runtime.Net
             if (IsOwner) LocalOwned = this;
         }
 
+        /// <summary>Host → owner: you got hit (the owner moves this raccoon, so the owner applies it).</summary>
+        [Rpc(SendTo.Owner)]
+        public void HitRpc(UnityEngine.Vector3 impulse, float stunSeconds) => Controller.ApplyHit(impulse, stunSeconds);
+
+        /// <summary>Host → owner: caught, no more control.</summary>
+        [Rpc(SendTo.Owner)]
+        public void FreezeRpc() => Controller.Frozen = true;
+
         public override void OnNetworkDespawn()
         {
             if (LocalOwned == this) LocalOwned = null;

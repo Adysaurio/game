@@ -18,6 +18,30 @@ namespace TrashPandas.Runtime.Net
     public sealed class DevAutomation : MonoBehaviour
     {
         public static string Bot { get; private set; }
+
+        /// <summary>Dev bots: once the panic starts, run for an exit — "hopflee" the sewer (open path),
+        /// "hopgap" crouching through the hedge gap where humans can't follow.</summary>
+        public static Vector2? FleeMove(Vector3 from)
+        {
+            if (Bot != "hopflee" && Bot != "flee" && Bot != "hopgap") return null;
+            var pd = TrashPandas.Runtime.Panic.PanicDirector.Instance;
+            if (!pd || pd.Phase != TrashPandas.Runtime.Panic.RoundPhase.Panic || pd.Exits.Length < 2) return null;
+            Vector3 exit = Bot == "hopgap" ? pd.Exits[0] : pd.Exits[1];
+            if (Bot == "hopgap" && from.z > -7f) exit = new Vector3(0f, 0f, -7f); // line up with the gap first
+            Vector3 to = exit - from;
+            return new Vector2(to.x, to.z).normalized;
+        }
+
+        /// <summary>Crouch only at the hedge (crouching halves speed).</summary>
+        public static bool FleeCrouchAt(Vector3 pos) => Bot == "hopgap" && FleeActive && pos.z < -6.3f;
+        static bool FleeActive
+        {
+            get
+            {
+                var pd = TrashPandas.Runtime.Panic.PanicDirector.Instance;
+                return pd && pd.Phase == TrashPandas.Runtime.Panic.RoundPhase.Panic;
+            }
+        }
         static string[] Args => Environment.GetCommandLineArgs();
 
         int _autoStart;
@@ -25,6 +49,8 @@ namespace TrashPandas.Runtime.Net
         bool _telemetry;
         float _nextLog;
         bool _connected;
+        float _shotAt = -1f;
+        string _shotPath;
 
         static string Value(string flag)
         {
@@ -35,6 +61,7 @@ namespace TrashPandas.Runtime.Net
 
         static DevAutomation s_instance;
         static bool s_autoConnectDone;
+        static bool s_restarted;
 
         void Awake()
         {
@@ -45,6 +72,9 @@ namespace TrashPandas.Runtime.Net
             int.TryParse(Value("-autostart"), out _autoStart);
             if (float.TryParse(Value("-quitafter"), System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out float q)) _quitAt = q;
             _telemetry = Args.Contains("-telemetry");
+            int s = Array.IndexOf(Args, "-shot");
+            if (s >= 0 && s + 2 < Args.Length && float.TryParse(Args[s + 1], System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out float at))
+            { _shotAt = at; _shotPath = Args[s + 2]; }
         }
 
         async void Start()
@@ -66,11 +96,49 @@ namespace TrashPandas.Runtime.Net
                 Log($"autostart with {nm.ConnectedClientsIds.Count} players");
                 session.StartRound();
             }
+            if (_shotAt > 0f && Time.realtimeSinceStartup >= _shotAt)
+            {
+                _shotAt = -1f;
+                ScreenCapture.CaptureScreenshot(_shotPath);
+                Log($"screenshot {_shotPath}");
+            }
             if (_telemetry && Time.realtimeSinceStartup >= _nextLog)
             {
                 _nextLog = Time.realtimeSinceStartup + 0.5f;
                 LogTelemetry();
             }
+        }
+
+        static string NpcSummary()
+        {
+            var d = TrashPandas.Runtime.Npc.SuspicionDirector.Instance;
+            if (!d) return "";
+            int curious = 0, alarmed = 0; string cat = "-";
+            foreach (var b in d.Brains)
+            {
+                if (!b.Pawn) continue;
+                if (b.Pawn.Kind == TrashPandas.Runtime.Npc.NpcKind.Cat) { cat = ((TrashPandas.Core.Npc.CatState)b.Pawn.Mood).ToString(); continue; }
+                var s = (TrashPandas.Core.Npc.GuestState)b.Pawn.Mood;
+                if (s == TrashPandas.Core.Npc.GuestState.Curious) curious++;
+                if (s == TrashPandas.Core.Npc.GuestState.Alarmed) alarmed++;
+            }
+            var f = d.LastFrame;
+            var pd = TrashPandas.Runtime.Panic.PanicDirector.Instance;
+            string panic = "";
+            if (pd)
+            {
+                var snap = pd.Snapshot;
+                panic = $" phase={pd.Phase} me={pd.LocalPlayer}";
+                for (int p = 0; p < snap.Count; p++) panic += $" P{p}={snap.OutcomeOf(p)}/{snap.HitsOf(p)}hits";
+                int armed = 0;
+                foreach (var w in UnityEngine.Object.FindObjectsByType<TrashPandas.Runtime.Panic.PanicWeapon>(FindObjectsSortMode.None)) if (w.Holder) armed++;
+                panic += $" armed={armed} left={snap.SecondsLeft:F0}s";
+                var opc = UnityEngine.Object.FindFirstObjectByType<OnlinePlayerController>();
+                if (opc) panic += $" spectating={opc.IsSpectating}";
+                if (Args.Contains("-autorestart") && pd.Phase == TrashPandas.Runtime.Panic.RoundPhase.Results && SessionHost.Instance && SessionHost.Instance.IsHost && !s_restarted)
+                { s_restarted = true; Log("autorestart"); pd.PlayAgain(); }
+            }
+            return panic + $" suspicion={d.Suspicion:F1} caught={d.Caught} curious={curious} alarmed={alarmed} cat={cat} frame[missing={f.MissingParts} seen={f.CoatWitnessed} weird={f.SeenWeirdness:F2} hiss={f.CatHissing}] dt={Time.deltaTime:F3}";
         }
 
         static void LogTelemetry()
@@ -82,7 +150,7 @@ namespace TrashPandas.Runtime.Net
                 var offlineBody = UnityEngine.Object.FindFirstObjectByType<TrashPandas.Runtime.Trenchcoat.TrenchcoatBody>();
                 var glass = UnityEngine.GameObject.Find("Glass_1a");
                 Log(offlineBody
-                    ? $"offline-debug coat={offlineBody.transform.position} kinematic={offlineBody.GetComponent<Rigidbody>().isKinematic} glassKinematic={(glass ? glass.GetComponent<Rigidbody>().isKinematic.ToString() : "-")}"
+                    ? $"offline-debug coat={offlineBody.transform.position} kinematic={offlineBody.GetComponent<Rigidbody>().isKinematic} glassKinematic={(glass ? glass.GetComponent<Rigidbody>().isKinematic.ToString() : "-")}{NpcSummary()}"
                     : "offline");
                 return;
             }
@@ -92,7 +160,7 @@ namespace TrashPandas.Runtime.Net
             var b = coat.Body;
             string held = string.Join(",", Grabbable.All.Where(g => g && g.IsHeld).Select(g => g.name));
             string raccoon = NetworkedRaccoon.LocalOwned ? $" myRaccoon={NetworkedRaccoon.LocalOwned.transform.position}" : "";
-            Log($"me={nm.LocalClientId} host={nm.IsHost} seats=[{seats}] missing={snap.MissingParts} coat={b.transform.position} yaw={b.transform.eulerAngles.y:F0} leftHand={b.LeftHand.localPosition} heldOnHost=[{held}] raccoons={UnityEngine.Object.FindObjectsByType<NetworkedRaccoon>(FindObjectsSortMode.None).Length}{raccoon}");
+            Log($"me={nm.LocalClientId} host={nm.IsHost} seats=[{seats}] missing={snap.MissingParts} coat={b.transform.position} yaw={b.transform.eulerAngles.y:F0} leftHand={b.LeftHand.localPosition} heldOnHost=[{held}] raccoons={UnityEngine.Object.FindObjectsByType<NetworkedRaccoon>(FindObjectsSortMode.None).Length}{raccoon}{NpcSummary()}");
         }
 
         static void Log(string msg) => Debug.Log($"[DEV {Time.realtimeSinceStartup:F1}] {msg}");

@@ -3,6 +3,7 @@ using TrashPandas.Runtime.Cameras;
 using TrashPandas.Runtime.Input;
 using Unity.Netcode;
 using UnityEngine;
+using TrashPandas.Runtime.Ui;
 
 namespace TrashPandas.Runtime.Net
 {
@@ -23,6 +24,8 @@ namespace TrashPandas.Runtime.Net
         bool? _armsCamera;
         NetworkedRaccoon _cameraOnRaccoon;
         float _botHopAt = 8f;
+        bool _spectating;
+        public bool IsSpectating => _spectating;
         NetworkedTrenchcoat _coat;
 
         static bool Online => NetworkManager.Singleton && NetworkManager.Singleton.IsListening;
@@ -46,7 +49,7 @@ namespace TrashPandas.Runtime.Net
             int? slot = snapshot.SlotOfClient(nm.LocalClientId);
 
             var raccoon = NetworkedRaccoon.LocalOwned;
-            if (DevAutomation.Bot == "hop" && slot.HasValue && Time.realtimeSinceStartup > _botHopAt) { _botHopAt = float.MaxValue; _coat.RequestLeaveRpc(); }
+            if ((DevAutomation.Bot == "hop" || DevAutomation.Bot == "hopflee" || DevAutomation.Bot == "hopgap") && slot.HasValue && Time.realtimeSinceStartup > _botHopAt) { _botHopAt = float.MaxValue; _coat.RequestLeaveRpc(); }
             if (_reader.TogglePressed)
             {
                 if (slot.HasValue) _coat.RequestLeaveRpc();
@@ -60,10 +63,20 @@ namespace TrashPandas.Runtime.Net
                     _cameraOnRaccoon = raccoon;
                     CameraRig.SetTarget(raccoon.transform, RaccoonCameraRadius, RaccoonLookHeight);
                 }
-                raccoon.Controller.SetInput(_reader.CameraRelativeMove(CameraRig), _reader.JumpPressed, _reader.JumpHeld, _reader.CrouchHeld);
+                var move = DevAutomation.FleeMove(raccoon.transform.position)
+                    ?? (DevAutomation.Bot == "hopflee" ? new Vector2(0f, 1f) : _reader.CameraRelativeMove(CameraRig)); // dev bots
+                raccoon.Controller.SetInput(move, _reader.JumpPressed, _reader.JumpHeld, _reader.CrouchHeld || DevAutomation.FleeCrouchAt(raccoon.transform.position));
                 return;
             }
             if (_cameraOnRaccoon) { _cameraOnRaccoon = null; _armsCamera = null; }
+
+            // Escaped or caught during the panic: no seat, no raccoon — watch the others from above.
+            var panic = TrashPandas.Runtime.Panic.PanicDirector.Instance;
+            if (!slot.HasValue && panic && panic.Phase != TrashPandas.Runtime.Panic.RoundPhase.Infiltration && panic.Overview)
+            {
+                if (!_spectating) { _spectating = true; CameraRig.SetTarget(panic.Overview, 16f, 0f); }
+                return;
+            }
 
             if (slot.HasValue)
             {
@@ -106,6 +119,7 @@ namespace TrashPandas.Runtime.Net
 
         void OnGUI()
         {
+            UiScale.Apply();
             if (!_coat) return;
             var nm = NetworkManager.Singleton;
             var snapshot = _coat.Slots;
@@ -124,13 +138,13 @@ namespace TrashPandas.Runtime.Net
             string room = SessionHost.Instance && !string.IsNullOrEmpty(SessionHost.Instance.RoomCode) ? $"Room {SessionHost.Instance.RoomCode} · " : "";
             var lines = new[] { $"{room}ONLINE · {(nm.IsHost ? "host" : "client")}   {seats}", hint + "   F10: leave" };
             float h = lines.Length * 18f + 8f;
-            GUI.Box(new Rect(8, Screen.height - h - 8, Screen.width - 16, h), GUIContent.none);
+            GUI.Box(new Rect(8, UiScale.Height - h - 8, UiScale.Width - 16, h), GUIContent.none);
             for (int i = 0; i < lines.Length; i++)
-                GUI.Label(new Rect(14, Screen.height - h - 4 + i * 18f, Screen.width - 28, 18), lines[i], style);
+                GUI.Label(new Rect(14, UiScale.Height - h - 4 + i * 18f, UiScale.Width - 28, 18), lines[i], style);
 
             if (mine.HasValue && (snapshot.PartsOf(mine.Value) & BodyPart.Arms) != 0)
             {
-                var c = new Vector2(Screen.width * 0.5f, Screen.height * 0.5f);
+                var c = new Vector2(UiScale.Width * 0.5f, UiScale.Height * 0.5f);
                 var old = GUI.color;
                 GUI.color = _reader.AssistTarget ? new Color(0.3f, 1f, 0.4f) : new Color(1f, 1f, 1f, 0.6f);
                 float size = _reader.AssistTarget ? 14f : 8f;

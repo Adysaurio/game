@@ -71,6 +71,13 @@ namespace TrashPandas.Runtime.Grabbing
             }
         }
 
+        public void ReleaseAll()
+        {
+            if (_both) Release(ref _both, Vector3.zero);
+            if (_left) Release(ref _left, Vector3.zero);
+            if (_right) Release(ref _right, Vector3.zero);
+        }
+
         void TryGrab(ref Grabbable slot, Transform holder, float radius, bool bigOnly)
         {
             int count = Physics.OverlapSphereNonAlloc(holder.position, radius, _hits, ~0, QueryTriggerInteraction.Ignore);

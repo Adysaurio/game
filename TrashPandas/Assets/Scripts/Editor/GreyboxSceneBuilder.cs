@@ -2,6 +2,10 @@ using System.IO;
 using TrashPandas.Runtime.Cameras;
 using TrashPandas.Runtime.Grabbing;
 using TrashPandas.Runtime.Net;
+using TrashPandas.Runtime.Npc;
+using TrashPandas.Runtime.Panic;
+using Unity.AI.Navigation;
+using UnityEngine.AI;
 using Unity.Netcode;
 using Unity.Netcode.Components;
 using TrashPandas.Runtime.Raccoon;
@@ -130,6 +134,7 @@ namespace TrashPandas.EditorTools
             hedgeClimb.AddComponent<Climbable>();
 
             var body = BuildTrenchcoat(coat, skin, pants, raccoonPrefab);
+            BuildWeddingPeople(body, skin);
 
             var camGo = new GameObject("Main Camera");
             camGo.tag = "MainCamera";
@@ -171,6 +176,178 @@ namespace TrashPandas.EditorTools
             }
             EditorSceneManager.MarkSceneDirty(scene);
             EditorSceneManager.SaveScene(scene, ScenePath);
+        }
+
+        /// <summary>Guests (seated and standing), a waiter on a service route, the cat, the catering tent,
+        /// the NavMesh surface, and the suspicion director + HUD (stage 3a).</summary>
+        static void BuildWeddingPeople(TrenchcoatBody coat, Material skin)
+        {
+            var tent = Mat("Tent", new Color(0.95f, 0.95f, 0.98f));
+            Box("CateringTent", new Vector3(-13f, 1.5f, 12f), new Vector3(4f, 3f, 3f), tent);
+
+            var nav = new GameObject("Navigation").AddComponent<NavMeshSurface>();
+            nav.collectObjects = CollectObjects.All;
+            nav.useGeometry = NavMeshCollectGeometry.PhysicsColliders;
+
+            Color[] outfits =
+            {
+                new Color(0.55f, 0.6f, 0.85f), new Color(0.85f, 0.55f, 0.6f), new Color(0.6f, 0.8f, 0.6f),
+                new Color(0.9f, 0.75f, 0.45f), new Color(0.7f, 0.6f, 0.85f), new Color(0.5f, 0.75f, 0.8f),
+            };
+            int n = 0;
+            // One seated guest at the far side of each table, facing the garden.
+            for (int i = 0; i < 6; i++)
+            {
+                var t = new Vector3(-6f + (i % 3) * 6f, 0f, 4f + (i / 3) * 5f);
+                Person($"Guest_Seated_{i}", NpcKind.Guest, t + new Vector3(0.4f * (i % 2 == 0 ? 1 : -1), 0f, 1.1f), 180f, outfits[n++ % outfits.Length], skin, seated: true);
+            }
+            // Two standing groups chatting.
+            Person("Guest_Standing_0", NpcKind.Guest, new Vector3(-10f, 0f, -2f), 90f, outfits[n++ % outfits.Length], skin, false);
+            Person("Guest_Standing_1", NpcKind.Guest, new Vector3(-8.8f, 0f, -2f), -90f, outfits[n++ % outfits.Length], skin, false);
+            Person("Guest_Standing_2", NpcKind.Guest, new Vector3(11f, 0f, -3f), 90f, outfits[n++ % outfits.Length], skin, false);
+            Person("Guest_Standing_3", NpcKind.Guest, new Vector3(12.2f, 0f, -3f), -90f, outfits[n++ % outfits.Length], skin, false);
+
+            var waiter = Person("Waiter", NpcKind.Waiter, new Vector3(-12f, 0f, 9.5f), 0f, new Color(0.12f, 0.12f, 0.14f), skin, false);
+            waiter.gameObject.AddComponent<NpcRoute>().Points = new[]
+            {
+                new Vector3(-12f, 0f, 9.5f), new Vector3(-6f, 0f, 6.8f), new Vector3(0f, 0f, 6.8f), new Vector3(6f, 0f, 6.8f),
+                new Vector3(6f, 0f, 1.8f), new Vector3(0f, 0f, 1.8f), new Vector3(-6f, 0f, 1.8f),
+            };
+
+            var cat = Person("Cat", NpcKind.Cat, new Vector3(4f, 0f, -4f), 0f, new Color(0.98f, 0.98f, 0.98f), skin, false);
+            cat.gameObject.AddComponent<NpcRoute>().Points = new[]
+            {
+                new Vector3(4f, 0f, -4f), new Vector3(9f, 0f, 1f), new Vector3(3f, 0f, 11.5f), new Vector3(-9f, 0f, 11.5f), new Vector3(-9f, 0f, 0f),
+            };
+
+            var director = new GameObject("SuspicionDirector");
+            director.AddComponent<NetworkObject>();
+            var d = director.AddComponent<SuspicionDirector>();
+            d.Coat = coat;
+            d.Navigation = nav;
+            new GameObject("SuspicionHud").AddComponent<SuspicionHud>();
+            BuildPanic();
+        }
+
+        /// <summary>Stage 4: weapons to grab, the four exits, an overview point for spectators, the panic director + HUD.</summary>
+        static void BuildPanic()
+        {
+            var wood = Mat("BroomWood", new Color(0.65f, 0.48f, 0.3f));
+            var straw = Mat("BroomStraw", new Color(0.9f, 0.78f, 0.4f));
+            var metal = Mat("Pan", new Color(0.25f, 0.25f, 0.28f));
+            var chairMat = Mat("Chair", new Color(0.8f, 0.72f, 0.6f));
+            var silver = Mat("Tray", new Color(0.82f, 0.84f, 0.88f));
+
+            for (int i = 0; i < 3; i++)
+            {
+                var broom = Weapon($"Broom_{i}", WeaponKind.Broom, new Vector3(-11f + i * 0.6f, 0.6f, 10f));
+                Visual(PrimitiveType.Cylinder, "Stick", broom.transform, new Vector3(0f, 0.6f, 0f), new Vector3(0.05f, 0.6f, 0.05f), wood);
+                Visual(PrimitiveType.Cube, "Bristles", broom.transform, new Vector3(0f, 1.25f, 0f), new Vector3(0.3f, 0.2f, 0.08f), straw);
+            }
+            for (int i = 0; i < 2; i++)
+            {
+                var pan = Weapon($"Pan_{i}", WeaponKind.Pan, new Vector3(-14f + i * 1f, 0.1f, 10.2f));
+                Visual(PrimitiveType.Cylinder, "Pan", pan.transform, new Vector3(0f, 0.55f, 0f), new Vector3(0.35f, 0.02f, 0.35f), metal);
+                Visual(PrimitiveType.Cylinder, "Handle", pan.transform, new Vector3(0f, 0.25f, 0f), new Vector3(0.04f, 0.25f, 0.04f), metal);
+            }
+            for (int i = 0; i < 6; i++)
+            {
+                var t = new Vector3(-6f + (i % 3) * 6f, 0f, 4f + (i / 3) * 5f);
+                var chair = Weapon($"Chair_{i}", WeaponKind.Chair, t + new Vector3(1.4f, 0f, -0.9f));
+                Visual(PrimitiveType.Cube, "Seat", chair.transform, new Vector3(0f, 0.45f, 0f), new Vector3(0.45f, 0.06f, 0.45f), chairMat);
+                Visual(PrimitiveType.Cube, "Back", chair.transform, new Vector3(0f, 0.75f, -0.2f), new Vector3(0.45f, 0.6f, 0.05f), chairMat);
+            }
+            var tray = Weapon("Tray", WeaponKind.Tray, new Vector3(-12.5f, 0.05f, 8.8f));
+            Visual(PrimitiveType.Cylinder, "Tray", tray.transform, new Vector3(0f, 0.4f, 0f), new Vector3(0.45f, 0.015f, 0.45f), silver);
+
+            // Exits: hedge gap (crouch through), sewer grate, the catering van, the fountain.
+            var gold = Mat("Exit", new Color(1f, 0.82f, 0.2f));
+            var grate = Mat("Grate", new Color(0.2f, 0.2f, 0.22f));
+            var van = Mat("Van", new Color(0.92f, 0.92f, 0.95f));
+            var water = Mat("Water", new Color(0.45f, 0.7f, 0.95f));
+            Box("CateringVan", new Vector3(-17.5f, 1.1f, 14f), new Vector3(2.4f, 2.2f, 4.6f), van);
+            var fountain = Visual(PrimitiveType.Cylinder, "Fountain", null, new Vector3(16f, 0.35f, 8f), new Vector3(3f, 0.35f, 3f), water);
+            fountain.gameObject.AddComponent<BoxCollider>();
+            Visual(PrimitiveType.Cylinder, "SewerGrate", null, new Vector3(-15f, 0.01f, -5f), new Vector3(1.2f, 0.01f, 1.2f), grate);
+            var exits = new[] { new Vector3(0f, 0f, -9.6f), new Vector3(-15f, 0f, -5f), new Vector3(-15.6f, 0f, 14f), new Vector3(14f, 0f, 8f) };
+            var names = new[] { "Hedge gap (crouch!)", "Sewer", "Catering van", "Fountain" };
+            for (int i = 0; i < exits.Length; i++)
+                Visual(PrimitiveType.Cylinder, $"ExitRing_{i}", null, exits[i] + Vector3.up * 0.02f, new Vector3(2.4f, 0.005f, 2.4f), gold);
+
+            var overview = new GameObject("Overview").transform;
+            overview.position = new Vector3(0f, 0f, 3f);
+
+            var go = new GameObject("PanicDirector");
+            go.AddComponent<NetworkObject>();
+            var pd = go.AddComponent<PanicDirector>();
+            pd.Exits = exits;
+            pd.ExitNames = names;
+            pd.Overview = overview;
+            new GameObject("PanicHud").AddComponent<PanicHud>();
+        }
+
+        static PanicWeapon Weapon(string name, WeaponKind kind, Vector3 position)
+        {
+            var go = new GameObject(name);
+            go.transform.position = position;
+            var col = go.AddComponent<BoxCollider>();
+            col.center = new Vector3(0f, 0.5f, 0f);
+            col.size = new Vector3(0.4f, 1f, 0.4f);
+            go.AddComponent<NetworkObject>();
+            var nt = go.AddComponent<NetworkTransform>();
+            nt.SyncScaleX = nt.SyncScaleY = nt.SyncScaleZ = false;
+            IgnoreForNavigation(go);
+            var weapon = go.AddComponent<PanicWeapon>();
+            weapon.Kind = kind;
+            return weapon;
+        }
+
+        static NpcPawn Person(string name, NpcKind kind, Vector3 position, float yaw, Color outfit, Material skin, bool seated)
+        {
+            bool cat = kind == NpcKind.Cat;
+            var root = new GameObject(name);
+            root.transform.SetPositionAndRotation(position, Quaternion.Euler(0f, yaw, 0f));
+            var outfitMat = Mat($"Outfit_{name}", outfit);
+
+            float height = cat ? 0.4f : seated ? 1.3f : 1.75f;
+            var col = root.AddComponent<CapsuleCollider>();
+            col.height = height;
+            col.radius = cat ? 0.18f : 0.28f;
+            col.center = new Vector3(0f, height / 2f, 0f);
+            if (cat)
+            {
+                Visual(PrimitiveType.Capsule, "Body", root.transform, new Vector3(0f, 0.2f, 0f), new Vector3(0.3f, 0.2f, 0.45f), outfitMat);
+            }
+            else
+            {
+                Visual(PrimitiveType.Capsule, "Body", root.transform, new Vector3(0f, height * 0.42f, 0f), new Vector3(0.5f, height * 0.42f, 0.4f), outfitMat);
+            }
+            var head = new GameObject("Head").transform;
+            head.SetParent(root.transform, false);
+            head.localPosition = new Vector3(0f, cat ? 0.32f : height - 0.15f, cat ? 0.22f : 0f);
+            Visual(PrimitiveType.Sphere, "Face", head, Vector3.zero, Vector3.one * (cat ? 0.22f : 0.3f), cat ? outfitMat : skin);
+            Visual(PrimitiveType.Cube, "Nose", head, new Vector3(0f, 0f, cat ? 0.12f : 0.17f), new Vector3(0.06f, 0.06f, 0.08f), cat ? outfitMat : skin);
+
+            var agent = root.AddComponent<NavMeshAgent>();
+            agent.radius = col.radius;
+            agent.height = height;
+            agent.speed = cat ? 2.6f : kind == NpcKind.Waiter ? 1.6f : 1.1f;
+            agent.angularSpeed = 360f;
+            agent.enabled = false; // the director enables it once the NavMesh is baked
+
+            root.AddComponent<NetworkObject>();
+            var nt = root.AddComponent<NetworkTransform>();
+            nt.SyncScaleX = nt.SyncScaleY = nt.SyncScaleZ = false;
+            var pawn = root.AddComponent<NpcPawn>();
+            pawn.Kind = kind;
+            pawn.Head = head;
+            pawn.Seated = seated;
+            pawn.EyeHeight = head.localPosition.y;
+            var hand = new GameObject("Hand").transform;
+            hand.SetParent(root.transform, false);
+            hand.localPosition = cat ? new Vector3(0f, 0.25f, 0.3f) : new Vector3(0.32f, height * 0.6f, 0.2f);
+            pawn.Hand = hand;
+            return pawn;
         }
 
         static PlayerCameraRig BuildPlayerCamera(Camera output, Transform target)
@@ -240,6 +417,7 @@ namespace TrashPandas.EditorTools
             netTransform.Interpolate = true;
             root.AddComponent<NetworkRigidbody>();
             root.AddComponent<NetworkedTrenchcoat>().RaccoonPrefab = raccoonPrefab.GetComponent<NetworkObject>();
+            IgnoreForNavigation(root);
             body.Torso = torso;
             body.Head = head;
             body.LeftHand = left;
@@ -276,6 +454,7 @@ namespace TrashPandas.EditorTools
             nt.AuthorityMode = NetworkTransform.AuthorityModes.Owner; // the owner moves it, instantly
             nt.SyncScaleX = nt.SyncScaleY = nt.SyncScaleZ = false;
             root.AddComponent<NetworkedRaccoon>();
+            IgnoreForNavigation(root);
 
             var prefab = PrefabUtility.SaveAsPrefabAsset(root, PrefabPath);
             Object.DestroyImmediate(root);
@@ -311,7 +490,16 @@ namespace TrashPandas.EditorTools
             var nt = go.AddComponent<NetworkTransform>();
             nt.SyncScaleX = nt.SyncScaleY = nt.SyncScaleZ = false;
             go.AddComponent<NetworkRigidbody>();
+            IgnoreForNavigation(go);
             return go;
+        }
+
+        /// <summary>Things that move (coat, raccoons, props) must not carve permanent holes into the baked NavMesh.</summary>
+        static void IgnoreForNavigation(GameObject go)
+        {
+            var modifier = go.AddComponent<NavMeshModifier>();
+            modifier.ignoreFromBuild = true;
+            modifier.applyToChildren = true;
         }
 
         static GameObject Box(string name, Vector3 position, Vector3 size, Material mat)
