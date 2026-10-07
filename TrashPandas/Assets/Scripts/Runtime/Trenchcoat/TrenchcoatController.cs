@@ -6,6 +6,7 @@ using TrashPandas.Runtime.Grabbing;
 using TrashPandas.Runtime.Input;
 using TrashPandas.Runtime.Raccoon;
 using UnityEngine;
+using TrashPandas.Runtime.Ui;
 
 namespace TrashPandas.Runtime.Trenchcoat
 {
@@ -178,6 +179,7 @@ namespace TrashPandas.Runtime.Trenchcoat
 
         void DrawCrosshair()
         {
+            UiScale.Apply();
             if (_possession.ActiveIsOutside) return;
             var parts = _slots.PartsOf(_slots.SlotOf(_possession.ActivePlayerId).Value);
             if ((parts & BodyPart.Arms) == 0) return;
@@ -188,7 +190,7 @@ namespace TrashPandas.Runtime.Trenchcoat
                         : _reader.AimInReach ? Color.white
                         : new Color(1f, 1f, 1f, 0.35f);
             float size = _reader.AssistTarget ? 14f : 8f;
-            var c = new Vector2(Screen.width * 0.5f, Screen.height * 0.5f);
+            var c = new Vector2(UiScale.Width * 0.5f, UiScale.Height * 0.5f);
             var old = GUI.color;
             GUI.color = color;
             GUI.DrawTexture(new Rect(c.x - size * 0.5f, c.y - size * 0.5f, size, size), Texture2D.whiteTexture);
@@ -202,6 +204,7 @@ namespace TrashPandas.Runtime.Trenchcoat
 
         void OnGUI()
         {
+            UiScale.Apply();
             DrawCrosshair();
             var style = new GUIStyle(GUI.skin.label) { fontSize = 12 };
             var lines = new List<string>();
@@ -227,9 +230,9 @@ namespace TrashPandas.Runtime.Trenchcoat
             if (_status.Length > 0) lines.Add(_status);
 
             float h = lines.Count * 18f + 8f;
-            GUI.Box(new Rect(8, Screen.height - h - 8, Screen.width - 16, h), GUIContent.none);
+            GUI.Box(new Rect(8, UiScale.Height - h - 8, UiScale.Width - 16, h), GUIContent.none);
             for (int i = 0; i < lines.Count; i++)
-                GUI.Label(new Rect(14, Screen.height - h - 4 + i * 18f, Screen.width - 28, 18), lines[i], style);
+                GUI.Label(new Rect(14, UiScale.Height - h - 4 + i * 18f, UiScale.Width - 28, 18), lines[i], style);
         }
     }
 }

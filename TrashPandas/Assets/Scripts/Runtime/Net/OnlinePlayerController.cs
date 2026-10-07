@@ -3,6 +3,7 @@ using TrashPandas.Runtime.Cameras;
 using TrashPandas.Runtime.Input;
 using Unity.Netcode;
 using UnityEngine;
+using TrashPandas.Runtime.Ui;
 
 namespace TrashPandas.Runtime.Net
 {
@@ -106,6 +107,7 @@ namespace TrashPandas.Runtime.Net
 
         void OnGUI()
         {
+            UiScale.Apply();
             if (!_coat) return;
             var nm = NetworkManager.Singleton;
             var snapshot = _coat.Slots;
@@ -124,13 +126,13 @@ namespace TrashPandas.Runtime.Net
             string room = SessionHost.Instance && !string.IsNullOrEmpty(SessionHost.Instance.RoomCode) ? $"Room {SessionHost.Instance.RoomCode} · " : "";
             var lines = new[] { $"{room}ONLINE · {(nm.IsHost ? "host" : "client")}   {seats}", hint + "   F10: leave" };
             float h = lines.Length * 18f + 8f;
-            GUI.Box(new Rect(8, Screen.height - h - 8, Screen.width - 16, h), GUIContent.none);
+            GUI.Box(new Rect(8, UiScale.Height - h - 8, UiScale.Width - 16, h), GUIContent.none);
             for (int i = 0; i < lines.Length; i++)
-                GUI.Label(new Rect(14, Screen.height - h - 4 + i * 18f, Screen.width - 28, 18), lines[i], style);
+                GUI.Label(new Rect(14, UiScale.Height - h - 4 + i * 18f, UiScale.Width - 28, 18), lines[i], style);
 
             if (mine.HasValue && (snapshot.PartsOf(mine.Value) & BodyPart.Arms) != 0)
             {
-                var c = new Vector2(Screen.width * 0.5f, Screen.height * 0.5f);
+                var c = new Vector2(UiScale.Width * 0.5f, UiScale.Height * 0.5f);
                 var old = GUI.color;
                 GUI.color = _reader.AssistTarget ? new Color(0.3f, 1f, 0.4f) : new Color(1f, 1f, 1f, 0.6f);
                 float size = _reader.AssistTarget ? 14f : 8f;

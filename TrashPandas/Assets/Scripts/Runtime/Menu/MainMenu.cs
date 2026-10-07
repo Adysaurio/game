@@ -4,6 +4,7 @@ using TrashPandas.Core.Session;
 using TrashPandas.Runtime.Net;
 using Unity.Netcode;
 using UnityEngine;
+using TrashPandas.Runtime.Ui;
 using UnityEngine.SceneManagement;
 
 namespace TrashPandas.Runtime.Menu
@@ -38,8 +39,9 @@ namespace TrashPandas.Runtime.Menu
 
         void OnGUI()
         {
-            float w = Mathf.Min(460f, Screen.width - 32f);
-            GUILayout.BeginArea(new Rect((Screen.width - w) / 2f, 60f, w, Screen.height - 120f));
+            UiScale.Apply();
+            float w = Mathf.Min(460f, UiScale.Width - 32f);
+            GUILayout.BeginArea(new Rect((UiScale.Width - w) / 2f, 60f, w, UiScale.Height - 120f));
             var title = new GUIStyle(GUI.skin.label) { fontSize = 28, fontStyle = FontStyle.Bold };
             GUILayout.Label("Trash Pandas in a Trenchcoat", title);
             GUILayout.Space(12);

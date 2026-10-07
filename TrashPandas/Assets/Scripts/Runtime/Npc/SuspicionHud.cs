@@ -1,6 +1,7 @@
 using TrashPandas.Core.Npc;
 using TrashPandas.Runtime.Net;
 using UnityEngine;
+using TrashPandas.Runtime.Ui;
 
 namespace TrashPandas.Runtime.Npc
 {
@@ -22,6 +23,7 @@ namespace TrashPandas.Runtime.Npc
 
         void OnGUI()
         {
+            UiScale.Apply();
             var d = SuspicionDirector.Instance;
             var cam = Camera.main;
             if (!d || !cam) return;
@@ -30,7 +32,7 @@ namespace TrashPandas.Runtime.Npc
             _label ??= new GUIStyle(GUI.skin.label) { fontSize = 12, alignment = TextAnchor.MiddleCenter };
 
             // Bar
-            float w = Mathf.Min(360f, Screen.width - 40f), x = (Screen.width - w) / 2f, y = 14f;
+            float w = Mathf.Min(360f, UiScale.Width - 40f), x = (UiScale.Width - w) / 2f, y = 14f;
             float k = d.Suspicion / 100f;
             GUI.color = new Color(0f, 0f, 0f, 0.55f);
             GUI.DrawTexture(new Rect(x - 4, y - 4, w + 8, 26), Texture2D.whiteTexture);
@@ -60,18 +62,19 @@ namespace TrashPandas.Runtime.Npc
                 if (icon == null) continue;
                 Vector3 sp = cam.WorldToScreenPoint(pawn.Eye + Vector3.up * 0.55f);
                 if (sp.z <= 0f) continue;
+                Vector2 p = UiScale.FromScreen(sp);
                 GUI.color = color;
-                GUI.Label(new Rect(sp.x - 40, Screen.height - sp.y - 18, 80, 36), icon, _icon);
+                GUI.Label(new Rect(p.x - 40, p.y - 18, 80, 36), icon, _icon);
             }
             GUI.color = Color.white;
 
             if (d.Caught && _caughtAt >= 0f && Time.time - _caughtAt < 4f)
             {
                 GUI.color = new Color(1f, 0.3f, 0.25f);
-                GUI.Label(new Rect(0, Screen.height * 0.3f, Screen.width, 120), "¡¡RUUUN!!", _banner);
+                GUI.Label(new Rect(0, UiScale.Height * 0.3f, UiScale.Width, 120), "¡¡RUUUN!!", _banner);
                 GUI.color = Color.white;
                 if (!SimulationAuthority.IsOnline)
-                    GUI.Label(new Rect(0, Screen.height * 0.3f + 110, Screen.width, 20), "(panic phase comes in stage 4 — F5 resets suspicion)", _label);
+                    GUI.Label(new Rect(0, UiScale.Height * 0.3f + 110, UiScale.Width, 20), "(panic phase comes in stage 4 — F5 resets suspicion)", _label);
             }
         }
     }
