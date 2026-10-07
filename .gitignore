@@ -18,3 +18,5 @@
 
 # Local test output
 /test-results/
+/TrashPandas/Assets/Temp/
+/TrashPandas/Assets/Temp.meta

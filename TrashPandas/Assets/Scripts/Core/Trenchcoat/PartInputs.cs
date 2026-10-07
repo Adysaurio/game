@@ -4,14 +4,8 @@ namespace TrashPandas.Core.Trenchcoat
 {
     public struct LegInput
     {
-        /// <summary>-1..1, forward push of this leg.</summary>
-        public float Drive;
-        /// <summary>-1..1 turn rate (mouse), positive = right.</summary>
-        public float Steer;
-        /// <summary>-1..1 sidestep (A/D), positive = right.</summary>
-        public float Strafe;
-        /// <summary>Degrees to turn this frame (mouse), positive = right.</summary>
-        public float YawDelta;
+        /// <summary>World XZ direction this leg pushes toward, magnitude 0..1.</summary>
+        public Vector2 Move;
         /// <summary>Time (s) of the last jump press; NegativeInfinity = never.</summary>
         public float JumpPressedAt;
         public bool Crouch;
@@ -21,15 +15,15 @@ namespace TrashPandas.Core.Trenchcoat
 
     public struct ArmInput
     {
-        /// <summary>Hand target in body-local space.</summary>
-        public Vector3 HandTarget;
-        public bool Grab;
+        /// <summary>World-space direction to reach toward.</summary>
+        public Vector3 Aim;
+        public bool Reach;
     }
 
     public struct HeadInput
     {
-        public float Yaw;
-        public float Pitch;
+        /// <summary>World-space direction to look toward.</summary>
+        public Vector3 Aim;
     }
 
     public struct PartInputs

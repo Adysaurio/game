@@ -6,14 +6,12 @@ namespace TrashPandas.Core.Trenchcoat
     {
         /// <summary>Max seconds between both legs' jump presses, and since the latest press.</summary>
         public float JumpWindow = 0.25f;
-        /// <summary>How much a drive difference between legs turns the body.</summary>
-        public float DesyncTurnFactor = 1f;
         /// <summary>Speed multiplier when only one leg is present.</summary>
         public float LimpSpeedFactor = 0.4f;
-        /// <summary>Turn drift toward the missing leg, scaled by speed.</summary>
-        public float LimpTurnBias = 0.3f;
-        /// <summary>Largest mouse turn accepted in one frame, in degrees.</summary>
-        public float MaxYawDeltaPerFrame = 90f;
+        /// <summary>Degrees the walk direction is dragged toward the missing leg.</summary>
+        public float LimpDriftDegrees = 20f;
+        /// <summary>Below this input length a leg counts as idle (no discord).</summary>
+        public float IdleThreshold = 0.1f;
     }
 
     /// <summary>Combines per-part inputs into one body intent. All comedy rules live here.</summary>
@@ -23,17 +21,24 @@ namespace TrashPandas.Core.Trenchcoat
         {
             var intent = new BodyIntent();
             MixLegs(in input, present, now, settings, ref intent);
-            MixArms(in input, present, ref intent);
 
-            if ((present & BodyPart.Head) != 0)
+            if ((present & BodyPart.ArmLeft) != 0)
             {
-                intent.HeadYaw = Sanitize(input.Head.Yaw, 180f);
-                intent.HeadPitch = Sanitize(input.Head.Pitch, 90f);
+                intent.LeftAim = Direction(input.ArmLeft.Aim);
+                intent.LeftReach = input.ArmLeft.Reach;
             }
-            else
+            else intent.LeftArmLimp = true;
+
+            if ((present & BodyPart.ArmRight) != 0)
             {
-                intent.HeadSlumped = true;
+                intent.RightAim = Direction(input.ArmRight.Aim);
+                intent.RightReach = input.ArmRight.Reach;
             }
+            else intent.RightArmLimp = true;
+
+            if ((present & BodyPart.Head) != 0) intent.HeadAim = Direction(input.Head.Aim);
+            else intent.HeadSlumped = true;
+
             return intent;
         }
 
@@ -46,54 +51,23 @@ namespace TrashPandas.Core.Trenchcoat
 
             if (hasLeft && hasRight)
             {
-                float driveL = Unit(input.LegLeft.Drive);
-                float driveR = Unit(input.LegRight.Drive);
-                float steer = (Unit(input.LegLeft.Steer) + Unit(input.LegRight.Steer)) * 0.5f;
-                intent.Forward = (driveL + driveR) * 0.5f;
-                intent.Strafe = (Unit(input.LegLeft.Strafe) + Unit(input.LegRight.Strafe)) * 0.5f;
-                intent.YawDelta = (Sanitize(input.LegLeft.YawDelta, s.MaxYawDeltaPerFrame)
-                                 + Sanitize(input.LegRight.YawDelta, s.MaxYawDeltaPerFrame)) * 0.5f;
-                intent.Turn = Mathf.Clamp(steer + (driveL - driveR) * s.DesyncTurnFactor, -1f, 1f);
+                Vector2 left = Planar(input.LegLeft.Move), right = Planar(input.LegRight.Move);
+                intent.Move = (left + right) * 0.5f;
+                if (left.magnitude > s.IdleThreshold && right.magnitude > s.IdleThreshold)
+                    intent.Discord = (1f - Vector2.Dot(left.normalized, right.normalized)) * 0.5f;
                 intent.Jump = IsCoordinatedJump(input.LegLeft.JumpPressedAt, input.LegRight.JumpPressedAt, now, s.JumpWindow);
                 intent.Crouch = input.LegLeft.Crouch || input.LegRight.Crouch;
             }
             else if (hasLeft || hasRight)
             {
                 var leg = hasLeft ? input.LegLeft : input.LegRight;
-                intent.Forward = Unit(leg.Drive) * s.LimpSpeedFactor;
-                intent.Strafe = Unit(leg.Strafe) * s.LimpSpeedFactor;
-                intent.YawDelta = Sanitize(leg.YawDelta, s.MaxYawDeltaPerFrame) * s.LimpSpeedFactor;
-                float towardMissing = hasLeft ? 1f : -1f; // missing right leg drags right
-                float drift = towardMissing * s.LimpTurnBias * Mathf.Abs(intent.Forward);
-                intent.Turn = Mathf.Clamp(Unit(leg.Steer) + drift, -1f, 1f);
+                float drift = (hasLeft ? 1f : -1f) * s.LimpDriftDegrees; // missing right leg drags right (clockwise)
+                intent.Move = RotateClockwise(Planar(leg.Move) * s.LimpSpeedFactor, drift);
                 intent.Crouch = leg.Crouch;
             }
             else
             {
                 intent.Collapsed = true;
-            }
-        }
-
-        static void MixArms(in PartInputs input, BodyPart present, ref BodyIntent intent)
-        {
-            if ((present & BodyPart.ArmLeft) != 0)
-            {
-                intent.LeftHandTarget = input.ArmLeft.HandTarget;
-                intent.LeftGrab = input.ArmLeft.Grab;
-            }
-            else
-            {
-                intent.LeftArmLimp = true;
-            }
-
-            if ((present & BodyPart.ArmRight) != 0)
-            {
-                intent.RightHandTarget = input.ArmRight.HandTarget;
-                intent.RightGrab = input.ArmRight.Grab;
-            }
-            else
-            {
-                intent.RightArmLimp = true;
             }
         }
 
@@ -105,9 +79,17 @@ namespace TrashPandas.Core.Trenchcoat
             return Mathf.Abs(left - right) <= window && now >= latest && now - latest <= window;
         }
 
-        static float Unit(float value) => Sanitize(value, 1f);
+        /// <summary>Rotates an XZ vector clockwise as seen from above (positive = toward +X when facing +Z).</summary>
+        static Vector2 RotateClockwise(Vector2 v, float degrees)
+        {
+            float r = degrees * Mathf.Deg2Rad, c = Mathf.Cos(r), s = Mathf.Sin(r);
+            return new Vector2(v.x * c + v.y * s, -v.x * s + v.y * c);
+        }
 
-        static float Sanitize(float value, float limit) =>
-            float.IsNaN(value) ? 0f : Mathf.Clamp(value, -limit, limit);
+        static Vector2 Planar(Vector2 v) =>
+            float.IsNaN(v.x) || float.IsNaN(v.y) ? Vector2.zero : Vector2.ClampMagnitude(v, 1f);
+
+        static Vector3 Direction(Vector3 v) =>
+            float.IsNaN(v.x) || float.IsNaN(v.y) || float.IsNaN(v.z) || v.sqrMagnitude < 1e-6f ? Vector3.zero : v.normalized;
     }
 }

@@ -7,70 +7,89 @@ namespace TrashPandas.Tests
     public class TrenchcoatIntentMixerTests
     {
         static readonly MixerSettings Settings = new MixerSettings();
-        const float Eps = 1e-4f;
+        const float Eps = 1e-3f;
 
-        static PartInputs Legs(float driveL, float driveR, float steer = 0f)
+        static PartInputs Legs(Vector2 left, Vector2 right)
         {
             var input = PartInputs.Idle;
-            input.LegLeft.Drive = driveL;
-            input.LegRight.Drive = driveR;
-            input.LegLeft.Steer = steer;
-            input.LegRight.Steer = steer;
+            input.LegLeft.Move = left;
+            input.LegRight.Move = right;
             return input;
         }
 
-        [Test]
-        public void Mix_SyncedLegs_WalkStraight()
+        static void AssertVec(Vector2 expected, Vector2 actual, string msg = "")
         {
-            var intent = TrenchcoatIntentMixer.Mix(Legs(1f, 1f), BodyPart.All, 0f, Settings);
-            Assert.AreEqual(1f, intent.Forward, Eps);
-            Assert.AreEqual(0f, intent.Turn, Eps);
+            Assert.AreEqual(expected.x, actual.x, Eps, msg + " (x)");
+            Assert.AreEqual(expected.y, actual.y, Eps, msg + " (y)");
+        }
+
+        [Test]
+        public void Mix_AgreeingLegs_MoveFullSpeed_NoDiscord()
+        {
+            var intent = TrenchcoatIntentMixer.Mix(Legs(Vector2.up, Vector2.up), BodyPart.All, 0f, Settings);
+            AssertVec(Vector2.up, intent.Move);
+            Assert.AreEqual(0f, intent.Discord, Eps);
             Assert.IsFalse(intent.Collapsed);
         }
 
         [Test]
-        public void Mix_LeftLegFaster_TurnsRight()
+        public void Mix_PerpendicularLegs_AverageDirection_HalfDiscord()
         {
-            var intent = TrenchcoatIntentMixer.Mix(Legs(1f, 0f), BodyPart.All, 0f, Settings);
-            Assert.AreEqual(0.5f, intent.Forward, Eps);
-            Assert.Greater(intent.Turn, 0f);
+            var intent = TrenchcoatIntentMixer.Mix(Legs(Vector2.up, Vector2.right), BodyPart.All, 0f, Settings);
+            AssertVec(new Vector2(0.5f, 0.5f), intent.Move);
+            Assert.AreEqual(0.5f, intent.Discord, Eps);
         }
 
         [Test]
-        public void Mix_ClampsOutOfRangeAndNaNInputs()
+        public void Mix_OppositeLegs_CancelAndReportFullDiscord()
         {
-            var input = Legs(1.41f, 1.41f, steer: 5f);
+            var intent = TrenchcoatIntentMixer.Mix(Legs(Vector2.up, Vector2.down), BodyPart.All, 0f, Settings);
+            AssertVec(Vector2.zero, intent.Move);
+            Assert.AreEqual(1f, intent.Discord, Eps);
+        }
+
+        [Test]
+        public void Mix_OneLegIdle_NoDiscord()
+        {
+            var intent = TrenchcoatIntentMixer.Mix(Legs(Vector2.up, Vector2.zero), BodyPart.All, 0f, Settings);
+            AssertVec(new Vector2(0f, 0.5f), intent.Move);
+            Assert.AreEqual(0f, intent.Discord, Eps);
+        }
+
+        [Test]
+        public void Mix_SanitizesNaNMoveAndAim()
+        {
+            var input = Legs(new Vector2(float.NaN, 1f), new Vector2(3f, 0f));
+            input.ArmLeft.Aim = new Vector3(float.NaN, 0f, 1f);
+            input.ArmLeft.Reach = true;
             var intent = TrenchcoatIntentMixer.Mix(input, BodyPart.All, 0f, Settings);
-            Assert.AreEqual(1f, intent.Forward, Eps);
-            Assert.AreEqual(1f, intent.Turn, Eps);
-
-            var nan = Legs(float.NaN, float.NaN, steer: float.NaN);
-            var nanIntent = TrenchcoatIntentMixer.Mix(nan, BodyPart.All, 0f, Settings);
-            Assert.AreEqual(0f, nanIntent.Forward, Eps);
-            Assert.AreEqual(0f, nanIntent.Turn, Eps);
+            AssertVec(new Vector2(0.5f, 0f), intent.Move, "NaN leg ignored, over-long leg clamped to length 1");
+            Assert.AreEqual(Vector3.zero, intent.LeftAim);
         }
 
         [Test]
-        public void Mix_NoLegs_CollapsesAndCannotMove()
+        public void Mix_NoLegs_Collapses()
         {
-            var intent = TrenchcoatIntentMixer.Mix(Legs(1f, 1f), BodyPart.Arms | BodyPart.Head, 0f, Settings);
+            var intent = TrenchcoatIntentMixer.Mix(Legs(Vector2.up, Vector2.up), BodyPart.Arms | BodyPart.Head, 0f, Settings);
             Assert.IsTrue(intent.Collapsed);
-            Assert.AreEqual(0f, intent.Forward, Eps);
-            Assert.AreEqual(0f, intent.Turn, Eps);
+            AssertVec(Vector2.zero, intent.Move);
             Assert.IsFalse(intent.Jump);
+            Assert.IsTrue(intent.LeftLegLimp && intent.RightLegLimp);
         }
 
         [Test]
-        public void Mix_OneLeg_LimpsSlowerAndDriftsTowardMissingSide()
+        public void Mix_OneLeg_SlowerAndDriftsTowardMissingSide()
         {
             var onlyLeft = BodyPart.All & ~BodyPart.LegRight;
-            var intent = TrenchcoatIntentMixer.Mix(Legs(1f, 0f), onlyLeft, 0f, Settings);
-            Assert.AreEqual(Settings.LimpSpeedFactor, intent.Forward, Eps);
-            Assert.Greater(intent.Turn, 0f, "missing right leg drags the body to the right");
+            var intent = TrenchcoatIntentMixer.Mix(Legs(Vector2.up, Vector2.zero), onlyLeft, 0f, Settings);
+            Assert.AreEqual(Settings.LimpSpeedFactor, intent.Move.magnitude, Eps);
+            Assert.Greater(intent.Move.x, 0f, "missing right leg drags to the right");
+            Assert.IsTrue(intent.RightLegLimp);
+            Assert.IsFalse(intent.LeftLegLimp);
 
             var onlyRight = BodyPart.All & ~BodyPart.LegLeft;
-            var intent2 = TrenchcoatIntentMixer.Mix(Legs(0f, 1f), onlyRight, 0f, Settings);
-            Assert.Less(intent2.Turn, 0f, "missing left leg drags the body to the left");
+            var intent2 = TrenchcoatIntentMixer.Mix(Legs(Vector2.zero, Vector2.up), onlyRight, 0f, Settings);
+            Assert.Less(intent2.Move.x, 0f, "missing left leg drags to the left");
         }
 
         [Test]
@@ -79,8 +98,7 @@ namespace TrashPandas.Tests
             var input = PartInputs.Idle;
             input.LegLeft.JumpPressedAt = 10.00f;
             input.LegRight.JumpPressedAt = 10.20f;
-            var intent = TrenchcoatIntentMixer.Mix(input, BodyPart.All, now: 10.21f, Settings);
-            Assert.IsTrue(intent.Jump);
+            Assert.IsTrue(TrenchcoatIntentMixer.Mix(input, BodyPart.All, now: 10.21f, Settings).Jump);
         }
 
         [Test]
@@ -89,13 +107,10 @@ namespace TrashPandas.Tests
             var input = PartInputs.Idle;
             input.LegLeft.JumpPressedAt = 10.00f;
             input.LegRight.JumpPressedAt = 10.30f;
-            Assert.IsFalse(TrenchcoatIntentMixer.Mix(input, BodyPart.All, now: 10.31f, Settings).Jump,
-                "presses too far apart");
+            Assert.IsFalse(TrenchcoatIntentMixer.Mix(input, BodyPart.All, now: 10.31f, Settings).Jump, "too far apart");
 
-            input.LegLeft.JumpPressedAt = 10.00f;
             input.LegRight.JumpPressedAt = 10.00f;
-            Assert.IsFalse(TrenchcoatIntentMixer.Mix(input, BodyPart.All, now: 11.00f, Settings).Jump,
-                "presses are stale");
+            Assert.IsFalse(TrenchcoatIntentMixer.Mix(input, BodyPart.All, now: 11.00f, Settings).Jump, "stale");
         }
 
         [Test]
@@ -104,8 +119,7 @@ namespace TrashPandas.Tests
             var input = PartInputs.Idle;
             input.LegLeft.JumpPressedAt = 5f;
             input.LegRight.JumpPressedAt = 5f;
-            var onlyLeft = BodyPart.All & ~BodyPart.LegRight;
-            Assert.IsFalse(TrenchcoatIntentMixer.Mix(input, onlyLeft, now: 5f, Settings).Jump);
+            Assert.IsFalse(TrenchcoatIntentMixer.Mix(input, BodyPart.All & ~BodyPart.LegRight, now: 5f, Settings).Jump);
         }
 
         [Test]
@@ -115,95 +129,30 @@ namespace TrashPandas.Tests
         }
 
         [Test]
-        public void Mix_MissingArm_IsLimp_PresentArmFollowsTarget()
+        public void Mix_Arms_ReachAlongAim_MissingArmLimp()
         {
             var input = PartInputs.Idle;
-            input.ArmLeft.HandTarget = new Vector3(-0.3f, 1f, 0.5f);
-            input.ArmLeft.Grab = true;
-            input.ArmRight.Grab = true;
-            var present = BodyPart.All & ~BodyPart.ArmRight;
+            input.ArmLeft.Aim = new Vector3(0f, 0f, 2f);
+            input.ArmLeft.Reach = true;
+            input.ArmRight.Reach = true;
+            var intent = TrenchcoatIntentMixer.Mix(input, BodyPart.All & ~BodyPart.ArmRight, 0f, Settings);
 
-            var intent = TrenchcoatIntentMixer.Mix(input, present, 0f, Settings);
-
-            Assert.IsFalse(intent.LeftArmLimp);
-            Assert.AreEqual(input.ArmLeft.HandTarget, intent.LeftHandTarget);
-            Assert.IsTrue(intent.LeftGrab);
+            Assert.IsTrue(intent.LeftReach);
+            Assert.AreEqual(Vector3.forward, intent.LeftAim, "aim is normalized");
             Assert.IsTrue(intent.RightArmLimp);
-            Assert.IsFalse(intent.RightGrab, "a limp arm cannot grab");
+            Assert.IsFalse(intent.RightReach, "a limp arm cannot reach");
         }
 
         [Test]
-        public void Mix_MissingHead_Slumps_IgnoresLook()
+        public void Mix_Head_FollowsAim_OrSlumps()
         {
             var input = PartInputs.Idle;
-            input.Head.Yaw = 45f;
-            var intent = TrenchcoatIntentMixer.Mix(input, BodyPart.All & ~BodyPart.Head, 0f, Settings);
-            Assert.IsTrue(intent.HeadSlumped);
-            Assert.AreEqual(0f, intent.HeadYaw, Eps);
+            input.Head.Aim = Vector3.right;
+            Assert.AreEqual(Vector3.right, TrenchcoatIntentMixer.Mix(input, BodyPart.All, 0f, Settings).HeadAim);
 
-            var withHead = TrenchcoatIntentMixer.Mix(input, BodyPart.All, 0f, Settings);
-            Assert.IsFalse(withHead.HeadSlumped);
-            Assert.AreEqual(45f, withHead.HeadYaw, Eps);
-        }
-        [Test]
-        public void Mix_Strafe_AveragesBothLegs_AndIsClamped()
-        {
-            var input = PartInputs.Idle;
-            input.LegLeft.Strafe = 1f;
-            input.LegRight.Strafe = 0f;
-            Assert.AreEqual(0.5f, TrenchcoatIntentMixer.Mix(input, BodyPart.All, 0f, Settings).Strafe, Eps);
-
-            input.LegLeft.Strafe = 3f;
-            input.LegRight.Strafe = float.NaN;
-            Assert.AreEqual(0.5f, TrenchcoatIntentMixer.Mix(input, BodyPart.All, 0f, Settings).Strafe, Eps);
-        }
-
-        [Test]
-        public void Mix_OneLeg_StrafeIsSlowed_NoLegs_NoStrafe()
-        {
-            var input = PartInputs.Idle;
-            input.LegLeft.Strafe = 1f;
-            input.LegRight.Strafe = 1f;
-            var onlyLeft = BodyPart.All & ~BodyPart.LegRight;
-            Assert.AreEqual(Settings.LimpSpeedFactor, TrenchcoatIntentMixer.Mix(input, onlyLeft, 0f, Settings).Strafe, Eps);
-            Assert.AreEqual(0f, TrenchcoatIntentMixer.Mix(input, BodyPart.Arms | BodyPart.Head, 0f, Settings).Strafe, Eps);
-        }
-
-        [Test]
-        public void Mix_MissingLeg_IsMarkedLimp()
-        {
-            var onlyLeft = BodyPart.All & ~BodyPart.LegRight;
-            var intent = TrenchcoatIntentMixer.Mix(PartInputs.Idle, onlyLeft, 0f, Settings);
-            Assert.IsFalse(intent.LeftLegLimp);
-            Assert.IsTrue(intent.RightLegLimp);
-
-            var none = TrenchcoatIntentMixer.Mix(PartInputs.Idle, BodyPart.Arms, 0f, Settings);
-            Assert.IsTrue(none.LeftLegLimp);
-            Assert.IsTrue(none.RightLegLimp);
-        }
-
-        [Test]
-        public void Mix_YawDelta_AveragesLegs_LimpsWithOneLeg_ZeroWithoutLegs()
-        {
-            var input = PartInputs.Idle;
-            input.LegLeft.YawDelta = 10f;
-            input.LegRight.YawDelta = 20f;
-            Assert.AreEqual(15f, TrenchcoatIntentMixer.Mix(input, BodyPart.All, 0f, Settings).YawDelta, Eps);
-
-            var onlyLeft = BodyPart.All & ~BodyPart.LegRight;
-            Assert.AreEqual(10f * Settings.LimpSpeedFactor, TrenchcoatIntentMixer.Mix(input, onlyLeft, 0f, Settings).YawDelta, Eps);
-
-            Assert.AreEqual(0f, TrenchcoatIntentMixer.Mix(input, BodyPart.Arms | BodyPart.Head, 0f, Settings).YawDelta, Eps);
-        }
-
-        [Test]
-        public void Mix_YawDelta_RejectsNaNAndHugeSpikes()
-        {
-            var input = PartInputs.Idle;
-            input.LegLeft.YawDelta = float.NaN;
-            input.LegRight.YawDelta = 1000f;
-            Assert.AreEqual(45f, TrenchcoatIntentMixer.Mix(input, BodyPart.All, 0f, Settings).YawDelta, Eps,
-                "NaN counts as 0, spikes are capped at 90 degrees per frame");
+            var slumped = TrenchcoatIntentMixer.Mix(input, BodyPart.All & ~BodyPart.Head, 0f, Settings);
+            Assert.IsTrue(slumped.HeadSlumped);
+            Assert.AreEqual(Vector3.zero, slumped.HeadAim);
         }
     }
 }

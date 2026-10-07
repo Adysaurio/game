@@ -1,7 +1,13 @@
 {
   "name": "TrashPandas.Editor",
   "rootNamespace": "TrashPandas.EditorTools",
-  "references": ["TrashPandas.Core", "TrashPandas.Runtime"],
-  "includePlatforms": ["Editor"],
+  "references": [
+    "TrashPandas.Core",
+    "TrashPandas.Runtime",
+    "Unity.Cinemachine"
+  ],
+  "includePlatforms": [
+    "Editor"
+  ],
   "autoReferenced": false
 }

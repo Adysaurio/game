@@ -2,6 +2,7 @@ using System.IO;
 using TrashPandas.Runtime.Cameras;
 using TrashPandas.Runtime.Raccoon;
 using TrashPandas.Runtime.Trenchcoat;
+using Unity.Cinemachine;
 using UnityEditor;
 using UnityEditor.SceneManagement;
 using UnityEngine;
@@ -69,21 +70,56 @@ namespace TrashPandas.EditorTools
 
             var camGo = new GameObject("Main Camera");
             camGo.tag = "MainCamera";
-            camGo.AddComponent<Camera>();
+            var outputCamera = camGo.AddComponent<Camera>();
             camGo.AddComponent<AudioListener>();
             camGo.transform.position = new Vector3(0f, 3f, -5f);
-            var follow = camGo.AddComponent<FollowCamera>();
+            camGo.AddComponent<CinemachineBrain>().UpdateMethod = CinemachineBrain.UpdateMethods.LateUpdate;
+            var rig = BuildPlayerCamera(outputCamera, body.transform);
+
 
             var controller = new GameObject("TrenchcoatController").AddComponent<TrenchcoatController>();
             controller.PlayerCount = 3;
             controller.Body = body;
             controller.RaccoonPrefab = raccoonPrefab;
-            controller.Camera = follow;
+            controller.CameraRig = rig;
 
             EditorSceneManager.SaveScene(scene, ScenePath);
             EditorBuildSettings.scenes = new[] { new EditorBuildSettingsScene(ScenePath, true) };
             AssetDatabase.SaveAssets();
             Debug.Log($"[GreyboxSceneBuilder] Built {ScenePath}");
+        }
+
+        static PlayerCameraRig BuildPlayerCamera(Camera output, Transform target)
+        {
+            var go = new GameObject("PlayerCamera");
+            var vcam = go.AddComponent<CinemachineCamera>();
+            vcam.Follow = target;
+            vcam.LookAt = target;
+            vcam.Lens.FieldOfView = 55f;
+
+            var orbit = go.AddComponent<CinemachineOrbitalFollow>();
+            orbit.OrbitStyle = CinemachineOrbitalFollow.OrbitStyles.Sphere;
+            orbit.Radius = 5.5f;
+            orbit.TargetOffset = new Vector3(0f, 1.4f, 0f);
+            var tracker = orbit.TrackerSettings;
+            tracker.BindingMode = Unity.Cinemachine.TargetTracking.BindingMode.WorldSpace;
+            tracker.PositionDamping = new Vector3(0.1f, 0.3f, 0.2f);
+            orbit.TrackerSettings = tracker;
+            orbit.VerticalAxis.Range = new Vector2(-20f, 70f);
+            orbit.VerticalAxis.Value = 15f;
+            orbit.HorizontalAxis.Recentering.Enabled = false;
+            orbit.VerticalAxis.Recentering.Enabled = false;
+
+            var composer = go.AddComponent<CinemachineRotationComposer>();
+            composer.TargetOffset = new Vector3(0f, 1.4f, 0f);
+            composer.Damping = new Vector2(0.15f, 0.15f);
+
+            var rig = go.AddComponent<PlayerCameraRig>();
+            rig.VirtualCamera = vcam;
+            rig.Orbit = orbit;
+            rig.Composer = composer;
+            rig.OutputCamera = output;
+            return rig;
         }
 
         static TrenchcoatBody BuildTrenchcoat(Material coat, Material skin, Material pants)
@@ -96,6 +132,8 @@ namespace TrashPandas.EditorTools
             col.height = 2.1f;
             col.radius = 0.35f;
             col.center = new Vector3(0f, 1.05f, 0f);
+            // Frictionless so ground contact doesn't fight the velocity we set every physics step.
+            col.sharedMaterial = FrictionlessMaterial();
 
             var torso = Visual(PrimitiveType.Capsule, "Torso", root.transform, TrenchcoatBody.TorsoRest, new Vector3(0.7f, 0.6f, 0.5f), coat);
             var head = Visual(PrimitiveType.Sphere, "Head", root.transform, TrenchcoatBody.HeadRest, Vector3.one * 0.35f, skin);
@@ -166,6 +204,22 @@ namespace TrashPandas.EditorTools
             go.transform.localScale = scale;
             go.GetComponent<Renderer>().sharedMaterial = mat;
             return go.transform;
+        }
+
+        static PhysicsMaterial FrictionlessMaterial()
+        {
+            string path = $"{MaterialDir}/CoatFrictionless.physicMaterial";
+            var mat = AssetDatabase.LoadAssetAtPath<PhysicsMaterial>(path);
+            if (mat == null)
+            {
+                mat = new PhysicsMaterial("CoatFrictionless");
+                AssetDatabase.CreateAsset(mat, path);
+            }
+            mat.dynamicFriction = 0f;
+            mat.staticFriction = 0f;
+            mat.frictionCombine = PhysicsMaterialCombine.Minimum;
+            EditorUtility.SetDirty(mat);
+            return mat;
         }
 
         static Material Mat(string name, Color color)

@@ -1,6 +1,10 @@
 {
   "name": "TrashPandas.Runtime",
   "rootNamespace": "TrashPandas.Runtime",
-  "references": ["TrashPandas.Core", "Unity.InputSystem"],
+  "references": [
+    "TrashPandas.Core",
+    "Unity.InputSystem",
+    "Unity.Cinemachine"
+  ],
   "autoReferenced": true
 }

@@ -162,10 +162,15 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 5e646db5150bc401e8846557122d4cbb, type: 3}
   m_Name: 
   m_EditorClassIdentifier: TrashPandas.Runtime::TrashPandas.Runtime.Raccoon.RaccoonController
-  RunSpeed: 3.5
-  TurnSpeed: 220
+  RunSpeed: 4
+  Acceleration: 30
+  Deceleration: 40
+  AirControl: 0.5
+  TurnSpeed: 720
   JumpVelocity: 5.5
   Gravity: -20
+  FallGravityMultiplier: 2
+  JumpCutMultiplier: 2.5
   ClimbSpeed: 2.5
   StandHeight: 0.6
   CrouchHeight: 0.3

@@ -8,81 +8,108 @@ using UnityEngine;
 
 namespace TrashPandas.Runtime.Trenchcoat
 {
-    /// <summary>Debug-mode orchestrator: one person drives every slot, can hop out as a raccoon and back.</summary>
+    /// <summary>
+    /// Debug-mode orchestrator: one person drives every slot, can hop out as a raccoon and back, and can
+    /// record ghost inputs so recorded roles keep playing while they control another one.
+    /// </summary>
     public sealed class TrenchcoatController : MonoBehaviour
     {
         public int PlayerCount = 3;
         public TrenchcoatBody Body;
         public RaccoonController RaccoonPrefab;
-        public FollowCamera Camera;
+        public PlayerCameraRig CameraRig;
         public float ReturnDistance = 1.6f;
-        [Header("Mouse sensitivity (tweak live in Play mode)")]
-        public float TurnSensitivity = 0.25f;
-        public float HandSensitivity = 0.004f;
-        public float LookSensitivity = 0.15f;
+        public float CoatCameraRadius = 5.5f;
+        public float CoatLookHeight = 1.4f;
+        public float RaccoonCameraRadius = 3f;
+        public float RaccoonLookHeight = 0.4f;
 
         readonly MixerSettings _mixer = new MixerSettings();
         readonly Dictionary<int, SlotInput> _inputs = new Dictionary<int, SlotInput>();
+        readonly Dictionary<int, InputGhost> _ghosts = new Dictionary<int, InputGhost>();
         readonly DebugInputReader _reader = new DebugInputReader();
         SlotSystem _slots;
         DebugPossessionModel _possession;
         RaccoonController _raccoon;
+        int? _recording;
         string _status = "";
-        bool _cursorFreed;
+        bool _showHelp = true;
 
         void Awake()
         {
+            Time.fixedDeltaTime = 1f / 60f; // physics at 60 Hz: smoother follow on common displays
             _slots = new SlotSystem(Mathf.Clamp(PlayerCount, SlotLayout.MinPlayers, SlotLayout.MaxPlayers));
             _possession = new DebugPossessionModel(_slots);
-            Camera.Follow(Body.transform, 5f, 3f);
+            CameraRig.SetTarget(Body.transform, CoatCameraRadius, CoatLookHeight);
         }
 
         void Update()
         {
-            _reader.TurnSensitivity = TurnSensitivity;
-            _reader.HandSensitivity = HandSensitivity;
-            _reader.LookSensitivity = LookSensitivity;
-            // Esc frees the mouse (e.g. to use the inspector); clicking the game view captures it again.
-            if (_reader.EscapePressed) _cursorFreed = true;
-            else if (_cursorFreed && _reader.ClickPressed) _cursorFreed = false;
-            SetCursorLocked(!_cursorFreed);
-
-            if (_reader.CyclePressed) _possession.CycleNext();
+            float now = Time.time;
             int selected = _reader.SelectPressed();
+            if (selected >= 0 || _reader.CyclePressed) StopRecording(now);
             if (selected >= 0) _possession.TrySelect(selected);
-            if (_reader.TogglePressed) Toggle();
+            if (_reader.CyclePressed) _possession.CycleNext();
+            if (_reader.TogglePressed) Toggle(now);
+            if (_reader.RecordPressed) ToggleRecording(now);
+            if (UnityEngine.InputSystem.Keyboard.current?.f1Key.wasPressedThisFrame == true) _showHelp = !_showHelp;
+            if (_reader.ClearGhostsPressed) { _ghosts.Clear(); _recording = null; _status = "Ghosts cleared"; }
 
             _inputs.Clear();
+            foreach (var pair in _ghosts)
+                if (pair.Value.HasRecording && pair.Key != _recording) _inputs[pair.Key] = pair.Value.Sample(now);
+
             if (_possession.ActiveIsOutside)
             {
-                _raccoon.SetInput(_reader.Move(), _reader.MouseYaw(), _reader.JumpPressed, _reader.CrouchHeld);
+                _raccoon.SetInput(_reader.CameraRelativeMove(CameraRig), _reader.JumpPressed, _reader.JumpHeld, _reader.CrouchHeld);
             }
             else
             {
-                var parts = _slots.PartsOf(_slots.SlotOf(_possession.ActivePlayerId).Value);
-                _inputs[_possession.ActivePlayerId] = _reader.ReadSlotInput(parts, Time.time, Time.deltaTime);
+                var live = _reader.ReadSlotInput(CameraRig, now);
+                _inputs[_possession.ActivePlayerId] = live; // you always override your own ghost
+                if (_recording == _possession.ActivePlayerId) _ghosts[_possession.ActivePlayerId].Record(now, live);
             }
 
             var partInputs = SlotInputRouter.Route(_slots, _inputs);
-            Body.SetIntent(TrenchcoatIntentMixer.Mix(partInputs, _slots.ControlledParts, Time.time, _mixer));
+            Body.SetIntent(TrenchcoatIntentMixer.Mix(partInputs, _slots.ControlledParts, now, _mixer));
         }
 
-        void OnDisable() => SetCursorLocked(false);
-
-        static void SetCursorLocked(bool locked)
+        void ToggleRecording(float now)
         {
-            Cursor.lockState = locked ? CursorLockMode.Locked : CursorLockMode.None;
-            Cursor.visible = !locked;
+            if (_recording.HasValue) { StopRecording(now); return; }
+            if (_possession.ActiveIsOutside) return;
+            var ghost = new InputGhost();
+            _ghosts[_possession.ActivePlayerId] = ghost;
+            _recording = _possession.ActivePlayerId;
+            _status = $"● REC P{_recording} — press R to stop, then switch roles";
         }
 
-        void Toggle()
+        void StopRecording(float now)
+        {
+            if (!_recording.HasValue) return;
+            var ghost = _ghosts[_recording.Value];
+            if (ghost.HasRecording)
+            {
+                ghost.StartPlayback(now);
+                _status = $"Ghost P{_recording} replaying ({ghost.Duration:F1}s loop)";
+            }
+            else
+            {
+                _ghosts.Remove(_recording.Value);
+                _status = "";
+            }
+            _recording = null;
+        }
+
+        void Toggle(float now)
         {
             if (!_possession.ActiveIsOutside)
             {
+                StopRecording(now);
                 if (!_possession.LeaveCoat()) return;
                 Vector3 spawn = Body.transform.position + Body.transform.right * 0.9f + Vector3.up * 0.2f;
                 _raccoon = Instantiate(RaccoonPrefab, spawn, Body.transform.rotation);
-                Camera.Follow(_raccoon.transform, 2.5f, 1.4f);
+                CameraRig.SetTarget(_raccoon.transform, RaccoonCameraRadius, RaccoonLookHeight);
                 _status = "";
                 return;
             }
@@ -93,35 +120,39 @@ namespace TrashPandas.Runtime.Trenchcoat
 
             Destroy(_raccoon.gameObject);
             _raccoon = null;
-            Camera.Follow(Body.transform, 5f, 3f);
+            CameraRig.SetTarget(Body.transform, CoatCameraRadius, CoatLookHeight);
             _status = "";
         }
 
         void OnGUI()
         {
-            GUILayout.BeginArea(new Rect(10, 10, 560, 300), GUI.skin.box);
-            GUILayout.Label($"DEBUG — {_slots.SlotCount} players   [1-{_slots.SlotCount}] / [Tab] switch   [E] out/in   [Esc] free mouse");
+            var style = new GUIStyle(GUI.skin.label) { fontSize = 12 };
+            var lines = new List<string>();
+            var slotsLine = "";
             for (int i = 0; i < _slots.SlotCount; i++)
             {
                 var occupant = _slots.OccupantOf(i);
-                string who = occupant.HasValue ? $"P{occupant.Value}" : "— EMPTY —";
-                string me = occupant == _possession.ActivePlayerId ? "  ◀ YOU" : "";
-                GUILayout.Label($"Slot {i} [{_slots.PartsOf(i)}]: {who}{me}");
+                string mark = !occupant.HasValue ? "·empty"
+                            : occupant == _possession.ActivePlayerId ? "◀YOU"
+                            : _ghosts.ContainsKey(occupant.Value) ? "👻" : "";
+                if (occupant.HasValue && occupant == _recording) mark += "●REC";
+                slotsLine += $"[{i + 1}] {_slots.PartsOf(i)} {mark}   ";
             }
-            GUILayout.Label($"Missing: {_slots.MissingParts}");
-            if (_possession.ActiveIsOutside)
+            lines.Add(slotsLine);
+            if (_showHelp)
             {
-                GUILayout.Label($"P{_possession.ActivePlayerId} is a loose raccoon");
-                GUILayout.Label("WASD move · Mouse turn · Space jump · Ctrl crouch · walk into red/marked hedge to climb");
+                if (_possession.ActiveIsOutside)
+                    lines.Add("RACCOON  Mouse camera · WASD run · Space jump (hold=higher) · Ctrl crouch · walk into red curtain to climb · E near coat");
+                else
+                    lines.Add(DebugInputReader.HintFor(_slots.PartsOf(_slots.SlotOf(_possession.ActivePlayerId).Value)));
+                lines.Add("Tab/1-5 switch · E out/in · R record ghost · Backspace clear ghosts · Esc free mouse · F1 hide help");
             }
-            else
-            {
-                var slot = _slots.SlotOf(_possession.ActivePlayerId).Value;
-                GUILayout.Label($"YOU control: {_slots.PartsOf(slot)}");
-                GUILayout.Label(DebugInputReader.HintFor(_slots.PartsOf(slot)));
-            }
-            if (_status.Length > 0) GUILayout.Label(_status);
-            GUILayout.EndArea();
+            if (_status.Length > 0) lines.Add(_status);
+
+            float h = lines.Count * 18f + 8f;
+            GUI.Box(new Rect(8, Screen.height - h - 8, Screen.width - 16, h), GUIContent.none);
+            for (int i = 0; i < lines.Count; i++)
+                GUI.Label(new Rect(14, Screen.height - h - 4 + i * 18f, Screen.width - 28, 18), lines[i], style);
         }
     }
 }
