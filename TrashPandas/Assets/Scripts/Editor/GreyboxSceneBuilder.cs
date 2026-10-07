@@ -263,6 +263,12 @@ namespace TrashPandas.EditorTools
             rb.mass = mass;
             rb.interpolation = RigidbodyInterpolation.Interpolate;
             go.AddComponent<Grabbable>().RequiresBothHands = bothHands;
+
+            // Online: the host simulates and grabs; everyone sees the same glass fly.
+            go.AddComponent<NetworkObject>();
+            var nt = go.AddComponent<NetworkTransform>();
+            nt.SyncScaleX = nt.SyncScaleY = nt.SyncScaleZ = false;
+            go.AddComponent<NetworkRigidbody>();
             return go;
         }
 
