@@ -10,7 +10,7 @@ namespace TrashPandas.Runtime.Raccoon
     [RequireComponent(typeof(CharacterController))]
     public sealed class RaccoonController : MonoBehaviour
     {
-        public float RunSpeed = 4f;
+        public float RunSpeed = 4.4f;
         public float Acceleration = 30f;
         public float Deceleration = 40f;
         public float AirControl = 0.5f;

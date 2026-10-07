@@ -23,8 +23,8 @@ namespace TrashPandas.Runtime.Panic
         public string[] ExitNames = new string[0];
         public float ExitRadius = 1.3f;
         public float TimeLimit = 90f;
-        public float ChaserSpeed = 3.3f;
-        public float CatSpeed = 4.2f;
+        public float ChaserSpeed = 3.6f;
+        public float CatSpeed = 4.6f;
         public float HitImpulse = 5.5f;
         public float CatPushImpulse = 3.5f;
         public Transform Overview;

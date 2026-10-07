@@ -23,7 +23,7 @@ namespace TrashPandas.Runtime.Trenchcoat
         public Transform RightArm;
 
         [Header("Movement")]
-        public float MoveSpeed = 1.8f;
+        public float MoveSpeed = 2.2f;
         public float Acceleration = 10f;
         public float Deceleration = 14f;
         public float TurnSpeed = 300f;
