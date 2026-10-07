@@ -207,7 +207,13 @@ namespace TrashPandas.EditorTools
             Person("Guest_Standing_2", NpcKind.Guest, new Vector3(11f, 0f, -3f), 90f, outfits[n++ % outfits.Length], skin, false);
             Person("Guest_Standing_3", NpcKind.Guest, new Vector3(12.2f, 0f, -3f), -90f, outfits[n++ % outfits.Length], skin, false);
 
+            // Social-event speakers (stage 3b). They're guests too: they see and react like everyone else.
+            Person("MotherInLaw", NpcKind.Guest, new Vector3(-3f, 0f, 13f), 180f, new Color(0.55f, 0.3f, 0.65f), skin, false).SpeakerId = "MotherInLaw";
+            Person("Priest", NpcKind.Guest, new Vector3(8f, 0f, 13f), 200f, new Color(0.08f, 0.08f, 0.1f), skin, false).SpeakerId = "Priest";
+            Person("Bride", NpcKind.Guest, new Vector3(12f, 0f, 4f), 250f, new Color(0.98f, 0.97f, 0.95f), skin, false).SpeakerId = "Bride";
+
             var waiter = Person("Waiter", NpcKind.Waiter, new Vector3(-12f, 0f, 9.5f), 0f, new Color(0.12f, 0.12f, 0.14f), skin, false);
+            waiter.SpeakerId = "Waiter";
             waiter.gameObject.AddComponent<NpcRoute>().Points = new[]
             {
                 new Vector3(-12f, 0f, 9.5f), new Vector3(-6f, 0f, 6.8f), new Vector3(0f, 0f, 6.8f), new Vector3(6f, 0f, 6.8f),
@@ -226,6 +232,10 @@ namespace TrashPandas.EditorTools
             d.Coat = coat;
             d.Navigation = nav;
             new GameObject("SuspicionHud").AddComponent<SuspicionHud>();
+            var events = new GameObject("SocialEventDirector");
+            events.AddComponent<NetworkObject>();
+            events.AddComponent<SocialEventDirector>();
+            new GameObject("EventHud").AddComponent<EventHud>();
             BuildPanic();
         }
 
