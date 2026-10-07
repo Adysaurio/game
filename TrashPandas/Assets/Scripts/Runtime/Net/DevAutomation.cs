@@ -25,6 +25,8 @@ namespace TrashPandas.Runtime.Net
         bool _telemetry;
         float _nextLog;
         bool _connected;
+        float _shotAt = -1f;
+        string _shotPath;
 
         static string Value(string flag)
         {
@@ -45,6 +47,9 @@ namespace TrashPandas.Runtime.Net
             int.TryParse(Value("-autostart"), out _autoStart);
             if (float.TryParse(Value("-quitafter"), System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out float q)) _quitAt = q;
             _telemetry = Args.Contains("-telemetry");
+            int s = Array.IndexOf(Args, "-shot");
+            if (s >= 0 && s + 2 < Args.Length && float.TryParse(Args[s + 1], System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out float at))
+            { _shotAt = at; _shotPath = Args[s + 2]; }
         }
 
         async void Start()
@@ -66,11 +71,34 @@ namespace TrashPandas.Runtime.Net
                 Log($"autostart with {nm.ConnectedClientsIds.Count} players");
                 session.StartRound();
             }
+            if (_shotAt > 0f && Time.realtimeSinceStartup >= _shotAt)
+            {
+                _shotAt = -1f;
+                ScreenCapture.CaptureScreenshot(_shotPath);
+                Log($"screenshot {_shotPath}");
+            }
             if (_telemetry && Time.realtimeSinceStartup >= _nextLog)
             {
                 _nextLog = Time.realtimeSinceStartup + 0.5f;
                 LogTelemetry();
             }
+        }
+
+        static string NpcSummary()
+        {
+            var d = TrashPandas.Runtime.Npc.SuspicionDirector.Instance;
+            if (!d) return "";
+            int curious = 0, alarmed = 0; string cat = "-";
+            foreach (var b in d.Brains)
+            {
+                if (!b.Pawn) continue;
+                if (b.Pawn.Kind == TrashPandas.Runtime.Npc.NpcKind.Cat) { cat = ((TrashPandas.Core.Npc.CatState)b.Pawn.Mood).ToString(); continue; }
+                var s = (TrashPandas.Core.Npc.GuestState)b.Pawn.Mood;
+                if (s == TrashPandas.Core.Npc.GuestState.Curious) curious++;
+                if (s == TrashPandas.Core.Npc.GuestState.Alarmed) alarmed++;
+            }
+            var f = d.LastFrame;
+            return $" suspicion={d.Suspicion:F1} caught={d.Caught} curious={curious} alarmed={alarmed} cat={cat} frame[missing={f.MissingParts} seen={f.CoatWitnessed} weird={f.SeenWeirdness:F2} hiss={f.CatHissing}] dt={Time.deltaTime:F3}";
         }
 
         static void LogTelemetry()
@@ -82,7 +110,7 @@ namespace TrashPandas.Runtime.Net
                 var offlineBody = UnityEngine.Object.FindFirstObjectByType<TrashPandas.Runtime.Trenchcoat.TrenchcoatBody>();
                 var glass = UnityEngine.GameObject.Find("Glass_1a");
                 Log(offlineBody
-                    ? $"offline-debug coat={offlineBody.transform.position} kinematic={offlineBody.GetComponent<Rigidbody>().isKinematic} glassKinematic={(glass ? glass.GetComponent<Rigidbody>().isKinematic.ToString() : "-")}"
+                    ? $"offline-debug coat={offlineBody.transform.position} kinematic={offlineBody.GetComponent<Rigidbody>().isKinematic} glassKinematic={(glass ? glass.GetComponent<Rigidbody>().isKinematic.ToString() : "-")}{NpcSummary()}"
                     : "offline");
                 return;
             }
@@ -92,7 +120,7 @@ namespace TrashPandas.Runtime.Net
             var b = coat.Body;
             string held = string.Join(",", Grabbable.All.Where(g => g && g.IsHeld).Select(g => g.name));
             string raccoon = NetworkedRaccoon.LocalOwned ? $" myRaccoon={NetworkedRaccoon.LocalOwned.transform.position}" : "";
-            Log($"me={nm.LocalClientId} host={nm.IsHost} seats=[{seats}] missing={snap.MissingParts} coat={b.transform.position} yaw={b.transform.eulerAngles.y:F0} leftHand={b.LeftHand.localPosition} heldOnHost=[{held}] raccoons={UnityEngine.Object.FindObjectsByType<NetworkedRaccoon>(FindObjectsSortMode.None).Length}{raccoon}");
+            Log($"me={nm.LocalClientId} host={nm.IsHost} seats=[{seats}] missing={snap.MissingParts} coat={b.transform.position} yaw={b.transform.eulerAngles.y:F0} leftHand={b.LeftHand.localPosition} heldOnHost=[{held}] raccoons={UnityEngine.Object.FindObjectsByType<NetworkedRaccoon>(FindObjectsSortMode.None).Length}{raccoon}{NpcSummary()}");
         }
 
         static void Log(string msg) => Debug.Log($"[DEV {Time.realtimeSinceStartup:F1}] {msg}");

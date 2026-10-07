@@ -40,6 +40,7 @@ namespace TrashPandas.Runtime.Trenchcoat
         bool? _armsCamera;
         HandGrabber _grabber;
         bool _showHelp = true;
+        bool _botHopped;
 
         void Awake()
         {
@@ -81,6 +82,7 @@ namespace TrashPandas.Runtime.Trenchcoat
             if (selected >= 0) _possession.TrySelect(selected);
             if (_reader.CyclePressed) _possession.CycleNext();
             if (_reader.TogglePressed) Toggle(now);
+            if (Net.DevAutomation.Bot == "hop" && !_botHopped && Time.timeSinceLevelLoad > 3f) { _botHopped = true; Toggle(now); } // dev automation
             if (_reader.RecordPressed) ToggleRecording(now);
             UpdateCoatCamera();
             if (UnityEngine.InputSystem.Keyboard.current?.f1Key.wasPressedThisFrame == true) _showHelp = !_showHelp;
@@ -92,18 +94,35 @@ namespace TrashPandas.Runtime.Trenchcoat
 
             if (_possession.ActiveIsOutside)
             {
-                _raccoon.SetInput(_reader.CameraRelativeMove(CameraRig), _reader.JumpPressed, _reader.JumpHeld, _reader.CrouchHeld);
+                var raccoonMove = Net.DevAutomation.Bot == "hop" ? new Vector2(0f, 1f) : _reader.CameraRelativeMove(CameraRig); // dev: run toward the tables
+                _raccoon.SetInput(raccoonMove, _reader.JumpPressed, _reader.JumpHeld, _reader.CrouchHeld);
             }
             else
             {
                 var live = _reader.ReadSlotInput(CameraRig, Body, now);
                 if (Net.DevAutomation.Bot == "walk") live.Move = new Vector2(0f, 1f); // dev automation
+                if (Net.DevAutomation.Bot == "tocat") live.Move = TowardCat();
                 _inputs[_possession.ActivePlayerId] = live; // you always override your own ghost
                 if (_recording == _possession.ActivePlayerId) _ghosts[_possession.ActivePlayerId].Record(now, live);
             }
 
             var partInputs = SlotInputRouter.Route(_slots, _inputs);
             Body.SetIntent(TrenchcoatIntentMixer.Mix(partInputs, _slots.ControlledParts, now, _mixer));
+        }
+
+        /// <summary>Dev automation: walk the coat toward the cat, stopping a step away.</summary>
+        Vector2 TowardCat()
+        {
+            var d = TrashPandas.Runtime.Npc.SuspicionDirector.Instance;
+            if (!d) return Vector2.zero;
+            foreach (var b in d.Brains)
+                if (b.Pawn && b.Pawn.Kind == TrashPandas.Runtime.Npc.NpcKind.Cat)
+                {
+                    Vector3 to = b.Pawn.transform.position - Body.transform.position;
+                    to.y = 0f;
+                    return to.magnitude < 1.2f ? Vector2.zero : new Vector2(to.x, to.z).normalized;
+                }
+            return Vector2.zero;
         }
 
         void ToggleRecording(float now)

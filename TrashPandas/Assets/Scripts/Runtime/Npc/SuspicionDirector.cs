@@ -40,6 +40,8 @@ namespace TrashPandas.Runtime.Npc
         public float Suspicion => SimulationAuthority.IsOnline ? _suspicion.Value : (_model?.Value ?? 0f);
         public bool Caught => SimulationAuthority.IsOnline ? _caught.Value : (_model?.Caught ?? false);
         public IReadOnlyList<NpcBrain> Brains => _brains;
+        /// <summary>Last perception frame fed to the meter (diagnostics).</summary>
+        public SuspicionFrame LastFrame { get; private set; }
 
         void Awake()
         {
@@ -114,6 +116,7 @@ namespace TrashPandas.Runtime.Npc
                 brain.Stroll(dt, state);
             }
 
+            LastFrame = frame;
             _model.Tick(dt, frame);
             Publish();
         }

@@ -15,7 +15,8 @@ namespace TrashPandas.Tests
 
         static void Run(SuspicionModel m, float seconds, SuspicionFrame f, float step = 0.1f)
         {
-            for (float t = 0; t < seconds - 1e-4f; t += step) m.Tick(step, f);
+            long steps = (long)System.Math.Round(seconds / (double)step);
+            for (long i = 0; i < steps; i++) m.Tick(step, f);
         }
 
         [Test]
@@ -113,6 +114,35 @@ namespace TrashPandas.Tests
             m.Reset();
             Assert.IsFalse(m.Caught);
             Assert.AreEqual(0f, m.Value);
+        }
+    
+        [TestCase(0.016f)]
+        [TestCase(0.0001f)]
+        [TestCase(0.000001f)]
+        public void Calm_DecaysAtAnyFrameRate(float step)
+        {
+            var m = new SuspicionModel(S());
+            m.ReportRaccoonSighting(1, 0f); // 20
+            Run(m, 4f, default, step);      // 2 s delay + 2 s of decay at 5/s
+            Assert.AreEqual(10f, m.Value, 0.3f, $"dt={step}");
+        }
+
+        [TestCase(0.0001f)]
+        [TestCase(0.000001f)]
+        public void Rise_IsFrameRateIndependent(float step)
+        {
+            var m = new SuspicionModel(S());
+            Run(m, 1f, new SuspicionFrame { CatHissing = true }, step);
+            Assert.AreEqual(15f, m.Value, 0.3f, $"dt={step}");
+        }
+    
+        [Test]
+        public void NegligibleWeirdness_DoesNotBlockCalmDecay()
+        {
+            var m = new SuspicionModel(S());
+            m.ReportRaccoonSighting(1, 0f); // 20
+            Run(m, 4f, new SuspicionFrame { CoatWitnessed = true, SeenWeirdness = 1e-6f });
+            Assert.AreEqual(10f, m.Value, 0.3f, "a rounding-level wobble while walking is not 'something odd'");
         }
     }
 }

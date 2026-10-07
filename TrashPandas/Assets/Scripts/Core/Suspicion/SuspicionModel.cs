@@ -13,6 +13,8 @@ namespace TrashPandas.Core.Suspicion
         public float UnwitnessedFactor = 0.2f;
         /// <summary>Per second at weirdness 1 (collapsed, flailing) while seen.</summary>
         public float WeirdMovementRate = 12f;
+        /// <summary>Weirdness below this is noise (rounding while walking), not something odd.</summary>
+        public float WeirdnessFloor = 0.05f;
         /// <summary>Instant jump when a human spots a loose raccoon.</summary>
         public float RaccoonSightingBurst = 20f;
         /// <summary>Seconds before the same human can count another sighting.</summary>
@@ -39,9 +41,11 @@ namespace TrashPandas.Core.Suspicion
     {
         readonly SuspicionSettings _s;
         readonly Dictionary<int, float> _lastSighting = new Dictionary<int, float>();
-        float _calmFor;
+        // Doubles: at very high frame rates a per-frame change is below float resolution near 30-100.
+        double _value;
+        double _calmFor;
 
-        public float Value { get; private set; }
+        public float Value => (float)_value;
         public bool Caught { get; private set; }
         public event Action<bool> CaughtChanged;
 
@@ -51,16 +55,16 @@ namespace TrashPandas.Core.Suspicion
         {
             if (Caught || dt <= 0f) return;
             float missing = CountParts(f.MissingParts) * _s.WitnessedMissingPartRate * (f.CoatWitnessed ? 1f : _s.UnwitnessedFactor);
-            float weird = f.CoatWitnessed ? Mathf.Clamp01(f.SeenWeirdness) * _s.WeirdMovementRate : 0f;
+            float weird = f.CoatWitnessed && f.SeenWeirdness >= _s.WeirdnessFloor ? Mathf.Clamp01(f.SeenWeirdness) * _s.WeirdMovementRate : 0f;
             float hiss = f.CatHissing ? _s.CatHissRate : 0f;
             float rise = missing + weird + hiss;
 
-            if (rise > 0f) { _calmFor = 0f; Add(rise * dt); return; }
+            if (rise > 0f) { _calmFor = 0.0; Add((double)rise * dt); return; }
 
-            float before = _calmFor;
+            double before = _calmFor;
             _calmFor += dt;
-            float decaying = Mathf.Max(0f, _calmFor - Mathf.Max(before, _s.CalmDelay));
-            if (decaying > 0f) Add(-_s.CalmDecayRate * decaying);
+            double decaying = _calmFor - System.Math.Max(before, _s.CalmDelay);
+            if (decaying > 0.0) Add(-_s.CalmDecayRate * decaying);
         }
 
         public bool ReportRaccoonSighting(int witnessId, float now)
@@ -68,23 +72,23 @@ namespace TrashPandas.Core.Suspicion
             if (Caught) return false;
             if (_lastSighting.TryGetValue(witnessId, out float last) && now - last < _s.SightingCooldown) return false;
             _lastSighting[witnessId] = now;
-            _calmFor = 0f;
+            _calmFor = 0.0;
             Add(_s.RaccoonSightingBurst);
             return true;
         }
 
         public void Reset()
         {
-            Value = 0f;
-            _calmFor = 0f;
+            _value = 0.0;
+            _calmFor = 0.0;
             _lastSighting.Clear();
             if (Caught) { Caught = false; CaughtChanged?.Invoke(false); }
         }
 
-        void Add(float amount)
+        void Add(double amount)
         {
-            Value = Mathf.Clamp(Value + amount, 0f, _s.Max);
-            if (!Caught && Value >= _s.Max)
+            _value = System.Math.Min(System.Math.Max(_value + amount, 0.0), _s.Max);
+            if (!Caught && _value >= _s.Max)
             {
                 Caught = true;
                 CaughtChanged?.Invoke(true);
