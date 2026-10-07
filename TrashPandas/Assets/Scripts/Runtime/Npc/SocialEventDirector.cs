@@ -47,6 +47,18 @@ namespace TrashPandas.Runtime.Npc
             }
         }
 
+        /// <summary>The speaker's transform on this machine (for the conversation camera), if any.</summary>
+        public Transform SpeakerTransform
+        {
+            get
+            {
+                if (Phase == EventPhase.Idle) return null;
+                foreach (var p in FindObjectsByType<NpcPawn>(FindObjectsSortMode.None))
+                    if (p.SpeakerId == Current.Speaker) return p.transform;
+                return null;
+            }
+        }
+
         void Awake()
         {
             Instance = this;

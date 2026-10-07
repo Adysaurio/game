@@ -84,13 +84,15 @@ namespace TrashPandas.Runtime.Net
             if (slot.HasValue)
             {
                 var parts = snapshot.PartsOf(slot.Value);
-                if (engaged != _eventCamera)
+                var ed = TrashPandas.Runtime.Npc.SocialEventDirector.Instance;
+                bool talking = ed && (engaged || ed.Phase == TrashPandas.Runtime.Npc.EventPhase.Resolved);
+                if (talking != _eventCamera)
                 {
-                    _eventCamera = engaged;
-                    if (engaged) CameraRig.SetTarget(_coat.Body.transform, 3.6f, 1.6f);
-                    else _armsCamera = null;
+                    _eventCamera = talking;
+                    if (talking) CameraRig.BeginConversation(_coat.Body.transform, ed.SpeakerTransform);
+                    else { CameraRig.EndConversation(); _armsCamera = null; }
                 }
-                if (!engaged) UpdateCamera(parts);
+                if (!talking) UpdateCamera(parts);
                 var input = _reader.ReadSlotInput(CameraRig, _coat.Body, now);
                 ApplyBot(ref input);
                 if (Time.unscaledTime >= _nextSend)
@@ -129,6 +131,7 @@ namespace TrashPandas.Runtime.Net
         void OnGUI()
         {
             UiScale.Apply();
+            if (CameraRig.InConversation) return; // the conversation owns the screen
             if (!_coat) return;
             var nm = NetworkManager.Singleton;
             var snapshot = _coat.Slots;

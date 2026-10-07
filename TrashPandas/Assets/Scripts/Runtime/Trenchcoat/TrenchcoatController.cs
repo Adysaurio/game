@@ -46,10 +46,12 @@ namespace TrashPandas.Runtime.Trenchcoat
 
         void UpdateEventCamera(bool engaged)
         {
-            if (engaged == _eventCamera || _possession.ActiveIsOutside) return;
-            _eventCamera = engaged;
-            if (engaged) CameraRig.SetTarget(Body.transform, 3.6f, 1.6f);
-            else { _armsCamera = null; UpdateCoatCamera(); }
+            var d = TrashPandas.Runtime.Npc.SocialEventDirector.Instance;
+            bool talking = d && (engaged || d.Phase == TrashPandas.Runtime.Npc.EventPhase.Resolved) && !_possession.ActiveIsOutside;
+            if (talking == _eventCamera) return;
+            _eventCamera = talking;
+            if (talking) CameraRig.BeginConversation(Body.transform, d.SpeakerTransform);
+            else { CameraRig.EndConversation(); _armsCamera = null; UpdateCoatCamera(); }
         }
         readonly List<RaccoonController> _botRaccoons = new List<RaccoonController>();
 
@@ -265,6 +267,7 @@ namespace TrashPandas.Runtime.Trenchcoat
         void OnGUI()
         {
             UiScale.Apply();
+            if (CameraRig.InConversation) return; // the conversation owns the screen
             DrawCrosshair();
             var style = new GUIStyle(GUI.skin.label) { fontSize = 12 };
             var lines = new List<string>();
