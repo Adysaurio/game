@@ -144,7 +144,11 @@ namespace TrashPandas.Runtime.Npc
                     break;
                 case EventPhase.Warning:
                     if (_speaker) _speaker.GoTo(MeetingPoint(coat));
-                    if (now >= _phaseEndsAt) StartEngaged(coat, now);
+                    if (now >= _phaseEndsAt) StartTalking(now);
+                    break;
+                case EventPhase.Talking:
+                    if (_speaker) { _speaker.Stop(); _speaker.LookAt(coat.ChestWorld); }
+                    if (now >= _phaseEndsAt) { _responses.Clear(); SetPhase(EventPhase.Engaged, now + ResponseWindow); }
                     break;
                 case EventPhase.Engaged:
                     if (_speaker) { _speaker.Stop(); _speaker.LookAt(coat.ChestWorld); }
@@ -193,7 +197,7 @@ namespace TrashPandas.Runtime.Npc
             SetPhase(EventPhase.Warning, now + warning);
         }
 
-        void StartEngaged(TrenchcoatBody coat, float now)
+        void StartTalking(float now)
         {
             // Who is in the coat is decided the moment the conversation starts (late arrivals don't count).
             _presentAtStart = PresentParts();
@@ -203,7 +207,8 @@ namespace TrashPandas.Runtime.Npc
             _offline.Arms = (byte)roll.Arms;
             _offline.Legs = (byte)roll.Legs;
             _offline.Order = roll.Order;
-            SetPhase(EventPhase.Engaged, now + ResponseWindow);
+            // First the line plays with no clock running; the response timer starts when it's your turn.
+            SetPhase(EventPhase.Talking, now + EventTiming.ReadingTime(SocialEventCatalog.All[_offline.EventIndex].Line));
         }
 
         void Resolve(SuspicionDirector suspicion, float now)

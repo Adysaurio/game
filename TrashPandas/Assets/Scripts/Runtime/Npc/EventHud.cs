@@ -72,9 +72,9 @@ namespace TrashPandas.Runtime.Npc
         void LateUpdate()
         {
             var d = SocialEventDirector.Instance;
-            bool talking = d && (d.Phase == EventPhase.Engaged || d.Phase == EventPhase.Resolved);
+            bool talking = d && (d.Phase == EventPhase.Talking || d.Phase == EventPhase.Engaged || d.Phase == EventPhase.Resolved);
             _barsK = Mathf.MoveTowards(_barsK, talking ? 1f : 0f, Time.unscaledDeltaTime / 0.35f);
-            if (d && d.Phase == EventPhase.Engaged && d.Snapshot.Serial != _engagedSerial)
+            if (d && d.Phase == EventPhase.Talking && d.Snapshot.Serial != _engagedSerial)
             {
                 _engagedSerial = d.Snapshot.Serial;
                 _engagedAt = Time.unscaledTime;
@@ -130,15 +130,28 @@ namespace TrashPandas.Runtime.Npc
 
             var line = _line ??= new GUIStyle(GUI.skin.label) { fontSize = 21, wordWrap = true, alignment = TextAnchor.UpperLeft };
             var parts = MyParts();
+            int shownChars = _engagedAt < 0f ? ev.Line.Length : Mathf.Clamp((int)((Time.unscaledTime - _engagedAt) * 30f), 0, ev.Line.Length);
+            if (d.Phase == EventPhase.Talking)
+            {
+                // The line plays; no clock yet.
+                GUI.Label(new Rect(x + 22, y + 14, w - 44, 56), "“" + ev.Line.Substring(0, shownChars) + (shownChars < ev.Line.Length ? "" : "”"), line);
+                GUI.color = new Color(1f, 0.85f, 0.4f);
+                GUI.Label(new Rect(x + 22, y + 92, w - 44, 26), _firstEventSeen ? "Get ready…" : "Each part of the body has a job — watch YOUR PART when it's your turn.", _small);
+                GUI.color = Color.white;
+                return;
+            }
             if (d.Phase == EventPhase.Engaged)
             {
+                _firstEventSeen = true;
+                GUI.color = new Color(1f, 0.85f, 0.3f);
+                GUI.Label(new Rect(x + w - 190, y - 30, 180, 30), $"YOUR TURN!  {Mathf.CeilToInt(snap.SecondsLeft)}s", _turn ??= new GUIStyle(GUI.skin.label) { fontSize = 20, fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleRight });
+                GUI.color = Color.white;
                 // Response timer along the top edge of the box.
                 GUI.color = new Color(1f, 0.85f, 0.3f);
                 GUI.DrawTexture(new Rect(x, y, w * Mathf.Clamp01(snap.SecondsLeft / d.ResponseWindow), 3), Texture2D.whiteTexture);
                 GUI.color = Color.white;
 
-                int shown = _engagedAt < 0f ? ev.Line.Length : Mathf.Clamp((int)((Time.unscaledTime - _engagedAt) * 55f), 0, ev.Line.Length);
-                GUI.Label(new Rect(x + 22, y + 14, w - 44, 56), "“" + ev.Line.Substring(0, shown) + (shown < ev.Line.Length ? "" : "”"), line);
+                GUI.Label(new Rect(x + 22, y + 14, w - 44, 56), "“" + ev.Line + "”", line);
 
                 float col = x + 22, ty = y + 76;
                 if ((parts & BodyPart.Head) != 0)
@@ -151,7 +164,7 @@ namespace TrashPandas.Runtime.Npc
                 float rx = x + w * 0.6f, ry = y + 76;
                 GUI.Label(new Rect(rx, ry, w * 0.38f, 22), "YOUR PART", _small);
                 ry += 24;
-                if ((parts & BodyPart.Head) != 0) { GUI.Label(new Rect(rx, ry, w * 0.38f, 22), "• Head: press 1, 2 or 3", _small); ry += 22; }
+                if ((parts & BodyPart.Head) != 0) { GUI.Label(new Rect(rx, ry, w * 0.38f, 22), "• Head: PRESS [1] [2] or [3]", _small); ry += 22; }
                 if ((parts & BodyPart.Arms) != 0) { GUI.Label(new Rect(rx, ry, w * 0.38f, 22), "• Arms: " + (ev.Arms == ArmsTask.None ? "nothing — act natural" : ArmsPrompt(ev.Arms)), _small); ry += 22; }
                 if ((parts & BodyPart.Legs) != 0) GUI.Label(new Rect(rx, ry, w * 0.38f, 22), "• Legs: " + (ev.Legs == LegsTask.None ? "nothing — act natural" : LegsPrompt(ev.Legs)), _small);
                 return;
@@ -166,21 +179,22 @@ namespace TrashPandas.Runtime.Npc
             GUI.Label(new Rect(x, y + 118, w, 26), $"Head: {Describe(snap.HeadOutcome)}     Arms: {Describe(snap.ArmsOutcome)}     Legs: {Describe(snap.LegsOutcome)}", _mid);
         }
 
-        GUIStyle _plate, _line;
+        GUIStyle _plate, _line, _turn;
+        static bool _firstEventSeen;
 
         static string ArmsPrompt(ArmsTask t) => t switch
         {
-            ArmsTask.Handshake => "hold LEFT CLICK to shake hands",
-            ArmsTask.TakeGlass => "hold LEFT CLICK to take it",
-            ArmsTask.HandsTogether => "hold LEFT + RIGHT CLICK: hands together",
+            ArmsTask.Handshake => "HOLD [LEFT CLICK] — shake hands",
+            ArmsTask.TakeGlass => "HOLD [LEFT CLICK] — take it",
+            ArmsTask.HandsTogether => "HOLD [LEFT + RIGHT CLICK] — hands together",
             _ => "",
         };
 
         static string LegsPrompt(LegsTask t) => t switch
         {
-            LegsTask.StayStill => "DON'T MOVE!",
-            LegsTask.Kneel => "hold CTRL to kneel",
-            LegsTask.DanceStep => "press SPACE: dance step!",
+            LegsTask.StayStill => "DON'T MOVE (hands off WASD)",
+            LegsTask.Kneel => "HOLD [CTRL] — kneel",
+            LegsTask.DanceStep => "PRESS [SPACE] — dance step!",
             _ => "",
         };
 

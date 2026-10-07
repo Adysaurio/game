@@ -95,7 +95,7 @@ namespace TrashPandas.Runtime.Net
             {
                 var parts = snapshot.PartsOf(slot.Value);
                 var ed = TrashPandas.Runtime.Npc.SocialEventDirector.Instance;
-                bool talking = ed && (engaged || ed.Phase == TrashPandas.Runtime.Npc.EventPhase.Resolved);
+                bool talking = ed && (engaged || ed.Phase == TrashPandas.Runtime.Npc.EventPhase.Resolved || ed.Phase == TrashPandas.Runtime.Npc.EventPhase.Talking);
                 if (talking != _eventCamera)
                 {
                     _eventCamera = talking;

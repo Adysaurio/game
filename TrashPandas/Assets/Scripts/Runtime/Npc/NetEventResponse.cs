@@ -19,7 +19,8 @@ namespace TrashPandas.Runtime.Npc
         }
     }
 
-    public enum EventPhase : byte { Idle, Warning, Engaged, Resolved }
+    /// <summary>Talking = the speaker's line plays and nobody is timed yet; Engaged = your turn, the timer runs.</summary>
+    public enum EventPhase : byte { Idle, Warning, Engaged, Resolved, Talking }
 
     /// <summary>What every client needs to draw the event: phase, which event, time left, and the result.</summary>
     public struct EventSnapshot : INetworkSerializable, System.IEquatable<EventSnapshot>

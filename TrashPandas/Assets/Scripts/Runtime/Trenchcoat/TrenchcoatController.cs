@@ -49,7 +49,7 @@ namespace TrashPandas.Runtime.Trenchcoat
         void UpdateEventCamera(bool engaged)
         {
             var d = TrashPandas.Runtime.Npc.SocialEventDirector.Instance;
-            bool talking = d && (engaged || d.Phase == TrashPandas.Runtime.Npc.EventPhase.Resolved) && !_possession.ActiveIsOutside;
+            bool talking = d && (engaged || d.Phase == TrashPandas.Runtime.Npc.EventPhase.Resolved || d.Phase == TrashPandas.Runtime.Npc.EventPhase.Talking) && !_possession.ActiveIsOutside;
             if (_burst) return; // after RUN the camera belongs to your raccoon
             if (talking == _eventCamera) return;
             _eventCamera = talking;
