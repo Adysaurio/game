@@ -281,8 +281,24 @@ namespace TrashPandas.EditorTools
             Visual(PrimitiveType.Cylinder, "SewerGrate", null, new Vector3(-15f, 0.01f, -5f), new Vector3(1.2f, 0.01f, 1.2f), grate);
             var exits = new[] { new Vector3(0f, 0f, -9.6f), new Vector3(-15f, 0f, -5f), new Vector3(-15.6f, 0f, 14f), new Vector3(14f, 0f, 8f) };
             var names = new[] { "Hedge gap (crouch!)", "Sewer", "Catering van", "Fountain" };
+            var markers = new GameObject[exits.Length];
             for (int i = 0; i < exits.Length; i++)
-                Visual(PrimitiveType.Cylinder, $"ExitRing_{i}", null, exits[i] + Vector3.up * 0.02f, new Vector3(2.4f, 0.005f, 2.4f), gold);
+            {
+                // Ring on the ground + a floating arrow (shaft + diamond tip pointing down). Hidden until RUN.
+                var marker = new GameObject($"ExitMarker_{i}");
+                marker.transform.position = exits[i];
+                Visual(PrimitiveType.Cylinder, "Ring", marker.transform, Vector3.up * 0.02f, new Vector3(2.4f, 0.005f, 2.4f), gold);
+                var arrow = new GameObject("Arrow").transform;
+                arrow.SetParent(marker.transform, false);
+                arrow.localPosition = Vector3.up * 3.8f;
+                Visual(PrimitiveType.Cube, "Shaft", arrow, Vector3.up * 0.45f, new Vector3(0.18f, 0.7f, 0.18f), gold);
+                var tip = Visual(PrimitiveType.Cube, "Tip", arrow, Vector3.zero, new Vector3(0.5f, 0.5f, 0.5f), gold);
+                tip.localRotation = Quaternion.Euler(45f, 0f, 45f);
+                foreach (var c in marker.GetComponentsInChildren<Collider>()) Object.DestroyImmediate(c);
+                marker.AddComponent<ExitBeacon>().Arrow = arrow;
+                marker.SetActive(false);
+                markers[i] = marker;
+            }
 
             var overview = new GameObject("Overview").transform;
             overview.position = new Vector3(0f, 0f, 3f);
@@ -292,6 +308,7 @@ namespace TrashPandas.EditorTools
             var pd = go.AddComponent<PanicDirector>();
             pd.Exits = exits;
             pd.ExitNames = names;
+            pd.ExitMarkers = markers;
             pd.Overview = overview;
             new GameObject("PanicHud").AddComponent<PanicHud>();
         }

@@ -20,6 +20,8 @@ namespace TrashPandas.Runtime.Panic
     public sealed class PanicDirector : NetworkBehaviour
     {
         public Vector3[] Exits = new Vector3[0];
+        /// <summary>Rings + floating arrows; only visible once RUN! starts.</summary>
+        public GameObject[] ExitMarkers = new GameObject[0];
         public string[] ExitNames = new string[0];
         public float ExitRadius = 1.3f;
         public float TimeLimit = 90f;
@@ -82,6 +84,8 @@ namespace TrashPandas.Runtime.Panic
 
         void Update()
         {
+            bool showExits = Phase != RoundPhase.Infiltration;
+            foreach (var m in ExitMarkers) if (m && m.activeSelf != showExits) m.SetActive(showExits);
             if (!SimulationAuthority.IsSimulating) return;
             var suspicion = SuspicionDirector.Instance;
             if (Phase == RoundPhase.Infiltration && suspicion && suspicion.Caught) BeginPanic(suspicion);
