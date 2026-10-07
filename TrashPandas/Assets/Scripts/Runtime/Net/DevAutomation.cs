@@ -19,14 +19,28 @@ namespace TrashPandas.Runtime.Net
     {
         public static string Bot { get; private set; }
 
-        /// <summary>Dev bots: once the panic starts, run for the sewer exit (index 1, an open path).</summary>
+        /// <summary>Dev bots: once the panic starts, run for an exit — "hopflee" the sewer (open path),
+        /// "hopgap" crouching through the hedge gap where humans can't follow.</summary>
         public static Vector2? FleeMove(Vector3 from)
         {
-            if (Bot != "hopflee" && Bot != "flee") return null;
+            if (Bot != "hopflee" && Bot != "flee" && Bot != "hopgap") return null;
             var pd = TrashPandas.Runtime.Panic.PanicDirector.Instance;
             if (!pd || pd.Phase != TrashPandas.Runtime.Panic.RoundPhase.Panic || pd.Exits.Length < 2) return null;
-            Vector3 to = pd.Exits[1] - from;
+            Vector3 exit = Bot == "hopgap" ? pd.Exits[0] : pd.Exits[1];
+            if (Bot == "hopgap" && from.z > -7f) exit = new Vector3(0f, 0f, -7f); // line up with the gap first
+            Vector3 to = exit - from;
             return new Vector2(to.x, to.z).normalized;
+        }
+
+        /// <summary>Crouch only at the hedge (crouching halves speed).</summary>
+        public static bool FleeCrouchAt(Vector3 pos) => Bot == "hopgap" && FleeActive && pos.z < -6.3f;
+        static bool FleeActive
+        {
+            get
+            {
+                var pd = TrashPandas.Runtime.Panic.PanicDirector.Instance;
+                return pd && pd.Phase == TrashPandas.Runtime.Panic.RoundPhase.Panic;
+            }
         }
         static string[] Args => Environment.GetCommandLineArgs();
 
@@ -47,6 +61,7 @@ namespace TrashPandas.Runtime.Net
 
         static DevAutomation s_instance;
         static bool s_autoConnectDone;
+        static bool s_restarted;
 
         void Awake()
         {
@@ -118,6 +133,10 @@ namespace TrashPandas.Runtime.Net
                 int armed = 0;
                 foreach (var w in UnityEngine.Object.FindObjectsByType<TrashPandas.Runtime.Panic.PanicWeapon>(FindObjectsSortMode.None)) if (w.Holder) armed++;
                 panic += $" armed={armed} left={snap.SecondsLeft:F0}s";
+                var opc = UnityEngine.Object.FindFirstObjectByType<OnlinePlayerController>();
+                if (opc) panic += $" spectating={opc.IsSpectating}";
+                if (Args.Contains("-autorestart") && pd.Phase == TrashPandas.Runtime.Panic.RoundPhase.Results && SessionHost.Instance && SessionHost.Instance.IsHost && !s_restarted)
+                { s_restarted = true; Log("autorestart"); pd.PlayAgain(); }
             }
             return panic + $" suspicion={d.Suspicion:F1} caught={d.Caught} curious={curious} alarmed={alarmed} cat={cat} frame[missing={f.MissingParts} seen={f.CoatWitnessed} weird={f.SeenWeirdness:F2} hiss={f.CatHissing}] dt={Time.deltaTime:F3}";
         }

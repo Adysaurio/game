@@ -20,9 +20,20 @@ namespace TrashPandas.Tests
         {
             var h = new HitTracker();
             h.TryHit(0, 1f);
-            Assert.AreEqual(HitResult.Ignored, h.TryHit(0, 1.5f), "same swing / pile-on within 0.8 s");
+            Assert.AreEqual(HitResult.Ignored, h.TryHit(0, 1.5f), "same swing / pile-on right after a hit");
             Assert.AreEqual(1, h.Hits(0));
-            Assert.AreEqual(HitResult.Stunned, h.TryHit(0, 1.9f));
+            Assert.AreEqual(HitResult.Stunned, h.TryHit(0, 2.6f));
+        }
+
+        [Test]
+        public void TwoChasersAlternating_CannotStunLock()
+        {
+            var h = new HitTracker();
+            h.TryHit(0, 0f);
+            Assert.AreEqual(HitResult.Ignored, h.TryHit(0, 0.8f), "still dizzy: no hit");
+            Assert.AreEqual(HitResult.Ignored, h.TryHit(0, 1.2f), "just got control back: a moment to run");
+            Assert.AreEqual(HitResult.Stunned, h.TryHit(0, 1.6f));
+            Assert.Greater(h.InvulnerableSeconds, h.StunSeconds, "you always get some control back between hits");
         }
 
         [Test]
@@ -39,8 +50,8 @@ namespace TrashPandas.Tests
         public void AfterCaught_FurtherHitsIgnored()
         {
             var h = new HitTracker();
-            h.TryHit(0, 1f); h.TryHit(0, 2f); h.TryHit(0, 3f);
-            Assert.AreEqual(HitResult.Ignored, h.TryHit(0, 5f));
+            h.TryHit(0, 1f); h.TryHit(0, 3f); h.TryHit(0, 5f);
+            Assert.AreEqual(HitResult.Ignored, h.TryHit(0, 7f));
             Assert.AreEqual(3, h.Hits(0));
         }
 

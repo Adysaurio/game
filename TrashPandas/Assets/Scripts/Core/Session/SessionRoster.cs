@@ -18,6 +18,8 @@ namespace TrashPandas.Core.Session
 
         public IReadOnlyList<ulong> Clients => _clients;
         public bool RoundStarted => Slots != null;
+        /// <summary>Enough connected players to (re)start a round.</summary>
+        public bool CanStart => _clients.Count >= SlotLayout.MinPlayers;
         public SlotSystem Slots { get; private set; }
 
         public bool Join(ulong clientId)

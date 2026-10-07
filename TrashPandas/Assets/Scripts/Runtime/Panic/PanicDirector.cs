@@ -89,6 +89,8 @@ namespace TrashPandas.Runtime.Panic
 
         void BeginPanic(SuspicionDirector suspicion)
         {
+            if (Debug.isDebugBuild && System.Array.IndexOf(System.Environment.GetCommandLineArgs(), "-slowchasers") >= 0)
+            { ChaserSpeed = 1f; CatSpeed = 1f; } // dev automation: let an escape happen deterministically
             SetPhase(RoundPhase.Panic);
             suspicion.Suspended = true;
 
@@ -178,7 +180,7 @@ namespace TrashPandas.Runtime.Panic
                 if (c.Weapon) c.Weapon.PlaySwing();
                 var result = _hits.TryHit(o.TargetId, now);
                 if (result == HitResult.Ignored) continue;
-                Push(target, dir * HitImpulse, 1f);
+                Push(target, dir * HitImpulse, _hits.StunSeconds);
                 if (result == HitResult.Caught && _outcome.MarkCaught(o.TargetId)) Freeze(target);
             }
 

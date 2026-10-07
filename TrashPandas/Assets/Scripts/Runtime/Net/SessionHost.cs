@@ -83,7 +83,7 @@ namespace TrashPandas.Runtime.Net
         /// <summary>Host: everyone still connected plays a fresh round of the game scene.</summary>
         public void RestartRound()
         {
-            if (!IsHost) return;
+            if (!IsHost || !Roster.CanStart) return; // checked before ending the round so the roster stays intact
             Roster.EndRound();
             Roster.StartRound();
             NetworkManager.Singleton.SceneManager.LoadScene(GameScene, LoadSceneMode.Single);

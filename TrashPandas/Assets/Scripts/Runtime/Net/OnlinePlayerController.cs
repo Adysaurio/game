@@ -24,6 +24,8 @@ namespace TrashPandas.Runtime.Net
         bool? _armsCamera;
         NetworkedRaccoon _cameraOnRaccoon;
         float _botHopAt = 8f;
+        bool _spectating;
+        public bool IsSpectating => _spectating;
         NetworkedTrenchcoat _coat;
 
         static bool Online => NetworkManager.Singleton && NetworkManager.Singleton.IsListening;
@@ -47,7 +49,7 @@ namespace TrashPandas.Runtime.Net
             int? slot = snapshot.SlotOfClient(nm.LocalClientId);
 
             var raccoon = NetworkedRaccoon.LocalOwned;
-            if ((DevAutomation.Bot == "hop" || DevAutomation.Bot == "hopflee") && slot.HasValue && Time.realtimeSinceStartup > _botHopAt) { _botHopAt = float.MaxValue; _coat.RequestLeaveRpc(); }
+            if ((DevAutomation.Bot == "hop" || DevAutomation.Bot == "hopflee" || DevAutomation.Bot == "hopgap") && slot.HasValue && Time.realtimeSinceStartup > _botHopAt) { _botHopAt = float.MaxValue; _coat.RequestLeaveRpc(); }
             if (_reader.TogglePressed)
             {
                 if (slot.HasValue) _coat.RequestLeaveRpc();
@@ -63,10 +65,18 @@ namespace TrashPandas.Runtime.Net
                 }
                 var move = DevAutomation.FleeMove(raccoon.transform.position)
                     ?? (DevAutomation.Bot == "hopflee" ? new Vector2(0f, 1f) : _reader.CameraRelativeMove(CameraRig)); // dev bots
-                raccoon.Controller.SetInput(move, _reader.JumpPressed, _reader.JumpHeld, _reader.CrouchHeld);
+                raccoon.Controller.SetInput(move, _reader.JumpPressed, _reader.JumpHeld, _reader.CrouchHeld || DevAutomation.FleeCrouchAt(raccoon.transform.position));
                 return;
             }
             if (_cameraOnRaccoon) { _cameraOnRaccoon = null; _armsCamera = null; }
+
+            // Escaped or caught during the panic: no seat, no raccoon — watch the others from above.
+            var panic = TrashPandas.Runtime.Panic.PanicDirector.Instance;
+            if (!slot.HasValue && panic && panic.Phase != TrashPandas.Runtime.Panic.RoundPhase.Infiltration && panic.Overview)
+            {
+                if (!_spectating) { _spectating = true; CameraRig.SetTarget(panic.Overview, 16f, 0f); }
+                return;
+            }
 
             if (slot.HasValue)
             {

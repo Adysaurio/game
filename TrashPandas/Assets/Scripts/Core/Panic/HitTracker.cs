@@ -12,7 +12,8 @@ namespace TrashPandas.Core.Panic
         readonly float _invulnerable;
         readonly Dictionary<int, (int hits, float lastHit)> _state = new Dictionary<int, (int, float)>();
 
-        public HitTracker(int hitsToCatch = 3, float stunSeconds = 1f, float invulnerableSeconds = 0.8f)
+        /// <summary>Invulnerability must outlast the stun so the player always gets control back between hits.</summary>
+        public HitTracker(int hitsToCatch = 3, float stunSeconds = 1f, float invulnerableSeconds = 1.5f)
         {
             _hitsToCatch = hitsToCatch;
             _stun = stunSeconds;
@@ -20,6 +21,8 @@ namespace TrashPandas.Core.Panic
         }
 
         public int HitsToCatch => _hitsToCatch;
+        public float StunSeconds => _stun;
+        public float InvulnerableSeconds => _invulnerable;
 
         public HitResult TryHit(int player, float now)
         {

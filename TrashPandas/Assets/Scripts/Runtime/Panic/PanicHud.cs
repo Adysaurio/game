@@ -92,10 +92,16 @@ namespace TrashPandas.Runtime.Panic
                 GUI.Label(new Rect(box.x, box.y + 52 + p * 28, w, 26), $"{who} — {(o == PlayerOutcome.Escaped ? "ESCAPED" : "CAUGHT")}", _small);
             }
             GUI.color = Color.white;
-            bool canRestart = !SimulationAuthority.IsOnline || (SessionHost.Instance && SessionHost.Instance.IsHost);
-            if (canRestart)
+            bool online = SimulationAuthority.IsOnline;
+            bool isHost = online && SessionHost.Instance && SessionHost.Instance.IsHost;
+            if (!online || (isHost && SessionHost.Instance.Roster.CanStart))
             {
                 if (GUI.Button(new Rect(box.x + 40, box.yMax - 50, w - 80, 36), "Play again")) d.PlayAgain();
+            }
+            else if (isHost)
+            {
+                GUI.Label(new Rect(box.x, box.yMax - 72, w, 22), "Everyone else left — you need 2 players to play again.", _small);
+                if (GUI.Button(new Rect(box.x + 40, box.yMax - 46, w - 80, 34), "Back to menu")) _ = SessionHost.Instance.LeaveAsync();
             }
             else GUI.Label(new Rect(box.x, box.yMax - 50, w, 36), "Waiting for the host to start again…", _small);
             Cursor.lockState = CursorLockMode.None;
