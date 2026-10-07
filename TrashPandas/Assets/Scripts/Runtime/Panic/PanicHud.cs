@@ -38,7 +38,7 @@ namespace TrashPandas.Runtime.Panic
                     GUI.Label(new Rect(0, H * 0.22f + 80, W, 30), "Get to an EXIT before they whack you!", _mid);
                 }
 
-                GUI.Label(new Rect(W - 170, 50, 160, 30), $"⏱ {Mathf.CeilToInt(snap.SecondsLeft)}s", _mid);
+                GUI.Label(new Rect(W - 170, 50, 160, 30), $"Time {Mathf.CeilToInt(snap.SecondsLeft)}s", _mid);
 
                 if (myOutcome == PlayerOutcome.Running && me.HasValue)
                 {
@@ -50,14 +50,14 @@ namespace TrashPandas.Runtime.Panic
                 else if (myOutcome == PlayerOutcome.Escaped)
                 {
                     GUI.color = new Color(0.4f, 1f, 0.5f);
-                    GUI.Label(new Rect(0, H * 0.4f, W, 60), "YOU ESCAPED! 🦝💨", _mid);
+                    GUI.Label(new Rect(0, H * 0.4f, W, 60), "YOU ESCAPED!", _mid);
                     GUI.color = Color.white;
                     GUI.Label(new Rect(0, H * 0.4f + 40, W, 24), "Watching the others…", _small);
                 }
                 else if (myOutcome == PlayerOutcome.Caught)
                 {
                     GUI.color = new Color(1f, 0.35f, 0.3f);
-                    GUI.Label(new Rect(0, H * 0.4f, W, 60), "YOU GOT CAUGHT! 🧹", _mid);
+                    GUI.Label(new Rect(0, H * 0.4f, W, 60), "YOU GOT CAUGHT!", _mid);
                     GUI.color = Color.white;
                     GUI.Label(new Rect(0, H * 0.4f + 40, W, 24), "Watching the others…", _small);
                 }
