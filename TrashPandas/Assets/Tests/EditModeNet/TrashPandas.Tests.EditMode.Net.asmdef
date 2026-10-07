@@ -1,10 +1,24 @@
 {
   "name": "TrashPandas.Tests.EditMode.Net",
   "rootNamespace": "TrashPandas.Tests.Net",
-  "references": ["TrashPandas.Core", "TrashPandas.Runtime", "Unity.Netcode.Runtime", "Unity.Collections", "UnityEngine.TestRunner", "UnityEditor.TestRunner"],
-  "includePlatforms": ["Editor"],
+  "references": [
+    "TrashPandas.Core",
+    "TrashPandas.Runtime",
+    "Unity.Netcode.Runtime",
+    "Unity.Collections",
+    "Unity.Services.Multiplayer",
+    "UnityEngine.TestRunner",
+    "UnityEditor.TestRunner"
+  ],
+  "includePlatforms": [
+    "Editor"
+  ],
   "overrideReferences": true,
-  "precompiledReferences": ["nunit.framework.dll"],
+  "precompiledReferences": [
+    "nunit.framework.dll"
+  ],
   "autoReferenced": false,
-  "defineConstraints": ["UNITY_INCLUDE_TESTS"]
+  "defineConstraints": [
+    "UNITY_INCLUDE_TESTS"
+  ]
 }
