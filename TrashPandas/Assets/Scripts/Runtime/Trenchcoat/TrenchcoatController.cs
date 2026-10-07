@@ -47,6 +47,7 @@ namespace TrashPandas.Runtime.Trenchcoat
         /// <summary>The player the person at the keyboard controls (offline debug).</summary>
         public int LocalPlayerId => _possession != null ? _possession.ActivePlayerId : 0;
         public int PlayerCountInRound => _slots != null ? _slots.SlotCount : 0;
+        public BodyPart ControlledParts => _slots != null ? _slots.ControlledParts : BodyPart.None;
         bool _burst;
 
         /// <summary>RUN!: everyone still inside pops out as a raccoon, flung outward.</summary>
