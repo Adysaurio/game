@@ -11,6 +11,8 @@ namespace TrashPandas.Core.Npc
         public float AlarmAfter = 1.5f;
         public float AlarmedHold = 4f;
         public float CuriousHold = 2.5f;
+        /// <summary>Seconds a loose raccoon must stay in view before this guest registers it.</summary>
+        public float NoticeTime = 0.6f;
     }
 
     /// <summary>One wedding guest's reaction to what they see: calm → curious ("?") → alarmed ("!").</summary>
@@ -20,6 +22,7 @@ namespace TrashPandas.Core.Npc
         float _sinceOdd = float.MaxValue;   // since last noticeable weirdness
         float _veryOddFor;                  // continuous time seeing high weirdness
         float _alarmedFor;
+        float _raccoonSeenFor;
 
         public GuestState State { get; private set; } = GuestState.Calm;
         /// <summary>True only on the update that turned this guest alarmed.</summary>
@@ -33,8 +36,10 @@ namespace TrashPandas.Core.Npc
             bool odd = seenWeirdness >= _s.CuriousThreshold;
             _sinceOdd = odd || seesRaccoon ? 0f : _sinceOdd + dt;
             _veryOddFor = seenWeirdness >= _s.AlarmThreshold ? _veryOddFor + dt : 0f;
+            _raccoonSeenFor = seesRaccoon ? _raccoonSeenFor + dt : 0f;
+            bool registersRaccoon = _raccoonSeenFor >= _s.NoticeTime - 1e-4f;
 
-            if (seesRaccoon || _veryOddFor >= _s.AlarmAfter)
+            if (registersRaccoon || _veryOddFor >= _s.AlarmAfter)
             {
                 if (State != GuestState.Alarmed) JustAlarmed = true;
                 State = GuestState.Alarmed;

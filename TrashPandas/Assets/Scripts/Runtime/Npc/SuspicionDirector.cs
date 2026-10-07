@@ -110,7 +110,8 @@ namespace TrashPandas.Runtime.Npc
 
                 float seen = seesCoat ? weirdness : 0f;
                 var state = brain.Guest.Update(dt, seen, seenRaccoon);
-                if (seenRaccoon) _model.ReportRaccoonSighting(brain.Id, now);
+                // Only once the guest has actually registered the raccoon (not on a split-second glimpse).
+                if (seenRaccoon && state == GuestState.Alarmed) _model.ReportRaccoonSighting(brain.Id, now);
                 if (seesCoat) { frame.CoatWitnessed = true; frame.SeenWeirdness = Mathf.Max(frame.SeenWeirdness, weirdness); }
 
                 pawn.SetMood((byte)state);

@@ -8,15 +8,15 @@ namespace TrashPandas.Core.Suspicion
     public sealed class SuspicionSettings
     {
         /// <summary>Per missing body part, per second, while a human sees the coat.</summary>
-        public float WitnessedMissingPartRate = 6f;
+        public float WitnessedMissingPartRate = 4f;
         /// <summary>Multiplier for missing parts when nobody is looking (hiding works).</summary>
         public float UnwitnessedFactor = 0.2f;
         /// <summary>Per second at weirdness 1 (collapsed, flailing) while seen.</summary>
-        public float WeirdMovementRate = 12f;
+        public float WeirdMovementRate = 8f;
         /// <summary>Weirdness below this is noise (rounding while walking), not something odd.</summary>
         public float WeirdnessFloor = 0.05f;
         /// <summary>Instant jump when a human spots a loose raccoon.</summary>
-        public float RaccoonSightingBurst = 20f;
+        public float RaccoonSightingBurst = 15f;
         /// <summary>Seconds before the same human can count another sighting.</summary>
         public float SightingCooldown = 2f;
         /// <summary>Sightings by other humans within this many seconds of the first one count less…</summary>
