@@ -1,0 +1,20 @@
+# macOS
+.DS_Store
+
+# Unity
+/TrashPandas/[Ll]ibrary/
+/TrashPandas/[Tt]emp/
+/TrashPandas/[Oo]bj/
+/TrashPandas/[Bb]uild/
+/TrashPandas/[Bb]uilds/
+/TrashPandas/[Ll]ogs/
+/TrashPandas/[Uu]ser[Ss]ettings/
+/TrashPandas/[Mm]emoryCaptures/
+/TrashPandas/.vs/
+/TrashPandas/.idea/
+/TrashPandas/*.csproj
+/TrashPandas/*.sln
+/TrashPandas/*.slnx
+
+# Local test output
+/test-results/

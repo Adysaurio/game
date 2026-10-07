@@ -1,0 +1,7 @@
+{
+  "name": "TrashPandas.Editor",
+  "rootNamespace": "TrashPandas.EditorTools",
+  "references": ["TrashPandas.Core", "TrashPandas.Runtime"],
+  "includePlatforms": ["Editor"],
+  "autoReferenced": false
+}

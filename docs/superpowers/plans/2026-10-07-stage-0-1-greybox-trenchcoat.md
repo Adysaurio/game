@@ -164,7 +164,7 @@ Expected: `blender` aparece como conectado en `/mcp`. Si no hay pestaña Blender
 /TrashPandas/*.slnx
 
 # Local test output
-/.test-results/
+/test-results/
 ```
 
 - [ ] **Step 2: Escribir `.gitattributes`**
@@ -193,7 +193,7 @@ ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 PROJECT="$ROOT/TrashPandas"
 VERSION="$(sed -n 's/^m_EditorVersion: //p' "$PROJECT/ProjectSettings/ProjectVersion.txt")"
 UNITY="/Applications/Unity/Hub/Editor/$VERSION/Unity.app/Contents/MacOS/Unity"
-OUT="$ROOT/.test-results"
+OUT="$ROOT/test-results"
 RESULTS="$OUT/editmode.xml"
 LOG="$OUT/editmode.log"
 mkdir -p "$OUT"
@@ -231,8 +231,8 @@ ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 PROJECT="$ROOT/TrashPandas"
 VERSION="$(sed -n 's/^m_EditorVersion: //p' "$PROJECT/ProjectSettings/ProjectVersion.txt")"
 UNITY="/Applications/Unity/Hub/Editor/$VERSION/Unity.app/Contents/MacOS/Unity"
-mkdir -p "$ROOT/.test-results"
-LOG="$ROOT/.test-results/run.log"
+mkdir -p "$ROOT/test-results"
+LOG="$ROOT/test-results/run.log"
 set +e
 "$UNITY" -batchmode -nographics -quit -projectPath "$PROJECT" -executeMethod "$1" -logFile "$LOG"
 CODE=$?
@@ -1949,7 +1949,7 @@ namespace TrashPandas.Runtime.Trenchcoat
 - [ ] **Step 6: Verificar que compila**
 
 Run: `tools/unity-test.sh`
-Expected: `total="42" passed="42" failed="0"`. Si sale "No test results produced", revisar `.test-results/editmode.log` buscando `error CS`.
+Expected: `total="42" passed="42" failed="0"`. Si sale "No test results produced", revisar `test-results/editmode.log` buscando `error CS`.
 
 - [ ] **Step 7: Commit**
 
@@ -2145,7 +2145,7 @@ namespace TrashPandas.EditorTools
 
 - [ ] **Step 2: Generar la escena** (editor cerrado)
 
-Run: `tools/unity-run.sh TrashPandas.EditorTools.GreyboxSceneBuilder.Build && grep -c "Built Assets/Scenes/Greybox_Trenchcoat.unity" .test-results/run.log`
+Run: `tools/unity-run.sh TrashPandas.EditorTools.GreyboxSceneBuilder.Build && grep -c "Built Assets/Scenes/Greybox_Trenchcoat.unity" test-results/run.log`
 Expected: exit 0 e imprime `1`. Existen `TrashPandas/Assets/Scenes/Greybox_Trenchcoat.unity` y `TrashPandas/Assets/Prefabs/Raccoon.prefab`.
 
 - [ ] **Step 3: Verificar que la suite sigue verde**

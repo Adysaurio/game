@@ -1,0 +1,6 @@
+{
+  "name": "TrashPandas.Core",
+  "rootNamespace": "TrashPandas.Core",
+  "references": [],
+  "autoReferenced": true
+}

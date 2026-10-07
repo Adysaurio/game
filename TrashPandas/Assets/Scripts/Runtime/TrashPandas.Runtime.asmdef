@@ -1,0 +1,6 @@
+{
+  "name": "TrashPandas.Runtime",
+  "rootNamespace": "TrashPandas.Runtime",
+  "references": ["TrashPandas.Core", "Unity.InputSystem"],
+  "autoReferenced": true
+}
