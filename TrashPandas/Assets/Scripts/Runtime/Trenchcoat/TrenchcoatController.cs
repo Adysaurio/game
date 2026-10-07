@@ -260,7 +260,7 @@ namespace TrashPandas.Runtime.Trenchcoat
                 var occupant = _slots.OccupantOf(i);
                 string mark = !occupant.HasValue ? "·empty"
                             : occupant == _possession.ActivePlayerId ? "◀YOU"
-                            : _ghosts.ContainsKey(occupant.Value) ? "👻" : "";
+                            : _ghosts.ContainsKey(occupant.Value) ? "[ghost]" : "";
                 if (occupant.HasValue && occupant == _recording) mark += "●REC";
                 slotsLine += $"[{i + 1}] {_slots.PartsOf(i)} {mark}   ";
             }
