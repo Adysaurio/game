@@ -40,7 +40,6 @@ namespace TrashPandas.EditorTools
         [MenuItem("TrashPandas/Build Menu Scene")]
         public static void BuildMenu()
         {
-            var raccoon = AssetDatabase.LoadAssetAtPath<GameObject>(PrefabPath);
             var scene = EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
 
             var cam = new GameObject("Main Camera").AddComponent<Camera>();
@@ -51,11 +50,11 @@ namespace TrashPandas.EditorTools
             var net = new GameObject("Network");
             net.AddComponent<NetworkManager>();
             net.AddComponent<Unity.Netcode.Transports.UTP.UnityTransport>();
-            var bootstrap = net.AddComponent<NetworkBootstrap>();
-            if (raccoon) bootstrap.SpawnablePrefabs.Add(raccoon);
+            net.AddComponent<NetworkBootstrap>();
             net.AddComponent<SessionHost>();
 
             new GameObject("MainMenu").AddComponent<TrashPandas.Runtime.Menu.MainMenu>();
+            new GameObject("DevAutomation").AddComponent<DevAutomation>();
 
             EditorSceneManager.SaveScene(scene, MenuScenePath);
             SetBuildScenes();

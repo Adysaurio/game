@@ -22,6 +22,7 @@ namespace TrashPandas.Runtime.Net
         float _nextSend;
         bool? _armsCamera;
         NetworkedRaccoon _cameraOnRaccoon;
+        float _botHopAt = 8f;
         NetworkedTrenchcoat _coat;
 
         static bool Online => NetworkManager.Singleton && NetworkManager.Singleton.IsListening;
@@ -45,6 +46,7 @@ namespace TrashPandas.Runtime.Net
             int? slot = snapshot.SlotOfClient(nm.LocalClientId);
 
             var raccoon = NetworkedRaccoon.LocalOwned;
+            if (DevAutomation.Bot == "hop" && slot.HasValue && Time.realtimeSinceStartup > _botHopAt) { _botHopAt = float.MaxValue; _coat.RequestLeaveRpc(); }
             if (_reader.TogglePressed)
             {
                 if (slot.HasValue) _coat.RequestLeaveRpc();
@@ -68,11 +70,29 @@ namespace TrashPandas.Runtime.Net
                 var parts = snapshot.PartsOf(slot.Value);
                 UpdateCamera(parts);
                 var input = _reader.ReadSlotInput(CameraRig, _coat.Body, now);
+                ApplyBot(ref input);
                 if (Time.unscaledTime >= _nextSend)
                 {
                     _nextSend = Time.unscaledTime + 1f / SendRate;
                     _coat.SubmitInputRpc(new NetSlotInput { Sequence = ++_sequence, Input = input });
                 }
+            }
+        }
+
+        /// <summary>Development automation (-bot): fake input so builds can test themselves.</summary>
+        void ApplyBot(ref SlotInput input)
+        {
+            switch (DevAutomation.Bot)
+            {
+                case "walk":
+                    input.Move = new Vector2(0f, 1f);
+                    break;
+                case "reach":
+                    input.GrabOne = true;
+                    input.HasAimPoint = true;
+                    input.AimPoint = _coat.Body.transform.TransformPoint(new Vector3(-0.6f, 2.2f, 0.8f));
+                    input.PreferLeftHand = true;
+                    break;
             }
         }
 

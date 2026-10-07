@@ -36,23 +36,32 @@ namespace TrashPandas.Runtime.Net
             Instance = this;
         }
 
-        void Start()
+        bool _subscribed;
+
+        /// <summary>Hook NetworkManager callbacks before any connection starts (script start order is not guaranteed).</summary>
+        void EnsureSubscribed()
         {
+            if (_subscribed) return;
             var nm = NetworkManager.Singleton;
             nm.OnClientConnectedCallback += OnClientConnected;
             nm.OnClientDisconnectCallback += OnClientDisconnected;
+            _subscribed = true;
         }
 
         public async Task<string> HostAsync(ISessionConnector connector)
         {
+            EnsureSubscribed();
             Roster = new SessionRoster();
             _connector = connector;
             RoomCode = await connector.HostAsync(SessionRoster.MaxPlayers);
+            // The host is a player too; register it even if its connect callback already fired.
+            Roster.Join(NetworkManager.Singleton.LocalClientId);
             return RoomCode;
         }
 
         public Task JoinAsync(ISessionConnector connector, string code)
         {
+            EnsureSubscribed();
             Roster = new SessionRoster();
             _connector = connector;
             return connector.JoinAsync(code);
