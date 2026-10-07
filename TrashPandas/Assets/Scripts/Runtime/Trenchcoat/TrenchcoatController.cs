@@ -41,6 +41,8 @@ namespace TrashPandas.Runtime.Trenchcoat
         bool? _armsCamera;
         HandGrabber _grabber;
         bool _showHelp = true;
+        /// <summary>Debug: drive the whole body at once (default) instead of one seat at a time.</summary>
+        public bool SoloMode = true;
         readonly TrashPandas.Runtime.Npc.EventParticipation _events = new TrashPandas.Runtime.Npc.EventParticipation();
         bool _eventCamera;
 
@@ -133,7 +135,7 @@ namespace TrashPandas.Runtime.Trenchcoat
         {
             if (_possession.ActiveIsOutside) return;
             var parts = _slots.PartsOf(_slots.SlotOf(_possession.ActivePlayerId).Value);
-            bool arms = (parts & BodyPart.Arms) != 0 && (parts & BodyPart.Legs) == 0;
+            bool arms = !SoloMode && (parts & BodyPart.Arms) != 0 && (parts & BodyPart.Legs) == 0;
             if (_armsCamera == arms) return;
             _armsCamera = arms;
             if (arms) CameraRig.SetTarget(Body.transform, ArmsCameraRadius, ArmsLookHeight);
@@ -155,6 +157,13 @@ namespace TrashPandas.Runtime.Trenchcoat
             if (_reader.RecordPressed) ToggleRecording(now);
             UpdateCoatCamera();
             if (UnityEngine.InputSystem.Keyboard.current?.f1Key.wasPressedThisFrame == true) _showHelp = !_showHelp;
+            if (UnityEngine.InputSystem.Keyboard.current?.f2Key.wasPressedThisFrame == true)
+            {
+                SoloMode = !SoloMode;
+                _armsCamera = null;
+                UpdateCoatCamera();
+                _status = SoloMode ? "SOLO: you control the whole body" : "ROLES: one seat at a time (1-5 / Tab)";
+            }
             if (_reader.ClearGhostsPressed) { _ghosts.Clear(); _recording = null; _status = "Ghosts cleared"; }
 
             _inputs.Clear();
@@ -173,8 +182,16 @@ namespace TrashPandas.Runtime.Trenchcoat
             {
                 var live = TrashPandas.Core.Events.ConversationInput.Filter(_reader.ReadSlotInput(CameraRig, Body, now), engaged);
                 if (Net.DevAutomation.Bot == "walk") live.Move = new Vector2(0f, 1f); // dev automation
+                if (Net.DevAutomation.Bot == "walkgrab") { live.Move = Body.transform.position.z < 2.6f ? new Vector2(0f, 1f) : Vector2.zero; live.GrabOne = true; }
                 if (Net.DevAutomation.Bot == "tocat") live.Move = TowardCat();
                 _inputs[_possession.ActivePlayerId] = live; // you always override your own ghost
+                if (SoloMode)
+                {
+                    // Solo: one person drives every seat that's still inside (ghosts still play their own seats).
+                    for (int p = 0; p < _slots.SlotCount; p++)
+                        if (_slots.SlotOf(p).HasValue && !(_ghosts.TryGetValue(p, out var g) && g.HasRecording && p != _possession.ActivePlayerId))
+                            _inputs[p] = live;
+                }
                 if (_recording == _possession.ActivePlayerId) _ghosts[_possession.ActivePlayerId].Record(now, live);
             }
 
@@ -255,7 +272,7 @@ namespace TrashPandas.Runtime.Trenchcoat
             UiScale.Apply();
             if (_possession.ActiveIsOutside) return;
             var parts = _slots.PartsOf(_slots.SlotOf(_possession.ActivePlayerId).Value);
-            if ((parts & BodyPart.Arms) == 0) return;
+            if ((parts & BodyPart.Arms) == 0 && !(SoloMode && (_slots.ControlledParts & BodyPart.Arms) != 0)) return;
 
             bool holding = _grabber && (_grabber.HeldLeft || _grabber.HeldRight || _grabber.HeldBoth);
             Color color = holding ? new Color(1f, 0.85f, 0.2f)
@@ -298,7 +315,7 @@ namespace TrashPandas.Runtime.Trenchcoat
                 if (_possession.ActiveIsOutside)
                     lines.Add("RACCOON  Mouse camera · WASD run · Space jump (hold=higher) · Ctrl crouch · walk into red curtain to climb · E near coat");
                 else
-                    lines.Add(DebugInputReader.HintFor(_slots.PartsOf(_slots.SlotOf(_possession.ActivePlayerId).Value)));
+                    lines.Add((SoloMode ? "[SOLO — F2: roles]  " : "[ROLES — F2: solo]  ") + DebugInputReader.HintFor(SoloMode ? _slots.ControlledParts : _slots.PartsOf(_slots.SlotOf(_possession.ActivePlayerId).Value)));
                 lines.Add($"Tab/1-5 switch · E out/in · R record ghost · Backspace clear ghosts · [ ] camera speed ({CameraRig.Sensitivity:F2}) · ←→ orbit · Esc free mouse · F1 hide help");
             }
             if (_status.Length > 0) lines.Add(_status);

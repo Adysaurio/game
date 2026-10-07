@@ -175,7 +175,7 @@ namespace TrashPandas.Runtime.Net
                 var offlineBody = UnityEngine.Object.FindFirstObjectByType<TrashPandas.Runtime.Trenchcoat.TrenchcoatBody>();
                 var glass = UnityEngine.GameObject.Find("Glass_1a");
                 Log(offlineBody
-                    ? $"offline-debug coat={offlineBody.transform.position} kinematic={offlineBody.GetComponent<Rigidbody>().isKinematic} glassKinematic={(glass ? glass.GetComponent<Rigidbody>().isKinematic.ToString() : "-")}{NpcSummary()}"
+                    ? $"offline-debug held=[{string.Join(",", TrashPandas.Runtime.Grabbing.Grabbable.All.Where(g => g && g.IsHeld).Select(g => g.name))}] coat={offlineBody.transform.position} kinematic={offlineBody.GetComponent<Rigidbody>().isKinematic} glassKinematic={(glass ? glass.GetComponent<Rigidbody>().isKinematic.ToString() : "-")}{NpcSummary()}"
                     : "offline");
                 return;
             }
