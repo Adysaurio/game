@@ -17,8 +17,51 @@ namespace TrashPandas.EditorTools
     public static class GreyboxSceneBuilder
     {
         const string ScenePath = "Assets/Scenes/Greybox_Trenchcoat.unity";
+        const string MenuScenePath = "Assets/Scenes/Menu.unity";
         const string PrefabPath = "Assets/Prefabs/Raccoon.prefab";
         const string MaterialDir = "Assets/Materials/Greybox";
+
+        [MenuItem("TrashPandas/Build All Scenes")]
+        public static void BuildAll()
+        {
+            Build();
+            BuildMenu();
+        }
+
+        static void SetBuildScenes()
+        {
+            var scenes = new System.Collections.Generic.List<EditorBuildSettingsScene>();
+            if (File.Exists(MenuScenePath)) scenes.Add(new EditorBuildSettingsScene(MenuScenePath, true));
+            scenes.Add(new EditorBuildSettingsScene(ScenePath, true));
+            EditorBuildSettings.scenes = scenes.ToArray();
+        }
+
+        /// <summary>The menu owns the app-wide NetworkManager (it survives loading the game scene).</summary>
+        [MenuItem("TrashPandas/Build Menu Scene")]
+        public static void BuildMenu()
+        {
+            var raccoon = AssetDatabase.LoadAssetAtPath<GameObject>(PrefabPath);
+            var scene = EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
+
+            var cam = new GameObject("Main Camera").AddComponent<Camera>();
+            cam.tag = "MainCamera";
+            cam.clearFlags = CameraClearFlags.SolidColor;
+            cam.backgroundColor = new Color(0.12f, 0.22f, 0.16f);
+
+            var net = new GameObject("Network");
+            net.AddComponent<NetworkManager>();
+            net.AddComponent<Unity.Netcode.Transports.UTP.UnityTransport>();
+            var bootstrap = net.AddComponent<NetworkBootstrap>();
+            if (raccoon) bootstrap.SpawnablePrefabs.Add(raccoon);
+            net.AddComponent<SessionHost>();
+
+            new GameObject("MainMenu").AddComponent<TrashPandas.Runtime.Menu.MainMenu>();
+
+            EditorSceneManager.SaveScene(scene, MenuScenePath);
+            SetBuildScenes();
+            AssetDatabase.SaveAssets();
+            Debug.Log($"[GreyboxSceneBuilder] Built {MenuScenePath}");
+        }
 
         [MenuItem("TrashPandas/Build Greybox Scene")]
         public static void Build()
@@ -109,7 +152,7 @@ namespace TrashPandas.EditorTools
 
             EditorSceneManager.SaveScene(scene, ScenePath);
             AssignNetworkIds(scene);
-            EditorBuildSettings.scenes = new[] { new EditorBuildSettingsScene(ScenePath, true) };
+            SetBuildScenes();
             AssetDatabase.SaveAssets();
             Debug.Log($"[GreyboxSceneBuilder] Built {ScenePath}");
         }

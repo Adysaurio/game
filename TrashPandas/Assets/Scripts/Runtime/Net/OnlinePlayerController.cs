@@ -33,6 +33,11 @@ namespace TrashPandas.Runtime.Net
 
         void Update()
         {
+            if (UnityEngine.InputSystem.Keyboard.current?.f10Key.wasPressedThisFrame == true && SessionHost.Instance)
+            {
+                _ = SessionHost.Instance.LeaveAsync();
+                return;
+            }
             if (!_coat) { _coat = NetworkedTrenchcoat.Instance; if (!_coat) return; _armsCamera = null; }
             var nm = NetworkManager.Singleton;
             float now = nm.ServerTime.TimeAsFloat;
@@ -97,7 +102,7 @@ namespace TrashPandas.Runtime.Net
                         : NetworkedRaccoon.LocalOwned ? "RACCOON  Mouse camera · WASD run · Space jump · Ctrl crouch · E next to the coat: hop back in"
                         : "Waiting for a seat…";
             string room = SessionHost.Instance && !string.IsNullOrEmpty(SessionHost.Instance.RoomCode) ? $"Room {SessionHost.Instance.RoomCode} · " : "";
-            var lines = new[] { $"{room}ONLINE · {(nm.IsHost ? "host" : "client")}   {seats}", hint };
+            var lines = new[] { $"{room}ONLINE · {(nm.IsHost ? "host" : "client")}   {seats}", hint + "   F10: leave" };
             float h = lines.Length * 18f + 8f;
             GUI.Box(new Rect(8, Screen.height - h - 8, Screen.width - 16, h), GUIContent.none);
             for (int i = 0; i < lines.Length; i++)
