@@ -152,8 +152,8 @@ namespace TrashPandas.Runtime.Npc
                 GUI.Label(new Rect(rx, ry, w * 0.38f, 22), "YOUR PART", _small);
                 ry += 24;
                 if ((parts & BodyPart.Head) != 0) { GUI.Label(new Rect(rx, ry, w * 0.38f, 22), "• Head: press 1, 2 or 3", _small); ry += 22; }
-                if ((parts & BodyPart.Arms) != 0 && ev.Arms != ArmsTask.None) { GUI.Label(new Rect(rx, ry, w * 0.38f, 22), "• Arms: " + ArmsPrompt(ev.Arms), _small); ry += 22; }
-                if ((parts & BodyPart.Legs) != 0 && ev.Legs != LegsTask.None) GUI.Label(new Rect(rx, ry, w * 0.38f, 22), "• Legs: " + LegsPrompt(ev.Legs), _small);
+                if ((parts & BodyPart.Arms) != 0) { GUI.Label(new Rect(rx, ry, w * 0.38f, 22), "• Arms: " + (ev.Arms == ArmsTask.None ? "nothing — act natural" : ArmsPrompt(ev.Arms)), _small); ry += 22; }
+                if ((parts & BodyPart.Legs) != 0) GUI.Label(new Rect(rx, ry, w * 0.38f, 22), "• Legs: " + (ev.Legs == LegsTask.None ? "nothing — act natural" : LegsPrompt(ev.Legs)), _small);
                 return;
             }
 

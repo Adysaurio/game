@@ -69,6 +69,7 @@ namespace TrashPandas.Runtime.Net
 
             if (raccoon && !slot.HasValue)
             {
+                if (CameraRig.InConversation) { CameraRig.EndConversation(restore: false); _eventCamera = false; _cameraOnRaccoon = null; }
                 if (_cameraOnRaccoon != raccoon)
                 {
                     _cameraOnRaccoon = raccoon;

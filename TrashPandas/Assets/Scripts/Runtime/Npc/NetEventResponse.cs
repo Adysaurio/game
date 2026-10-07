@@ -30,16 +30,19 @@ namespace TrashPandas.Runtime.Npc
         public float SecondsLeft;
         public float ResultDelta;
         public byte HeadOutcome, ArmsOutcome, LegsOutcome; // PartOutcome + 1, 0 = not judged
+        public byte Arms, Legs, Order;                     // rolled when the conversation starts
 
         public void NetworkSerialize<T>(BufferSerializer<T> s) where T : IReaderWriter
         {
             s.SerializeValue(ref Phase); s.SerializeValue(ref EventIndex); s.SerializeValue(ref Serial);
             s.SerializeValue(ref SecondsLeft); s.SerializeValue(ref ResultDelta);
             s.SerializeValue(ref HeadOutcome); s.SerializeValue(ref ArmsOutcome); s.SerializeValue(ref LegsOutcome);
+            s.SerializeValue(ref Arms); s.SerializeValue(ref Legs); s.SerializeValue(ref Order);
         }
 
         public bool Equals(EventSnapshot o) =>
             Phase == o.Phase && EventIndex == o.EventIndex && Serial == o.Serial && (int)(SecondsLeft * 10) == (int)(o.SecondsLeft * 10) &&
-            ResultDelta == o.ResultDelta && HeadOutcome == o.HeadOutcome && ArmsOutcome == o.ArmsOutcome && LegsOutcome == o.LegsOutcome;
+            ResultDelta == o.ResultDelta && HeadOutcome == o.HeadOutcome && ArmsOutcome == o.ArmsOutcome && LegsOutcome == o.LegsOutcome &&
+            Arms == o.Arms && Legs == o.Legs && Order == o.Order;
     }
 }

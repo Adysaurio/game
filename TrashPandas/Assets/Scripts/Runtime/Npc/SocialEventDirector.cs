@@ -16,7 +16,7 @@ namespace TrashPandas.Runtime.Npc
     [DefaultExecutionOrder(-50)] // before PanicDirector, so cancelling on RUN never undoes its panic speed
     public sealed class SocialEventDirector : NetworkBehaviour
     {
-        public float ResponseWindow = 5f;
+        public float ResponseWindow = 8f;
         public float ResultDisplay = 3f;
         [Tooltip("Dev/testing: start the first event this many seconds into the round instead of 35-50 s (0 = normal).")]
         public float FirstEventOverride;
@@ -37,7 +37,23 @@ namespace TrashPandas.Runtime.Npc
 
         public EventSnapshot Snapshot => SimulationAuthority.IsOnline ? _net.Value : _offline;
         public EventPhase Phase => (EventPhase)Snapshot.Phase;
-        public SocialEvent Current => SocialEventCatalog.All[Mathf.Clamp(Snapshot.EventIndex, 0, SocialEventCatalog.All.Count - 1)];
+        /// <summary>The current conversation with this occurrence's rolled tasks and answer order.</summary>
+        public SocialEvent Current
+        {
+            get
+            {
+                var s = Snapshot;
+                if (_cached == null || _cachedKey != (s.Serial, s.EventIndex, s.Arms, s.Legs, s.Order))
+                {
+                    var template = SocialEventCatalog.All[Mathf.Clamp(s.EventIndex, 0, SocialEventCatalog.All.Count - 1)];
+                    _cached = EventRoll.Apply(template, new RolledTasks { Arms = (ArmsTask)s.Arms, Legs = (LegsTask)s.Legs, Order = s.Order });
+                    _cachedKey = (s.Serial, s.EventIndex, s.Arms, s.Legs, s.Order);
+                }
+                return _cached;
+            }
+        }
+        SocialEvent _cached;
+        (byte, byte, byte, byte, byte) _cachedKey;
         /// <summary>Where the speaker is (for the HUD arrow), if visible on this machine.</summary>
         public Vector3? SpeakerPosition
         {
@@ -172,6 +188,7 @@ namespace TrashPandas.Runtime.Npc
             _offline.EventIndex = (byte)index;
             _offline.Serial = _serial;
             _offline.HeadOutcome = _offline.ArmsOutcome = _offline.LegsOutcome = 0;
+            _offline.Arms = _offline.Legs = 0; // nobody knows what the body will have to do yet
             _offline.ResultDelta = 0f;
             SetPhase(EventPhase.Warning, now + warning);
         }
@@ -181,12 +198,17 @@ namespace TrashPandas.Runtime.Npc
             // Who is in the coat is decided the moment the conversation starts (late arrivals don't count).
             _presentAtStart = PresentParts();
             _responses.Clear();
+            // The surprise: what arms and legs must do (and the answer order) is decided right now.
+            var roll = EventRoll.Roll(_random);
+            _offline.Arms = (byte)roll.Arms;
+            _offline.Legs = (byte)roll.Legs;
+            _offline.Order = roll.Order;
             SetPhase(EventPhase.Engaged, now + ResponseWindow);
         }
 
         void Resolve(SuspicionDirector suspicion, float now)
         {
-            var ev = SocialEventCatalog.All[_offline.EventIndex];
+            var ev = Current;
             var result = EventResolver.Resolve(ev, _presentAtStart, role =>
             {
                 int? player = PlayerFor(role);

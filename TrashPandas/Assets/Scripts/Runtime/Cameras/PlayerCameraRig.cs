@@ -64,10 +64,12 @@ namespace TrashPandas.Runtime.Cameras
             Orbit.VerticalAxis.Value = 10f;
         }
 
-        public void EndConversation()
+        /// <param name="restore">False when something else (RUN!) is about to point the camera elsewhere.</param>
+        public void EndConversation(bool restore = true)
         {
             if (!InConversation) return;
             _convA = _convB = null;
+            if (!restore) return;
             if (_savedTarget) SetTarget(_savedTarget, _savedRadius, _savedLook);
             Orbit.HorizontalAxis.Value = _savedYaw;
             Orbit.VerticalAxis.Value = _savedPitch;

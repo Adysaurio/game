@@ -48,9 +48,16 @@ namespace TrashPandas.Runtime.Trenchcoat
         {
             var d = TrashPandas.Runtime.Npc.SocialEventDirector.Instance;
             bool talking = d && (engaged || d.Phase == TrashPandas.Runtime.Npc.EventPhase.Resolved) && !_possession.ActiveIsOutside;
+            if (_burst) return; // after RUN the camera belongs to your raccoon
             if (talking == _eventCamera) return;
             _eventCamera = talking;
             if (talking) CameraRig.BeginConversation(Body.transform, d.SpeakerTransform);
+            else if (_possession.ActiveIsOutside && _raccoon)
+            {
+                // Hopped out mid-conversation: the camera follows your raccoon, not the coat.
+                CameraRig.EndConversation(restore: false);
+                CameraRig.SetTarget(_raccoon.transform, RaccoonCameraRadius, RaccoonLookHeight);
+            }
             else { CameraRig.EndConversation(); _armsCamera = null; UpdateCoatCamera(); }
         }
         readonly List<RaccoonController> _botRaccoons = new List<RaccoonController>();
@@ -67,6 +74,8 @@ namespace TrashPandas.Runtime.Trenchcoat
         {
             if (_burst) return;
             _burst = true;
+            CameraRig.EndConversation(restore: false); // RUN! interrupts any conversation close-up
+            _eventCamera = false;
             StopRecording(Time.time);
             Vector3 center = Body.transform.position;
             for (int player = 0; player < _slots.SlotCount; player++)
@@ -86,6 +95,8 @@ namespace TrashPandas.Runtime.Trenchcoat
                 else _botRaccoons.Add(raccoon);
             }
             Body.Explode();
+            // If you were already outside, make sure the camera is on your raccoon (not the vanished coat).
+            if (_raccoon && _possession.ActiveIsOutside) CameraRig.SetTarget(_raccoon.transform, RaccoonCameraRadius, RaccoonLookHeight);
         }
 
         /// <summary>The local raccoon was removed (escaped or caught): watch the garden from above.</summary>
