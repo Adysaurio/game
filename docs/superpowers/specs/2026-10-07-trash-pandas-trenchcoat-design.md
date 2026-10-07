@@ -62,14 +62,22 @@ Más jugadores = más objetivos en el mapa y un multiplicador de botín por tama
 
 ### Controles (teclado/mouse y control)
 
-- **Piernas:** WASD/stick para moverse, Espacio para saltar, Ctrl para sentarse/agacharse. Con piernas separadas, cada jugador impulsa su pierna; si van a ritmo distinto, el señor gira o da vueltas.
-- **Brazos:** el mouse/stick mueve el objetivo de la mano en 3D (IK); clic agarra/suelta; también lanzar. Con brazos separados, cada jugador controla uno.
-- **Cabeza:** dirección de la mirada y expresión (sonreír, asentir). Responde conversaciones. Marca objetos y lugares con *ping*.
+> Revisado el 2026-10-07 tras el primer playtest gris. Ver `docs/research/2026-10-07-movement-and-camera-feel.md`.
+
+**Principio:** cada rol, por sí solo, se siente como un juego en tercera persona normal y preciso. La comedia sale de la **descoordinación entre jugadores**, nunca de controles malos (lección del co-op de *Octodad*). Lo torpe del señor es visual y secundario (lección de *Fall Guys*).
+
+Cada jugador **orbita su propia cámara con el mouse**. Todas siguen al señor.
+
+- **Piernas:** WASD camina **relativo a tu cámara**; el señor gira suave hacia donde camina. Espacio salta (coyote time 0.12 s, jump buffer 0.15 s), Ctrl agacha. Con piernas separadas, cada pierna empuja hacia la dirección de *su* jugador: si no coinciden, el señor avanza menos y se tuerce.
+- **Brazos** (estilo *Human: Fall Flat*): **las manos apuntan a donde mira tu cámara**. Clic izquierdo y derecho estiran y agarran con la mano izquierda y derecha.
+- **Cabeza:** la cabeza mira hacia donde mira tu cámara (dentro de un rango natural). Responde conversaciones y marca con *ping*.
+- **Mapache suelto:** tercera persona estándar: WASD relativo a la cámara, el mapache mira hacia donde corre, salto con coyote y buffer, gravedad de caída más fuerte, salto de altura variable.
 
 ### Cámara
 
-- Infiltración: cámara compartida en tercera persona siguiendo al señor.
-- Mapache fuera de la gabardina o en pánico: cámara individual en tercera persona.
+- Cámara orbital por jugador (Cinemachine 3: `CinemachineCamera` + `OrbitalFollow`), con damping solo en posición y colisión con el escenario.
+- Input del mouse crudo, sin suavizado. El cursor se bloquea una sola vez y se filtran los picos del bug de macOS.
+- Rigidbody interpolado; la cámara se actualiza después de la física.
 
 ### Salirse y volver
 
