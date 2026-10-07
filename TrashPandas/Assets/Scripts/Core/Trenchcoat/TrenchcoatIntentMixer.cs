@@ -39,6 +39,8 @@ namespace TrashPandas.Core.Trenchcoat
         {
             bool hasLeft = (present & BodyPart.LegLeft) != 0;
             bool hasRight = (present & BodyPart.LegRight) != 0;
+            intent.LeftLegLimp = !hasLeft;
+            intent.RightLegLimp = !hasRight;
 
             if (hasLeft && hasRight)
             {
@@ -46,6 +48,7 @@ namespace TrashPandas.Core.Trenchcoat
                 float driveR = Unit(input.LegRight.Drive);
                 float steer = (Unit(input.LegLeft.Steer) + Unit(input.LegRight.Steer)) * 0.5f;
                 intent.Forward = (driveL + driveR) * 0.5f;
+                intent.Strafe = (Unit(input.LegLeft.Strafe) + Unit(input.LegRight.Strafe)) * 0.5f;
                 intent.Turn = Mathf.Clamp(steer + (driveL - driveR) * s.DesyncTurnFactor, -1f, 1f);
                 intent.Jump = IsCoordinatedJump(input.LegLeft.JumpPressedAt, input.LegRight.JumpPressedAt, now, s.JumpWindow);
                 intent.Crouch = input.LegLeft.Crouch || input.LegRight.Crouch;
@@ -54,6 +57,7 @@ namespace TrashPandas.Core.Trenchcoat
             {
                 var leg = hasLeft ? input.LegLeft : input.LegRight;
                 intent.Forward = Unit(leg.Drive) * s.LimpSpeedFactor;
+                intent.Strafe = Unit(leg.Strafe) * s.LimpSpeedFactor;
                 float towardMissing = hasLeft ? 1f : -1f; // missing right leg drags right
                 float drift = towardMissing * s.LimpTurnBias * Mathf.Abs(intent.Forward);
                 intent.Turn = Mathf.Clamp(Unit(leg.Steer) + drift, -1f, 1f);

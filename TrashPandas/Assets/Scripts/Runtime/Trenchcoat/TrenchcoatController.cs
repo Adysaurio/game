@@ -40,15 +40,26 @@ namespace TrashPandas.Runtime.Trenchcoat
             _inputs.Clear();
             if (_possession.ActiveIsOutside)
             {
-                _raccoon.SetInput(_reader.Move(), _reader.JumpPressed, _reader.CrouchHeld);
+                _raccoon.SetInput(_reader.Move(), _reader.MouseTurn(Time.deltaTime), _reader.JumpPressed, _reader.CrouchHeld);
+                SetCursorLocked(true);
             }
             else
             {
-                _inputs[_possession.ActivePlayerId] = _reader.ReadSlotInput(Time.time, Time.deltaTime);
+                var parts = _slots.PartsOf(_slots.SlotOf(_possession.ActivePlayerId).Value);
+                _inputs[_possession.ActivePlayerId] = _reader.ReadSlotInput(parts, Time.time, Time.deltaTime);
+                SetCursorLocked(DebugInputReader.WantsLockedCursor(parts));
             }
 
-            var parts = SlotInputRouter.Route(_slots, _inputs);
-            Body.SetIntent(TrenchcoatIntentMixer.Mix(parts, _slots.ControlledParts, Time.time, _mixer));
+            var partInputs = SlotInputRouter.Route(_slots, _inputs);
+            Body.SetIntent(TrenchcoatIntentMixer.Mix(partInputs, _slots.ControlledParts, Time.time, _mixer));
+        }
+
+        void OnDisable() => SetCursorLocked(false);
+
+        static void SetCursorLocked(bool locked)
+        {
+            Cursor.lockState = locked ? CursorLockMode.Locked : CursorLockMode.None;
+            Cursor.visible = !locked;
         }
 
         void Toggle()
@@ -58,7 +69,6 @@ namespace TrashPandas.Runtime.Trenchcoat
                 if (!_possession.LeaveCoat()) return;
                 Vector3 spawn = Body.transform.position + Body.transform.right * 0.9f + Vector3.up * 0.2f;
                 _raccoon = Instantiate(RaccoonPrefab, spawn, Body.transform.rotation);
-                _raccoon.CameraTransform = Camera.transform;
                 Camera.Follow(_raccoon.transform, 2.5f, 1.4f);
                 _status = "";
                 return;
@@ -77,7 +87,7 @@ namespace TrashPandas.Runtime.Trenchcoat
         void OnGUI()
         {
             GUILayout.BeginArea(new Rect(10, 10, 360, 260), GUI.skin.box);
-            GUILayout.Label($"DEBUG — {_slots.SlotCount} players   [Tab] switch  [E] out/in");
+            GUILayout.Label($"DEBUG — {_slots.SlotCount} players   [Tab] switch  [E] out/in  [Esc] free mouse");
             for (int i = 0; i < _slots.SlotCount; i++)
             {
                 var occupant = _slots.OccupantOf(i);

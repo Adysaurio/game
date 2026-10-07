@@ -26,7 +26,8 @@ namespace TrashPandas.Core.Trenchcoat
             var leg = new LegInput
             {
                 Drive = input.Move.y,
-                Steer = input.Move.x,
+                Steer = input.Turn,
+                Strafe = input.Move.x,
                 JumpPressedAt = input.JumpPressedAt,
                 Crouch = input.Crouch,
             };

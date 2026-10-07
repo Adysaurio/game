@@ -162,8 +162,8 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 5e646db5150bc401e8846557122d4cbb, type: 3}
   m_Name: 
   m_EditorClassIdentifier: TrashPandas.Runtime::TrashPandas.Runtime.Raccoon.RaccoonController
-  CameraTransform: {fileID: 0}
-  RunSpeed: 4.5
+  RunSpeed: 3.5
+  TurnSpeed: 220
   JumpVelocity: 5.5
   Gravity: -20
   ClimbSpeed: 2.5

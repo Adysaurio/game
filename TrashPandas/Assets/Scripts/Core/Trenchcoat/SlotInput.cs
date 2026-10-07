@@ -5,7 +5,8 @@ namespace TrashPandas.Core.Trenchcoat
     /// <summary>Raw input one player sends from their slot. Unused fields are ignored by the router.</summary>
     public struct SlotInput
     {
-        public Vector2 Move;          // legs: x = steer, y = drive
+        public Vector2 Move;          // legs: x = sidestep (A/D), y = drive (W/S)
+        public float Turn;            // legs: -1..1 turn rate from the mouse
         public bool Crouch;
         public float JumpPressedAt;   // NegativeInfinity = never
         public Vector3 HandTarget;    // arms, body-local

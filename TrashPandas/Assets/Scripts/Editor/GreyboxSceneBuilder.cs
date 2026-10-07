@@ -29,6 +29,7 @@ namespace TrashPandas.EditorTools
             var fur = Mat("Fur", new Color(0.45f, 0.45f, 0.5f));
             var curtain = Mat("Curtain", new Color(0.8f, 0.3f, 0.35f));
             var hedge = Mat("Hedge", new Color(0.2f, 0.45f, 0.2f));
+            var pants = Mat("Pants", new Color(0.25f, 0.27f, 0.35f));
 
             var raccoonPrefab = BuildRaccoonPrefab(fur);
 
@@ -64,7 +65,7 @@ namespace TrashPandas.EditorTools
             var hedgeClimb = Box("Hedge_Climbable", new Vector3(8f, 1f, -8f), new Vector3(1f, 2f, 1f), hedge);
             hedgeClimb.AddComponent<Climbable>();
 
-            var body = BuildTrenchcoat(coat, skin);
+            var body = BuildTrenchcoat(coat, skin, pants);
 
             var camGo = new GameObject("Main Camera");
             camGo.tag = "MainCamera";
@@ -85,29 +86,48 @@ namespace TrashPandas.EditorTools
             Debug.Log($"[GreyboxSceneBuilder] Built {ScenePath}");
         }
 
-        static TrenchcoatBody BuildTrenchcoat(Material coat, Material skin)
+        static TrenchcoatBody BuildTrenchcoat(Material coat, Material skin, Material pants)
         {
             var root = new GameObject("Trenchcoat");
             root.transform.position = new Vector3(0f, 0.05f, 0f);
             var rb = root.AddComponent<Rigidbody>();
             rb.mass = 60f;
             var col = root.AddComponent<CapsuleCollider>();
-            col.height = 1.9f;
+            col.height = 2.1f;
             col.radius = 0.35f;
-            col.center = new Vector3(0f, 0.95f, 0f);
+            col.center = new Vector3(0f, 1.05f, 0f);
 
-            var torso = Visual(PrimitiveType.Capsule, "Torso", root.transform, new Vector3(0f, 0.9f, 0f), new Vector3(0.7f, 0.9f, 0.5f), coat);
-            var head = Visual(PrimitiveType.Sphere, "Head", root.transform, new Vector3(0f, 1.75f, 0f), Vector3.one * 0.35f, skin);
+            var torso = Visual(PrimitiveType.Capsule, "Torso", root.transform, TrenchcoatBody.TorsoRest, new Vector3(0.7f, 0.6f, 0.5f), coat);
+            var head = Visual(PrimitiveType.Sphere, "Head", root.transform, TrenchcoatBody.HeadRest, Vector3.one * 0.35f, skin);
             Visual(PrimitiveType.Cube, "Hat", head, new Vector3(0f, 0.55f, 0f), new Vector3(1.1f, 0.4f, 1.1f), coat);
-            var left = Visual(PrimitiveType.Sphere, "LeftHand", root.transform, new Vector3(-0.4f, 0.6f, 0f), Vector3.one * 0.18f, skin);
-            var right = Visual(PrimitiveType.Sphere, "RightHand", root.transform, new Vector3(0.4f, 0.6f, 0f), Vector3.one * 0.18f, skin);
+            Visual(PrimitiveType.Cube, "Nose", head, new Vector3(0f, 0f, 0.5f), new Vector3(0.2f, 0.2f, 0.3f), skin);
+            var left = Visual(PrimitiveType.Sphere, "LeftHand", root.transform, TrenchcoatBody.LeftShoulder + Vector3.down * 0.75f, Vector3.one * 0.18f, skin);
+            var right = Visual(PrimitiveType.Sphere, "RightHand", root.transform, TrenchcoatBody.RightShoulder + Vector3.down * 0.75f, Vector3.one * 0.18f, skin);
+            var leftArm = Visual(PrimitiveType.Cylinder, "LeftArm", root.transform, TrenchcoatBody.LeftShoulder, new Vector3(0.09f, 0.37f, 0.09f), coat);
+            var rightArm = Visual(PrimitiveType.Cylinder, "RightArm", root.transform, TrenchcoatBody.RightShoulder, new Vector3(0.09f, 0.37f, 0.09f), coat);
+            var leftLeg = Leg("LeftLeg", root.transform, TrenchcoatBody.LeftHip, pants);
+            var rightLeg = Leg("RightLeg", root.transform, TrenchcoatBody.RightHip, pants);
 
             var body = root.AddComponent<TrenchcoatBody>();
             body.Torso = torso;
             body.Head = head;
             body.LeftHand = left;
             body.RightHand = right;
+            body.LeftArm = leftArm;
+            body.RightArm = rightArm;
+            body.LeftLeg = leftLeg;
+            body.RightLeg = rightLeg;
             return body;
+        }
+
+        /// <summary>A hip pivot with the visible leg hanging below it, so rotating the pivot swings the leg.</summary>
+        static Transform Leg(string name, Transform parent, Vector3 hip, Material mat)
+        {
+            var pivot = new GameObject(name).transform;
+            pivot.SetParent(parent, false);
+            pivot.localPosition = hip;
+            Visual(PrimitiveType.Capsule, "Mesh", pivot, new Vector3(0f, -0.33f, 0f), new Vector3(0.2f, 0.33f, 0.2f), mat);
+            return pivot;
         }
 
         static RaccoonController BuildRaccoonPrefab(Material fur)

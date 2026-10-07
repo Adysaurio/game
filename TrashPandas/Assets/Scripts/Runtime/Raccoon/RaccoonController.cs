@@ -2,12 +2,12 @@ using UnityEngine;
 
 namespace TrashPandas.Runtime.Raccoon
 {
-    /// <summary>A loose raccoon: runs, jumps, climbs Climbable surfaces, crouches under tables.</summary>
+    /// <summary>A loose raccoon: mouse turns, WASD moves relative to its facing; jumps, climbs, crouches.</summary>
     [RequireComponent(typeof(CharacterController))]
     public sealed class RaccoonController : MonoBehaviour
     {
-        public Transform CameraTransform;
-        public float RunSpeed = 4.5f;
+        public float RunSpeed = 3.5f;
+        public float TurnSpeed = 220f;
         public float JumpVelocity = 5.5f;
         public float Gravity = -20f;
         public float ClimbSpeed = 2.5f;
@@ -16,13 +16,17 @@ namespace TrashPandas.Runtime.Raccoon
 
         CharacterController _cc;
         Vector2 _move;
+        float _turn;
         bool _jumpPressed;
         bool _crouchHeld;
         float _verticalVelocity;
 
-        public void SetInput(Vector2 move, bool jumpPressed, bool crouchHeld)
+        /// <param name="move">WASD, x = sidestep, y = forward.</param>
+        /// <param name="turn">-1..1 turn rate from the mouse.</param>
+        public void SetInput(Vector2 move, float turn, bool jumpPressed, bool crouchHeld)
         {
             _move = move;
+            _turn = turn;
             _jumpPressed |= jumpPressed;   // latched until consumed in Update
             _crouchHeld = crouchHeld;
         }
@@ -35,12 +39,11 @@ namespace TrashPandas.Runtime.Raccoon
             _cc.height = height;
             _cc.center = new Vector3(0f, height * 0.5f, 0f);
 
-            Vector3 forward = CameraTransform ? Vector3.ProjectOnPlane(CameraTransform.forward, Vector3.up).normalized : transform.forward;
-            Vector3 right = Vector3.Cross(Vector3.up, forward);
-            Vector3 wish = (forward * _move.y + right * _move.x);
+            transform.Rotate(0f, _turn * TurnSpeed * Time.deltaTime, 0f);
+            Vector3 wish = transform.forward * _move.y + transform.right * _move.x;
             if (wish.sqrMagnitude > 1f) wish.Normalize();
 
-            bool climbing = _move.y > 0.1f && IsFacingClimbable(wish);
+            bool climbing = _move.y > 0.1f && IsFacingClimbable();
             if (climbing)
             {
                 _verticalVelocity = ClimbSpeed;
@@ -57,15 +60,12 @@ namespace TrashPandas.Runtime.Raccoon
 
             float speed = _crouchHeld ? RunSpeed * 0.5f : RunSpeed;
             _cc.Move((wish * speed + Vector3.up * _verticalVelocity) * Time.deltaTime);
-            if (wish.sqrMagnitude > 0.01f)
-                transform.rotation = Quaternion.Slerp(transform.rotation, Quaternion.LookRotation(wish), Time.deltaTime * 12f);
         }
 
-        bool IsFacingClimbable(Vector3 wish)
+        bool IsFacingClimbable()
         {
-            if (wish.sqrMagnitude < 0.01f) return false;
             Vector3 origin = transform.position + Vector3.up * (_cc.height * 0.5f);
-            return Physics.Raycast(origin, wish.normalized, out var hit, _cc.radius + 0.15f, ~0, QueryTriggerInteraction.Ignore)
+            return Physics.Raycast(origin, transform.forward, out var hit, _cc.radius + 0.15f, ~0, QueryTriggerInteraction.Ignore)
                    && hit.collider.GetComponentInParent<Climbable>() != null;
         }
     }

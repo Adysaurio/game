@@ -145,5 +145,41 @@ namespace TrashPandas.Tests
             Assert.IsFalse(withHead.HeadSlumped);
             Assert.AreEqual(45f, withHead.HeadYaw, Eps);
         }
+        [Test]
+        public void Mix_Strafe_AveragesBothLegs_AndIsClamped()
+        {
+            var input = PartInputs.Idle;
+            input.LegLeft.Strafe = 1f;
+            input.LegRight.Strafe = 0f;
+            Assert.AreEqual(0.5f, TrenchcoatIntentMixer.Mix(input, BodyPart.All, 0f, Settings).Strafe, Eps);
+
+            input.LegLeft.Strafe = 3f;
+            input.LegRight.Strafe = float.NaN;
+            Assert.AreEqual(0.5f, TrenchcoatIntentMixer.Mix(input, BodyPart.All, 0f, Settings).Strafe, Eps);
+        }
+
+        [Test]
+        public void Mix_OneLeg_StrafeIsSlowed_NoLegs_NoStrafe()
+        {
+            var input = PartInputs.Idle;
+            input.LegLeft.Strafe = 1f;
+            input.LegRight.Strafe = 1f;
+            var onlyLeft = BodyPart.All & ~BodyPart.LegRight;
+            Assert.AreEqual(Settings.LimpSpeedFactor, TrenchcoatIntentMixer.Mix(input, onlyLeft, 0f, Settings).Strafe, Eps);
+            Assert.AreEqual(0f, TrenchcoatIntentMixer.Mix(input, BodyPart.Arms | BodyPart.Head, 0f, Settings).Strafe, Eps);
+        }
+
+        [Test]
+        public void Mix_MissingLeg_IsMarkedLimp()
+        {
+            var onlyLeft = BodyPart.All & ~BodyPart.LegRight;
+            var intent = TrenchcoatIntentMixer.Mix(PartInputs.Idle, onlyLeft, 0f, Settings);
+            Assert.IsFalse(intent.LeftLegLimp);
+            Assert.IsTrue(intent.RightLegLimp);
+
+            var none = TrenchcoatIntentMixer.Mix(PartInputs.Idle, BodyPart.Arms, 0f, Settings);
+            Assert.IsTrue(none.LeftLegLimp);
+            Assert.IsTrue(none.RightLegLimp);
+        }
     }
 }
