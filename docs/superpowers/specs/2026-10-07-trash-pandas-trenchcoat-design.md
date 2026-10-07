@@ -135,6 +135,24 @@ Los objetivos dan mucho más botín que los objetos sueltos y se exhiben como tr
 
 Hueco en el seto · alcantarilla del jardín · camioneta del catering · estanque/fuente.
 
+## 6b. Eventos sociales (el ritmo de la infiltración)
+
+> Agregado el 2026-10-07 a partir de una idea del usuario: le dan ritmo a la ronda (calma → alarma → carrera de regreso → tensión → alivio o desastre) y resuelven que la cabeza se aburra.
+
+1. **Disparo:** al azar durante la infiltración (no a intervalos fijos), sin repetir NPC dos veces seguidas.
+2. **Aviso:** pantalla "¡EVENTO EN N…!" con el retrato del NPC (mesero, suegra, novia, cura…) y un indicador de dirección. **El NPC camina de verdad hacia el señor** desde un punto lejano.
+3. **Duración del aviso (dinámica):** `clamp(distancia del mapache más lejano a la gabardina / velocidad del mapache + 3 s, 8 s, 20 s)`. El punto de partida del NPC se elige para que su caminata dure ese tiempo. Así el aviso es justo aunque el mapa crezca.
+4. **¡Todos a sus puestos!:** los mapaches sueltos deben regresar y el señor debe verse normal (completo, de pie, quieto) cuando el NPC llegue.
+5. **Cámara de evento:** la cámara de todos se acerca a la escena (señor + NPC).
+6. **Cada rol tiene su parte, con tiempo límite:**
+   - **Cabeza:** elige la respuesta de diálogo (ver §7). Es su momento protagonista.
+   - **Brazos:** la acción que pide la situación (saludar de mano, tomar la copa que ofrecen, aplaudir).
+   - **Piernas:** la acción que pide la situación (quedarse quietas, pasito de baile, sentarse).
+   - Con menos jugadores, cada puesto combinado hace las partes de sus funciones.
+7. **Resultado:** éxito = la sospecha baja un poco. **Cualquier parte fallida o un puesto vacío (alguien no llegó) = la sospecha sube mucho.**
+
+**Entre eventos, la cabeza es el actor y vigía:** reacciona con expresiones a momentos de la boda, ve el radar de sospecha y avisa al equipo, puede **distraer** a los humanos cercanos con recarga ("¡Miren, el novio!", piropo, brindis) para abrir ventanas de robo, y debe aguantar el **estornudo** cuando el gato se acerca (si falla, se le vuela el sombrero). *Descartado:* robar con la boca (duplicaba a los brazos).
+
 ## 7. Diálogos
 
 Cuando un humano le habla al señor, la cabeza ve 3 respuestas en burbuja con tiempo límite (≈4 s). Una es correcta, otra es neutral y otra es absurda (incluido "idioma mapache"). Una respuesta incorrecta o un silencio suben la sospecha; una absurda puede provocar una reacción cómica del NPC. Si el puesto de cabeza está vacío, el diálogo cuenta como silencio.
