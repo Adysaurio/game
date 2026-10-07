@@ -11,6 +11,8 @@ namespace TrashPandas.Core.Npc
         public float HissRange = 1.5f;
         public float HissDuration = 2.5f;
         public float CooldownTime = 4f;
+        /// <summary>Give up sniffing if the coat can't be reached in this long (on a table, behind something).</summary>
+        public float SniffTimeout = 5f;
         public float ArriveDistance = 0.5f;
         public float StuckTime = 3f;
         public float StuckDistance = 0.2f;
@@ -58,6 +60,7 @@ namespace TrashPandas.Core.Npc
                     Destination = coat;
                     if (toCoat <= _s.HissRange) { Enter(CatState.Hissing); Destination = cat; }
                     else if (toCoat > _s.GiveUpRange) { Enter(CatState.Patrol); Destination = _route[_next]; }
+                    else if (_stateTime >= _s.SniffTimeout) { Enter(CatState.Cooldown); Advance(); }
                     break;
                 case CatState.Hissing:
                     Destination = cat;

@@ -61,5 +61,16 @@ namespace TrashPandas.Tests
             for (int i = 0; i < 35; i++) cat.Update(0.1f, new Vector3(3f, 0, 0), FarCoat); // not moving for 3.5 s
             Assert.AreEqual(Route[2], cat.Destination);
         }
+    
+        [Test]
+        public void CannotReachCoat_GivesUpSniffing()
+        {
+            var cat = new CatMind(Route);
+            var coat = new Vector3(5, 0, 3);
+            cat.Update(0.1f, new Vector3(5, 0, 0), coat);                 // sniffing from 3 m away
+            for (int i = 0; i < 60; i++) cat.Update(0.1f, new Vector3(5, 0, 0.5f), coat); // stuck 2.5 m away for 6 s
+            Assert.AreNotEqual(CatState.Sniffing, cat.State, "no endless '?' when the coat is out of reach");
+            Assert.AreNotEqual(CatState.Hissing, cat.State);
+        }
     }
 }

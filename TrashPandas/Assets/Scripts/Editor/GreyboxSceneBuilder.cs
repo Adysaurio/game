@@ -338,6 +338,7 @@ namespace TrashPandas.EditorTools
             netTransform.Interpolate = true;
             root.AddComponent<NetworkRigidbody>();
             root.AddComponent<NetworkedTrenchcoat>().RaccoonPrefab = raccoonPrefab.GetComponent<NetworkObject>();
+            IgnoreForNavigation(root);
             body.Torso = torso;
             body.Head = head;
             body.LeftHand = left;
@@ -374,6 +375,7 @@ namespace TrashPandas.EditorTools
             nt.AuthorityMode = NetworkTransform.AuthorityModes.Owner; // the owner moves it, instantly
             nt.SyncScaleX = nt.SyncScaleY = nt.SyncScaleZ = false;
             root.AddComponent<NetworkedRaccoon>();
+            IgnoreForNavigation(root);
 
             var prefab = PrefabUtility.SaveAsPrefabAsset(root, PrefabPath);
             Object.DestroyImmediate(root);
@@ -409,7 +411,16 @@ namespace TrashPandas.EditorTools
             var nt = go.AddComponent<NetworkTransform>();
             nt.SyncScaleX = nt.SyncScaleY = nt.SyncScaleZ = false;
             go.AddComponent<NetworkRigidbody>();
+            IgnoreForNavigation(go);
             return go;
+        }
+
+        /// <summary>Things that move (coat, raccoons, props) must not carve permanent holes into the baked NavMesh.</summary>
+        static void IgnoreForNavigation(GameObject go)
+        {
+            var modifier = go.AddComponent<NavMeshModifier>();
+            modifier.ignoreFromBuild = true;
+            modifier.applyToChildren = true;
         }
 
         static GameObject Box(string name, Vector3 position, Vector3 size, Material mat)

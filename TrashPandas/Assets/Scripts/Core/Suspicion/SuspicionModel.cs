@@ -19,6 +19,10 @@ namespace TrashPandas.Core.Suspicion
         public float RaccoonSightingBurst = 20f;
         /// <summary>Seconds before the same human can count another sighting.</summary>
         public float SightingCooldown = 2f;
+        /// <summary>Sightings by other humans within this many seconds of the first one count less…</summary>
+        public float SightingWindow = 1f;
+        /// <summary>…this fraction of the burst each (a crowd noticing at once is fast, not instant game over).</summary>
+        public float ExtraWitnessFactor = 0.25f;
         public float CatHissRate = 15f;
         public float CalmDecayRate = 4f;
         /// <summary>Seconds without anything suspicious before it starts going down.</summary>
@@ -44,6 +48,7 @@ namespace TrashPandas.Core.Suspicion
         // Doubles: at very high frame rates a per-frame change is below float resolution near 30-100.
         double _value;
         double _calmFor;
+        float _windowStart = float.NegativeInfinity;
 
         public float Value => (float)_value;
         public bool Caught { get; private set; }
@@ -73,7 +78,9 @@ namespace TrashPandas.Core.Suspicion
             if (_lastSighting.TryGetValue(witnessId, out float last) && now - last < _s.SightingCooldown) return false;
             _lastSighting[witnessId] = now;
             _calmFor = 0.0;
-            Add(_s.RaccoonSightingBurst);
+            bool sameMoment = now - _windowStart <= _s.SightingWindow;
+            if (!sameMoment) _windowStart = now;
+            Add(_s.RaccoonSightingBurst * (sameMoment ? _s.ExtraWitnessFactor : 1f));
             return true;
         }
 
@@ -82,6 +89,7 @@ namespace TrashPandas.Core.Suspicion
             _value = 0.0;
             _calmFor = 0.0;
             _lastSighting.Clear();
+            _windowStart = float.NegativeInfinity;
             if (Caught) { Caught = false; CaughtChanged?.Invoke(false); }
         }
 

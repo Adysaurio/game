@@ -59,7 +59,7 @@ namespace TrashPandas.Tests
             Assert.IsFalse(m.ReportRaccoonSighting(1, 10.5f), "same guest, still in cooldown");
             Assert.IsTrue(m.ReportRaccoonSighting(2, 10.5f), "a different guest counts");
             Assert.IsTrue(m.ReportRaccoonSighting(1, 12.1f), "cooldown over");
-            Assert.AreEqual(60f, m.Value, 0.01f);
+            Assert.AreEqual(20f + 5f + 20f, m.Value, 0.01f, "second witness in the same window adds a quarter burst");
         }
 
         [Test]
@@ -85,7 +85,7 @@ namespace TrashPandas.Tests
         public void ClampedToRange()
         {
             var m = new SuspicionModel(S());
-            for (int i = 0; i < 10; i++) m.ReportRaccoonSighting(i, 0f);
+            for (int i = 0; i < 10; i++) m.ReportRaccoonSighting(i, i * 1.5f); // spaced out: each one a full burst
             Assert.AreEqual(100f, m.Value);
             m.Reset();
             Run(m, 10f, default);
@@ -98,7 +98,7 @@ namespace TrashPandas.Tests
             var m = new SuspicionModel(S());
             int fired = 0;
             m.CaughtChanged += caught => { if (caught) fired++; };
-            for (int i = 0; i < 8; i++) m.ReportRaccoonSighting(i, 0f);
+            for (int i = 0; i < 8; i++) m.ReportRaccoonSighting(i, i * 1.5f); // spaced out: each one a full burst
             Run(m, 1f, new SuspicionFrame { CatHissing = true });
             Assert.IsTrue(m.Caught);
             Assert.AreEqual(1, fired);
@@ -108,7 +108,7 @@ namespace TrashPandas.Tests
         public void Caught_FreezesValue_UntilReset()
         {
             var m = new SuspicionModel(S());
-            for (int i = 0; i < 5; i++) m.ReportRaccoonSighting(i, 0f);
+            for (int i = 0; i < 5; i++) m.ReportRaccoonSighting(i, i * 1.5f); // spaced out: each one a full burst
             Run(m, 10f, default);
             Assert.AreEqual(100f, m.Value, "no calming down once caught");
             m.Reset();
@@ -143,6 +143,15 @@ namespace TrashPandas.Tests
             m.ReportRaccoonSighting(1, 0f); // 20
             Run(m, 4f, new SuspicionFrame { CoatWitnessed = true, SeenWeirdness = 1e-6f });
             Assert.AreEqual(10f, m.Value, 0.3f, "a rounding-level wobble while walking is not 'something odd'");
+        }
+    
+        [Test]
+        public void ManyWitnessesSameFrame_DoesNotJumpByN()
+        {
+            var m = new SuspicionModel(S());
+            for (int guest = 0; guest < 5; guest++) m.ReportRaccoonSighting(guest, 10f);
+            Assert.AreEqual(20f + 4 * 5f, m.Value, 0.01f, "first witness full, the rest a quarter each");
+            Assert.IsFalse(m.Caught);
         }
     }
 }

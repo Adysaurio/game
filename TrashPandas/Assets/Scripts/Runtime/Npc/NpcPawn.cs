@@ -41,6 +41,8 @@ namespace TrashPandas.Runtime.Npc
             if (!_agent || Seated || !SimulationAuthority.IsSimulating) return;
             if (NavMesh.SamplePosition(transform.position, out var hit, 2f, NavMesh.AllAreas))
             {
+                float moved = Vector2.Distance(new Vector2(hit.position.x, hit.position.z), new Vector2(transform.position.x, transform.position.z));
+                if (Debug.isDebugBuild && moved > 0.25f) Debug.Log($"[NAV] {name} displaced {moved:F2} m onto the NavMesh");
                 _agent.Warp(hit.position);
                 _agent.enabled = true;
             }

@@ -52,6 +52,8 @@ namespace TrashPandas.Runtime.Npc
 
         void Start()
         {
+            if (Debug.isDebugBuild && Coat && UnityEngine.AI.NavMesh.SamplePosition(Coat.transform.position, out var hit, 3f, UnityEngine.AI.NavMesh.AllAreas))
+                Debug.Log($"[NAV] coat start is {Vector3.Distance(hit.position, Coat.transform.position):F2} m from the NavMesh");
             _brains.Clear();
             foreach (var pawn in FindObjectsByType<NpcPawn>(FindObjectsSortMode.InstanceID))
             {
