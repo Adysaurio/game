@@ -9,7 +9,8 @@
     "Unity.Networking.Transport",
     "Unity.Services.Core",
     "Unity.Services.Multiplayer",
-    "Unity.Services.Authentication"
+    "Unity.Services.Authentication",
+    "Unity.AI.Navigation"
   ],
   "autoReferenced": true
 }

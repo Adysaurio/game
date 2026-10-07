@@ -62,6 +62,9 @@ namespace TrashPandas.Runtime.Trenchcoat
         public Vector3 ShoulderWorld(bool left) => transform.TransformPoint(left ? LeftShoulder : RightShoulder);
         public Vector3 ChestWorld => transform.TransformPoint(new Vector3(0f, 1.3f, 0f));
 
+        /// <summary>What the body is doing right now (what onlookers see).</summary>
+        public BodyIntent CurrentIntent => _intent;
+
         public void SetIntent(BodyIntent intent)
         {
             if (intent.Jump && !_jumpWasRequested && !VisualOnly) _jump.Press(Time.time);
