@@ -4,7 +4,9 @@
   "references": [
     "TrashPandas.Core",
     "TrashPandas.Runtime",
-    "Unity.Cinemachine"
+    "Unity.Cinemachine",
+    "Unity.Netcode.Runtime",
+    "Unity.Networking.Transport"
   ],
   "includePlatforms": [
     "Editor"

@@ -1,0 +1,30 @@
+using TrashPandas.Runtime.Raccoon;
+using Unity.Netcode;
+
+namespace TrashPandas.Runtime.Net
+{
+    /// <summary>
+    /// A loose raccoon online. Its owner moves it locally (owner-authoritative NetworkTransform) so it feels
+    /// instant; everyone else just sees it interpolated.
+    /// </summary>
+    public sealed class NetworkedRaccoon : NetworkBehaviour
+    {
+        /// <summary>The raccoon this machine controls, if any.</summary>
+        public static NetworkedRaccoon LocalOwned { get; private set; }
+
+        public RaccoonController Controller { get; private set; }
+
+        void Awake() => Controller = GetComponent<RaccoonController>();
+
+        public override void OnNetworkSpawn()
+        {
+            Controller.enabled = IsOwner; // non-owners must not run gravity/CharacterController moves
+            if (IsOwner) LocalOwned = this;
+        }
+
+        public override void OnNetworkDespawn()
+        {
+            if (LocalOwned == this) LocalOwned = null;
+        }
+    }
+}

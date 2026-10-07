@@ -1,6 +1,9 @@
 using System.IO;
 using TrashPandas.Runtime.Cameras;
 using TrashPandas.Runtime.Grabbing;
+using TrashPandas.Runtime.Net;
+using Unity.Netcode;
+using Unity.Netcode.Components;
 using TrashPandas.Runtime.Raccoon;
 using TrashPandas.Runtime.Trenchcoat;
 using Unity.Cinemachine;
@@ -14,8 +17,50 @@ namespace TrashPandas.EditorTools
     public static class GreyboxSceneBuilder
     {
         const string ScenePath = "Assets/Scenes/Greybox_Trenchcoat.unity";
+        const string MenuScenePath = "Assets/Scenes/Menu.unity";
         const string PrefabPath = "Assets/Prefabs/Raccoon.prefab";
         const string MaterialDir = "Assets/Materials/Greybox";
+
+        [MenuItem("TrashPandas/Build All Scenes")]
+        public static void BuildAll()
+        {
+            Build();
+            BuildMenu();
+        }
+
+        static void SetBuildScenes()
+        {
+            var scenes = new System.Collections.Generic.List<EditorBuildSettingsScene>();
+            if (File.Exists(MenuScenePath)) scenes.Add(new EditorBuildSettingsScene(MenuScenePath, true));
+            scenes.Add(new EditorBuildSettingsScene(ScenePath, true));
+            EditorBuildSettings.scenes = scenes.ToArray();
+        }
+
+        /// <summary>The menu owns the app-wide NetworkManager (it survives loading the game scene).</summary>
+        [MenuItem("TrashPandas/Build Menu Scene")]
+        public static void BuildMenu()
+        {
+            var scene = EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
+
+            var cam = new GameObject("Main Camera").AddComponent<Camera>();
+            cam.tag = "MainCamera";
+            cam.clearFlags = CameraClearFlags.SolidColor;
+            cam.backgroundColor = new Color(0.12f, 0.22f, 0.16f);
+
+            var net = new GameObject("Network");
+            net.AddComponent<NetworkManager>();
+            net.AddComponent<Unity.Netcode.Transports.UTP.UnityTransport>().DisconnectTimeoutMS = 8000;
+            net.AddComponent<NetworkBootstrap>();
+            net.AddComponent<SessionHost>();
+
+            new GameObject("MainMenu").AddComponent<TrashPandas.Runtime.Menu.MainMenu>();
+            new GameObject("DevAutomation").AddComponent<DevAutomation>();
+
+            EditorSceneManager.SaveScene(scene, MenuScenePath);
+            SetBuildScenes();
+            AssetDatabase.SaveAssets();
+            Debug.Log($"[GreyboxSceneBuilder] Built {MenuScenePath}");
+        }
 
         [MenuItem("TrashPandas/Build Greybox Scene")]
         public static void Build()
@@ -84,7 +129,7 @@ namespace TrashPandas.EditorTools
             var hedgeClimb = Box("Hedge_Climbable", new Vector3(8f, 1f, -8f), new Vector3(1f, 2f, 1f), hedge);
             hedgeClimb.AddComponent<Climbable>();
 
-            var body = BuildTrenchcoat(coat, skin, pants);
+            var body = BuildTrenchcoat(coat, skin, pants, raccoonPrefab);
 
             var camGo = new GameObject("Main Camera");
             camGo.tag = "MainCamera";
@@ -101,10 +146,31 @@ namespace TrashPandas.EditorTools
             controller.RaccoonPrefab = raccoonPrefab;
             controller.CameraRig = rig;
 
+            var online = new GameObject("OnlinePlayerController").AddComponent<OnlinePlayerController>();
+            online.CameraRig = rig;
+
             EditorSceneManager.SaveScene(scene, ScenePath);
-            EditorBuildSettings.scenes = new[] { new EditorBuildSettingsScene(ScenePath, true) };
+            AssignNetworkIds(scene);
+            SetBuildScenes();
             AssetDatabase.SaveAssets();
             Debug.Log($"[GreyboxSceneBuilder] Built {ScenePath}");
+        }
+
+        /// <summary>
+        /// In-scene NetworkObjects get their GlobalObjectIdHash from the saved scene's object ids, which only
+        /// exist after the first save: validate them now and save again.
+        /// </summary>
+        static void AssignNetworkIds(UnityEngine.SceneManagement.Scene scene)
+        {
+            var validate = typeof(NetworkObject).GetMethod("OnValidate",
+                System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Public);
+            foreach (var no in Object.FindObjectsByType<NetworkObject>(FindObjectsInactive.Include, FindObjectsSortMode.None))
+            {
+                validate?.Invoke(no, null);
+                EditorUtility.SetDirty(no);
+            }
+            EditorSceneManager.MarkSceneDirty(scene);
+            EditorSceneManager.SaveScene(scene, ScenePath);
         }
 
         static PlayerCameraRig BuildPlayerCamera(Camera output, Transform target)
@@ -140,10 +206,11 @@ namespace TrashPandas.EditorTools
             return rig;
         }
 
-        static TrenchcoatBody BuildTrenchcoat(Material coat, Material skin, Material pants)
+        static TrenchcoatBody BuildTrenchcoat(Material coat, Material skin, Material pants, RaccoonController raccoonPrefab)
         {
             var root = new GameObject("Trenchcoat");
             root.transform.position = new Vector3(0f, 0.05f, 0f);
+            root.AddComponent<NetworkObject>();
             var rb = root.AddComponent<Rigidbody>();
             rb.mass = 60f;
             var col = root.AddComponent<CapsuleCollider>();
@@ -166,6 +233,13 @@ namespace TrashPandas.EditorTools
 
             var body = root.AddComponent<TrenchcoatBody>();
             root.AddComponent<HandGrabber>();
+
+            // Online: the host simulates; clients get position/rotation interpolated plus a visual state.
+            var netTransform = root.AddComponent<NetworkTransform>();
+            netTransform.SyncScaleX = netTransform.SyncScaleY = netTransform.SyncScaleZ = false;
+            netTransform.Interpolate = true;
+            root.AddComponent<NetworkRigidbody>();
+            root.AddComponent<NetworkedTrenchcoat>().RaccoonPrefab = raccoonPrefab.GetComponent<NetworkObject>();
             body.Torso = torso;
             body.Head = head;
             body.LeftHand = left;
@@ -197,9 +271,20 @@ namespace TrashPandas.EditorTools
             Visual(PrimitiveType.Capsule, "Body", root.transform, new Vector3(0f, 0.3f, 0f), new Vector3(0.4f, 0.3f, 0.4f), fur);
             Visual(PrimitiveType.Sphere, "Snout", root.transform, new Vector3(0f, 0.4f, 0.22f), Vector3.one * 0.12f, fur);
             root.AddComponent<RaccoonController>();
+            root.AddComponent<NetworkObject>();
+            var nt = root.AddComponent<NetworkTransform>();
+            nt.AuthorityMode = NetworkTransform.AuthorityModes.Owner; // the owner moves it, instantly
+            nt.SyncScaleX = nt.SyncScaleY = nt.SyncScaleZ = false;
+            root.AddComponent<NetworkedRaccoon>();
 
             var prefab = PrefabUtility.SaveAsPrefabAsset(root, PrefabPath);
             Object.DestroyImmediate(root);
+            // Prefab NetworkObjects take their id from the saved asset: validate and save again.
+            var validate = typeof(NetworkObject).GetMethod("OnValidate",
+                System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Public);
+            validate?.Invoke(prefab.GetComponent<NetworkObject>(), null);
+            EditorUtility.SetDirty(prefab);
+            PrefabUtility.SavePrefabAsset(prefab);
             return prefab.GetComponent<RaccoonController>();
         }
 
@@ -220,6 +305,12 @@ namespace TrashPandas.EditorTools
             rb.mass = mass;
             rb.interpolation = RigidbodyInterpolation.Interpolate;
             go.AddComponent<Grabbable>().RequiresBothHands = bothHands;
+
+            // Online: the host simulates and grabs; everyone sees the same glass fly.
+            go.AddComponent<NetworkObject>();
+            var nt = go.AddComponent<NetworkTransform>();
+            nt.SyncScaleX = nt.SyncScaleY = nt.SyncScaleZ = false;
+            go.AddComponent<NetworkRigidbody>();
             return go;
         }
 

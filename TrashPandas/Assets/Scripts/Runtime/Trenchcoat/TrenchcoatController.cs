@@ -43,11 +43,22 @@ namespace TrashPandas.Runtime.Trenchcoat
 
         void Awake()
         {
+            // This is the single-person debug mode; online play is driven by OnlinePlayerController.
+            var nm = Unity.Netcode.NetworkManager.Singleton;
+            if (nm && nm.IsListening) { enabled = false; return; }
             Time.fixedDeltaTime = 1f / 60f; // physics at 60 Hz: smoother follow on common displays
             _slots = new SlotSystem(Mathf.Clamp(PlayerCount, SlotLayout.MinPlayers, SlotLayout.MaxPlayers));
             _possession = new DebugPossessionModel(_slots);
             _grabber = Body.GetComponent<HandGrabber>();
             UpdateCoatCamera();
+        }
+
+        void Start()
+        {
+            // Offline, nothing gets spawned: undo NetworkRigidbody's "kinematic until spawned" so physics runs.
+            // (In Start, not Awake: NetworkRigidbody sets itself up in its own Awake.)
+            foreach (var nrb in FindObjectsByType<Unity.Netcode.Components.NetworkRigidbody>(FindObjectsInactive.Include, FindObjectsSortMode.None))
+                nrb.SetIsKinematic(false);
         }
 
         /// <summary>Over-the-shoulder when the active role aims hands; wide when it walks.</summary>
@@ -86,6 +97,7 @@ namespace TrashPandas.Runtime.Trenchcoat
             else
             {
                 var live = _reader.ReadSlotInput(CameraRig, Body, now);
+                if (Net.DevAutomation.Bot == "walk") live.Move = new Vector2(0f, 1f); // dev automation
                 _inputs[_possession.ActivePlayerId] = live; // you always override your own ghost
                 if (_recording == _possession.ActivePlayerId) _ghosts[_possession.ActivePlayerId].Record(now, live);
             }
