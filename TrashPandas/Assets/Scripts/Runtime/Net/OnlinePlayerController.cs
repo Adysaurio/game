@@ -25,6 +25,8 @@ namespace TrashPandas.Runtime.Net
         NetworkedRaccoon _cameraOnRaccoon;
         float _botHopAt = 8f;
         bool _spectating;
+        bool _eventCamera;
+        readonly TrashPandas.Runtime.Npc.EventParticipation _events = new TrashPandas.Runtime.Npc.EventParticipation();
         public bool IsSpectating => _spectating;
         NetworkedTrenchcoat _coat;
 
@@ -78,10 +80,17 @@ namespace TrashPandas.Runtime.Net
                 return;
             }
 
+            bool engaged = _events.Tick(_reader, _reader.Move(), offlinePlayer: 0);
             if (slot.HasValue)
             {
                 var parts = snapshot.PartsOf(slot.Value);
-                UpdateCamera(parts);
+                if (engaged != _eventCamera)
+                {
+                    _eventCamera = engaged;
+                    if (engaged) CameraRig.SetTarget(_coat.Body.transform, 3.6f, 1.6f);
+                    else _armsCamera = null;
+                }
+                if (!engaged) UpdateCamera(parts);
                 var input = _reader.ReadSlotInput(CameraRig, _coat.Body, now);
                 ApplyBot(ref input);
                 if (Time.unscaledTime >= _nextSend)

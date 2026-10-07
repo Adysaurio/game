@@ -33,6 +33,20 @@ namespace TrashPandas.Runtime.Net
         }
 
         /// <summary>Crouch only at the hedge (crouching halves speed).</summary>
+        /// <summary>Dev bots for social events: "obey" plays every part right; "ignore" does nothing.</summary>
+        public static void ApplyEventBot(TrashPandas.Core.Events.SocialEvent ev, ref TrashPandas.Core.Events.TaskInput input, ref int answerKey)
+        {
+            if (Bot == "ignore") { input = default; answerKey = 0; return; }
+            if (Bot != "obey") return;
+            answerKey = System.Array.IndexOf(ev.OptionKinds, TrashPandas.Core.Events.HeadAnswer.Good) + 1;
+            input = new TrashPandas.Core.Events.TaskInput
+            {
+                Primary = true, Secondary = true,
+                Crouch = ev.Legs == TrashPandas.Core.Events.LegsTask.Kneel,
+                Jump = ev.Legs == TrashPandas.Core.Events.LegsTask.DanceStep,
+            };
+        }
+
         public static bool FleeCrouchAt(Vector3 pos) => Bot == "hopgap" && FleeActive && pos.z < -6.3f;
         static bool FleeActive
         {
@@ -138,6 +152,8 @@ namespace TrashPandas.Runtime.Net
                 if (Args.Contains("-autorestart") && pd.Phase == TrashPandas.Runtime.Panic.RoundPhase.Results && SessionHost.Instance && SessionHost.Instance.IsHost && !s_restarted)
                 { s_restarted = true; Log("autorestart"); pd.PlayAgain(); }
             }
+            var ed = TrashPandas.Runtime.Npc.SocialEventDirector.Instance;
+            if (ed) { var es = ed.Snapshot; panic += $" event={ed.Phase}#{es.Serial}:{ed.Current.Speaker} t={es.SecondsLeft:F1} result={es.ResultDelta:F0}[{es.HeadOutcome}{es.ArmsOutcome}{es.LegsOutcome}]"; }
             return panic + $" suspicion={d.Suspicion:F1} caught={d.Caught} curious={curious} alarmed={alarmed} cat={cat} frame[missing={f.MissingParts} seen={f.CoatWitnessed} weird={f.SeenWeirdness:F2} hiss={f.CatHissing}] dt={Time.deltaTime:F3}";
         }
 

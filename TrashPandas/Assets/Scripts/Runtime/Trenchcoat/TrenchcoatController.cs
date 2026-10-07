@@ -41,6 +41,16 @@ namespace TrashPandas.Runtime.Trenchcoat
         bool? _armsCamera;
         HandGrabber _grabber;
         bool _showHelp = true;
+        readonly TrashPandas.Runtime.Npc.EventParticipation _events = new TrashPandas.Runtime.Npc.EventParticipation();
+        bool _eventCamera;
+
+        void UpdateEventCamera(bool engaged)
+        {
+            if (engaged == _eventCamera || _possession.ActiveIsOutside) return;
+            _eventCamera = engaged;
+            if (engaged) CameraRig.SetTarget(Body.transform, 3.6f, 1.6f);
+            else { _armsCamera = null; UpdateCoatCamera(); }
+        }
         readonly List<RaccoonController> _botRaccoons = new List<RaccoonController>();
 
         public static TrenchcoatController Instance { get; private set; }
@@ -120,7 +130,10 @@ namespace TrashPandas.Runtime.Trenchcoat
         void Update()
         {
             float now = Time.time;
-            int selected = _reader.SelectPressed();
+            // Social event response window: number keys answer instead of switching seats.
+            bool engaged = _events.Tick(_reader, _reader.Move(), offlinePlayer: 0);
+            UpdateEventCamera(engaged);
+            int selected = engaged ? -1 : _reader.SelectPressed();
             if (selected >= 0 || _reader.CyclePressed) StopRecording(now);
             if (selected >= 0) _possession.TrySelect(selected);
             if (_reader.CyclePressed) _possession.CycleNext();

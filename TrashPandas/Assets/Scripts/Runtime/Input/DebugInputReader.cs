@@ -51,6 +51,15 @@ namespace TrashPandas.Runtime.Input
             return -1;
         }
 
+        /// <summary>Raw WASD (x = right, y = forward), magnitude 0..1.</summary>
+        public Vector2 Move()
+        {
+            if (K == null) return Vector2.zero;
+            float x = (K.dKey.isPressed ? 1f : 0f) - (K.aKey.isPressed ? 1f : 0f);
+            float y = (K.wKey.isPressed ? 1f : 0f) - (K.sKey.isPressed ? 1f : 0f);
+            return Vector2.ClampMagnitude(new Vector2(x, y), 1f);
+        }
+
         /// <summary>WASD turned into a world XZ direction relative to the camera, magnitude 0..1.</summary>
         public Vector2 CameraRelativeMove(PlayerCameraRig rig)
         {
