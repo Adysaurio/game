@@ -35,7 +35,7 @@ namespace TrashPandas.Runtime.Trenchcoat
         [Header("Visuals")]
         public float WobbleAmount = 6f;
         public float StepSwing = 30f;
-        public float ReachLength = 0.8f;
+        public float ReachLength = 1.0f;
         public float HandSpeed = 10f;
 
         public static readonly Vector3 TorsoRest = new Vector3(0f, 1.15f, 0f);
@@ -51,6 +51,12 @@ namespace TrashPandas.Runtime.Trenchcoat
         BodyIntent _intent;
         bool _jumpWasRequested;
         float _wobblePhase;
+
+        public bool LeftReachActive => _intent.LeftReach && !_intent.LeftArmLimp;
+        public bool RightReachActive => _intent.RightReach && !_intent.RightArmLimp;
+
+        public Vector3 ShoulderWorld(bool left) => transform.TransformPoint(left ? LeftShoulder : RightShoulder);
+        public Vector3 ChestWorld => transform.TransformPoint(new Vector3(0f, 1.3f, 0f));
 
         public void SetIntent(BodyIntent intent)
         {
@@ -129,8 +135,8 @@ namespace TrashPandas.Runtime.Trenchcoat
             // Arms: reach where the player looks, rest at the sides, or dangle when nobody controls them.
             float dangle = Mathf.Sin(_wobblePhase * 1.3f) * 0.12f;
             Vector3 leftShoulder = LeftShoulder + drop, rightShoulder = RightShoulder + drop;
-            Vector3 left = HandTarget(leftShoulder, _intent.LeftArmLimp, _intent.LeftReach, _intent.LeftAim, dangle, -1f);
-            Vector3 right = HandTarget(rightShoulder, _intent.RightArmLimp, _intent.RightReach, _intent.RightAim, -dangle, 1f);
+            Vector3 left = HandTarget(leftShoulder, _intent.LeftArmLimp, _intent.LeftReach, _intent.HasLeftPoint, _intent.LeftPoint, _intent.LeftAim, dangle, -1f);
+            Vector3 right = HandTarget(rightShoulder, _intent.RightArmLimp, _intent.RightReach, _intent.HasRightPoint, _intent.RightPoint, _intent.RightAim, -dangle, 1f);
             LeftHand.localPosition = Vector3.Lerp(LeftHand.localPosition, left, dt * HandSpeed);
             RightHand.localPosition = Vector3.Lerp(RightHand.localPosition, right, dt * HandSpeed);
             LeftHand.localScale = Vector3.one * (_intent.LeftReach ? 0.14f : 0.18f);
@@ -139,9 +145,11 @@ namespace TrashPandas.Runtime.Trenchcoat
             StretchArm(RightArm, rightShoulder, RightHand.localPosition);
         }
 
-        Vector3 HandTarget(Vector3 shoulder, bool limp, bool reach, Vector3 aimWorld, float dangle, float side)
+        Vector3 HandTarget(Vector3 shoulder, bool limp, bool reach, bool hasPoint, Vector3 pointWorld, Vector3 aimWorld, float dangle, float side)
         {
             if (limp) return shoulder + new Vector3(0.05f * side, -0.75f, dangle);
+            if (reach && hasPoint)
+                return shoulder + Vector3.ClampMagnitude(transform.InverseTransformPoint(pointWorld) - shoulder, ReachLength);
             if (reach && aimWorld != Vector3.zero) return shoulder + transform.InverseTransformDirection(aimWorld) * ReachLength;
             return shoulder + new Vector3(0.08f * side, -0.6f, 0.15f + dangle * 0.3f);
         }

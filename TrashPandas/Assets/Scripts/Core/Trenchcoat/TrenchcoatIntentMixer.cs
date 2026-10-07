@@ -26,6 +26,8 @@ namespace TrashPandas.Core.Trenchcoat
             {
                 intent.LeftAim = Direction(input.ArmLeft.Aim);
                 intent.LeftReach = input.ArmLeft.Reach;
+                intent.HasLeftPoint = input.ArmLeft.HasPoint && IsFinite(input.ArmLeft.Point);
+                intent.LeftPoint = intent.HasLeftPoint ? input.ArmLeft.Point : Vector3.zero;
             }
             else intent.LeftArmLimp = true;
 
@@ -33,6 +35,8 @@ namespace TrashPandas.Core.Trenchcoat
             {
                 intent.RightAim = Direction(input.ArmRight.Aim);
                 intent.RightReach = input.ArmRight.Reach;
+                intent.HasRightPoint = input.ArmRight.HasPoint && IsFinite(input.ArmRight.Point);
+                intent.RightPoint = intent.HasRightPoint ? input.ArmRight.Point : Vector3.zero;
             }
             else intent.RightArmLimp = true;
 
@@ -88,6 +92,9 @@ namespace TrashPandas.Core.Trenchcoat
 
         static Vector2 Planar(Vector2 v) =>
             float.IsNaN(v.x) || float.IsNaN(v.y) ? Vector2.zero : Vector2.ClampMagnitude(v, 1f);
+
+        static bool IsFinite(Vector3 v) =>
+            !(float.IsNaN(v.x) || float.IsNaN(v.y) || float.IsNaN(v.z) || float.IsInfinity(v.x) || float.IsInfinity(v.y) || float.IsInfinity(v.z));
 
         static Vector3 Direction(Vector3 v) =>
             float.IsNaN(v.x) || float.IsNaN(v.y) || float.IsNaN(v.z) || v.sqrMagnitude < 1e-6f ? Vector3.zero : v.normalized;

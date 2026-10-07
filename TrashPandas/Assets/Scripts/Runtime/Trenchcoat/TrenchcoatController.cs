@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using TrashPandas.Core.Debugging;
 using TrashPandas.Core.Trenchcoat;
 using TrashPandas.Runtime.Cameras;
+using TrashPandas.Runtime.Grabbing;
 using TrashPandas.Runtime.Input;
 using TrashPandas.Runtime.Raccoon;
 using UnityEngine;
@@ -23,6 +24,9 @@ namespace TrashPandas.Runtime.Trenchcoat
         public float CoatLookHeight = 1.4f;
         public float RaccoonCameraRadius = 3f;
         public float RaccoonLookHeight = 0.4f;
+        [Tooltip("Closer, over-the-shoulder camera when you control the arms (and not the legs).")]
+        public float ArmsCameraRadius = 3.2f;
+        public float ArmsLookHeight = 1.7f;
 
         readonly MixerSettings _mixer = new MixerSettings();
         readonly Dictionary<int, SlotInput> _inputs = new Dictionary<int, SlotInput>();
@@ -33,6 +37,8 @@ namespace TrashPandas.Runtime.Trenchcoat
         RaccoonController _raccoon;
         int? _recording;
         string _status = "";
+        bool? _armsCamera;
+        HandGrabber _grabber;
         bool _showHelp = true;
 
         void Awake()
@@ -40,7 +46,20 @@ namespace TrashPandas.Runtime.Trenchcoat
             Time.fixedDeltaTime = 1f / 60f; // physics at 60 Hz: smoother follow on common displays
             _slots = new SlotSystem(Mathf.Clamp(PlayerCount, SlotLayout.MinPlayers, SlotLayout.MaxPlayers));
             _possession = new DebugPossessionModel(_slots);
-            CameraRig.SetTarget(Body.transform, CoatCameraRadius, CoatLookHeight);
+            _grabber = Body.GetComponent<HandGrabber>();
+            UpdateCoatCamera();
+        }
+
+        /// <summary>Over-the-shoulder when the active role aims hands; wide when it walks.</summary>
+        void UpdateCoatCamera()
+        {
+            if (_possession.ActiveIsOutside) return;
+            var parts = _slots.PartsOf(_slots.SlotOf(_possession.ActivePlayerId).Value);
+            bool arms = (parts & BodyPart.Arms) != 0 && (parts & BodyPart.Legs) == 0;
+            if (_armsCamera == arms) return;
+            _armsCamera = arms;
+            if (arms) CameraRig.SetTarget(Body.transform, ArmsCameraRadius, ArmsLookHeight);
+            else CameraRig.SetTarget(Body.transform, CoatCameraRadius, CoatLookHeight);
         }
 
         void Update()
@@ -52,6 +71,7 @@ namespace TrashPandas.Runtime.Trenchcoat
             if (_reader.CyclePressed) _possession.CycleNext();
             if (_reader.TogglePressed) Toggle(now);
             if (_reader.RecordPressed) ToggleRecording(now);
+            UpdateCoatCamera();
             if (UnityEngine.InputSystem.Keyboard.current?.f1Key.wasPressedThisFrame == true) _showHelp = !_showHelp;
             if (_reader.ClearGhostsPressed) { _ghosts.Clear(); _recording = null; _status = "Ghosts cleared"; }
 
@@ -65,7 +85,7 @@ namespace TrashPandas.Runtime.Trenchcoat
             }
             else
             {
-                var live = _reader.ReadSlotInput(CameraRig, now);
+                var live = _reader.ReadSlotInput(CameraRig, Body, now);
                 _inputs[_possession.ActivePlayerId] = live; // you always override your own ghost
                 if (_recording == _possession.ActivePlayerId) _ghosts[_possession.ActivePlayerId].Record(now, live);
             }
@@ -120,12 +140,38 @@ namespace TrashPandas.Runtime.Trenchcoat
 
             Destroy(_raccoon.gameObject);
             _raccoon = null;
-            CameraRig.SetTarget(Body.transform, CoatCameraRadius, CoatLookHeight);
+            _armsCamera = null;
+            UpdateCoatCamera();
             _status = "";
+        }
+
+        void DrawCrosshair()
+        {
+            if (_possession.ActiveIsOutside) return;
+            var parts = _slots.PartsOf(_slots.SlotOf(_possession.ActivePlayerId).Value);
+            if ((parts & BodyPart.Arms) == 0) return;
+
+            bool holding = _grabber && (_grabber.HeldLeft || _grabber.HeldRight || _grabber.HeldBoth);
+            Color color = holding ? new Color(1f, 0.85f, 0.2f)
+                        : _reader.AssistTarget ? new Color(0.3f, 1f, 0.4f)
+                        : _reader.AimInReach ? Color.white
+                        : new Color(1f, 1f, 1f, 0.35f);
+            float size = _reader.AssistTarget ? 14f : 8f;
+            var c = new Vector2(Screen.width * 0.5f, Screen.height * 0.5f);
+            var old = GUI.color;
+            GUI.color = color;
+            GUI.DrawTexture(new Rect(c.x - size * 0.5f, c.y - size * 0.5f, size, size), Texture2D.whiteTexture);
+            GUI.color = old;
+            if (_reader.AssistTarget && !holding)
+            {
+                string label = _reader.AssistTarget.RequiresBothHands ? "Right click (both hands)" : "Left click";
+                GUI.Label(new Rect(c.x + 12, c.y - 9, 220, 18), $"{_reader.AssistTarget.name} — {label}");
+            }
         }
 
         void OnGUI()
         {
+            DrawCrosshair();
             var style = new GUIStyle(GUI.skin.label) { fontSize = 12 };
             var lines = new List<string>();
             var slotsLine = "";

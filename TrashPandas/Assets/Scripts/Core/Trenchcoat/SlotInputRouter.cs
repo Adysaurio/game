@@ -25,18 +25,19 @@ namespace TrashPandas.Core.Trenchcoat
             if ((slotParts & BodyPart.LegRight) != 0) parts.LegRight = leg;
 
             bool bothArms = (slotParts & BodyPart.Arms) == BodyPart.Arms;
+            var arm = new ArmInput { Aim = input.Aim, Point = input.AimPoint, HasPoint = input.HasAimPoint };
             if (bothArms)
             {
-                parts.ArmLeft = new ArmInput { Aim = input.Aim, Reach = input.PrimaryReach };
-                parts.ArmRight = new ArmInput { Aim = input.Aim, Reach = input.SecondaryReach };
+                var left = arm; left.Reach = input.GrabBoth || (input.GrabOne && input.PreferLeftHand);
+                var right = arm; right.Reach = input.GrabBoth || (input.GrabOne && !input.PreferLeftHand);
+                parts.ArmLeft = left;
+                parts.ArmRight = right;
             }
-            else if ((slotParts & BodyPart.ArmLeft) != 0)
+            else if ((slotParts & BodyPart.Arms) != 0)
             {
-                parts.ArmLeft = new ArmInput { Aim = input.Aim, Reach = input.PrimaryReach };
-            }
-            else if ((slotParts & BodyPart.ArmRight) != 0)
-            {
-                parts.ArmRight = new ArmInput { Aim = input.Aim, Reach = input.PrimaryReach };
+                arm.Reach = input.GrabOne || input.GrabBoth;
+                if ((slotParts & BodyPart.ArmLeft) != 0) parts.ArmLeft = arm;
+                else parts.ArmRight = arm;
             }
 
             if ((slotParts & BodyPart.Head) != 0)

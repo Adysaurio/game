@@ -45,38 +45,48 @@ namespace TrashPandas.Tests
         }
 
         [Test]
-        public void Route_BothArmsSlot_SharesAim_SplitsReach()
+        public void Route_BothArmsSlot_GrabOneUsesPreferredHand()
         {
             var slots = new SlotSystem(3);
             slots.TryEnter(1, 1); // Arms
+            var point = new Vector3(0.5f, 1f, 0.5f);
             var inputs = new Dictionary<int, SlotInput>
             {
-                [1] = new SlotInput { Aim = Vector3.forward, PrimaryReach = true, SecondaryReach = false },
+                [1] = new SlotInput { AimPoint = point, HasAimPoint = true, GrabOne = true, PreferLeftHand = false },
             };
 
             var parts = SlotInputRouter.Route(slots, inputs);
 
-            Assert.AreEqual(Vector3.forward, parts.ArmLeft.Aim);
-            Assert.AreEqual(Vector3.forward, parts.ArmRight.Aim);
-            Assert.IsTrue(parts.ArmLeft.Reach);
-            Assert.IsFalse(parts.ArmRight.Reach);
+            Assert.IsFalse(parts.ArmLeft.Reach);
+            Assert.IsTrue(parts.ArmRight.Reach);
+            Assert.AreEqual(point, parts.ArmRight.Point);
+            Assert.IsTrue(parts.ArmRight.HasPoint);
         }
 
         [Test]
-        public void Route_SingleArmSlot_UsesPrimaryReach()
+        public void Route_BothArmsSlot_GrabBothUsesBothHands()
         {
-            var slots = new SlotSystem(5);
-            slots.TryEnter(9, 3); // ArmRight
-            var inputs = new Dictionary<int, SlotInput>
-            {
-                [9] = new SlotInput { Aim = Vector3.up, PrimaryReach = true },
-            };
+            var slots = new SlotSystem(3);
+            slots.TryEnter(1, 1); // Arms
+            var inputs = new Dictionary<int, SlotInput> { [1] = new SlotInput { GrabBoth = true } };
 
             var parts = SlotInputRouter.Route(slots, inputs);
 
-            Assert.AreEqual(Vector3.up, parts.ArmRight.Aim);
+            Assert.IsTrue(parts.ArmLeft.Reach);
             Assert.IsTrue(parts.ArmRight.Reach);
+        }
+
+        [Test]
+        public void Route_SingleArmSlot_EitherButtonReaches()
+        {
+            var slots = new SlotSystem(5);
+            slots.TryEnter(9, 3); // ArmRight
+            var parts = SlotInputRouter.Route(slots, new Dictionary<int, SlotInput> { [9] = new SlotInput { GrabOne = true, PreferLeftHand = true } });
+            Assert.IsTrue(parts.ArmRight.Reach, "a one-arm player always uses their arm");
             Assert.IsFalse(parts.ArmLeft.Reach);
+
+            parts = SlotInputRouter.Route(slots, new Dictionary<int, SlotInput> { [9] = new SlotInput { GrabBoth = true } });
+            Assert.IsTrue(parts.ArmRight.Reach);
         }
 
         [Test]
@@ -86,7 +96,7 @@ namespace TrashPandas.Tests
             slots.TryEnter(1, 1); // Arms | Head
             var inputs = new Dictionary<int, SlotInput>
             {
-                [1] = new SlotInput { Aim = Vector3.left, PrimaryReach = true },
+                [1] = new SlotInput { Aim = Vector3.left, GrabOne = true, PreferLeftHand = true },
             };
 
             var parts = SlotInputRouter.Route(slots, inputs);

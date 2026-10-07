@@ -15,8 +15,11 @@ namespace TrashPandas.Core.Trenchcoat
 
     public struct ArmInput
     {
-        /// <summary>World-space direction to reach toward.</summary>
+        /// <summary>World-space direction to reach toward when there is no point.</summary>
         public Vector3 Aim;
+        /// <summary>World-space point to reach for (crosshair hit or assisted target).</summary>
+        public Vector3 Point;
+        public bool HasPoint;
         public bool Reach;
     }
 

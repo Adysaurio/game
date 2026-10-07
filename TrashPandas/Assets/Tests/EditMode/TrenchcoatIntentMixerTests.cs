@@ -61,10 +61,13 @@ namespace TrashPandas.Tests
         {
             var input = Legs(new Vector2(float.NaN, 1f), new Vector2(3f, 0f));
             input.ArmLeft.Aim = new Vector3(float.NaN, 0f, 1f);
+            input.ArmLeft.Point = new Vector3(float.NaN, 1f, 1f);
+            input.ArmLeft.HasPoint = true;
             input.ArmLeft.Reach = true;
             var intent = TrenchcoatIntentMixer.Mix(input, BodyPart.All, 0f, Settings);
             AssertVec(new Vector2(0.5f, 0f), intent.Move, "NaN leg ignored, over-long leg clamped to length 1");
             Assert.AreEqual(Vector3.zero, intent.LeftAim);
+            Assert.IsFalse(intent.HasLeftPoint, "a NaN reach point is dropped");
         }
 
         [Test]
@@ -139,6 +142,7 @@ namespace TrashPandas.Tests
 
             Assert.IsTrue(intent.LeftReach);
             Assert.AreEqual(Vector3.forward, intent.LeftAim, "aim is normalized");
+            Assert.IsFalse(intent.HasLeftPoint);
             Assert.IsTrue(intent.RightArmLimp);
             Assert.IsFalse(intent.RightReach, "a limp arm cannot reach");
         }

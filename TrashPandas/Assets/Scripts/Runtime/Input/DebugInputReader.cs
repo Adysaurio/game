@@ -1,5 +1,9 @@
+using System.Collections.Generic;
+using TrashPandas.Core.Grabbing;
 using TrashPandas.Core.Trenchcoat;
 using TrashPandas.Runtime.Cameras;
+using TrashPandas.Runtime.Grabbing;
+using TrashPandas.Runtime.Trenchcoat;
 using UnityEngine;
 using UnityEngine.InputSystem;
 
@@ -11,7 +15,18 @@ namespace TrashPandas.Runtime.Input
     /// </summary>
     public sealed class DebugInputReader
     {
+        public float AssistConeDegrees = 12f;
+        public float AssistReach = 1.35f;
+        public float MaxAimDistance = 6f;
+
         float _lastJumpPressedAt = float.NegativeInfinity;
+        readonly List<GrabCandidate> _candidates = new List<GrabCandidate>();
+        readonly RaycastHit[] _rayHits = new RaycastHit[16];
+
+        /// <summary>The grabbable the crosshair is locked onto this frame (aim assist), if any.</summary>
+        public Grabbable AssistTarget { get; private set; }
+        /// <summary>True when the crosshair points at something within reach (or an assist target).</summary>
+        public bool AimInReach { get; private set; }
 
         static Keyboard K => Keyboard.current;
         static Mouse M => Mouse.current;
@@ -47,18 +62,58 @@ namespace TrashPandas.Runtime.Input
             return new Vector2(world.x, world.z);
         }
 
-        public SlotInput ReadSlotInput(PlayerCameraRig rig, float now)
+        public SlotInput ReadSlotInput(PlayerCameraRig rig, TrenchcoatBody body, float now)
         {
             if (JumpPressed) _lastJumpPressedAt = now;
-            return new SlotInput
+            var input = new SlotInput
             {
                 Move = CameraRelativeMove(rig),
                 Crouch = CrouchHeld,
                 JumpPressedAt = _lastJumpPressedAt,
                 Aim = rig.AimDirection,
-                PrimaryReach = M != null && M.leftButton.isPressed && !rig.CursorFreed,
-                SecondaryReach = M != null && M.rightButton.isPressed && !rig.CursorFreed,
+                GrabOne = M != null && M.leftButton.isPressed && !rig.CursorFreed,
+                GrabBoth = M != null && M.rightButton.isPressed && !rig.CursorFreed,
             };
+
+            ResolveAimPoint(rig, body, out input.AimPoint, out input.HasAimPoint);
+            input.PreferLeftHand = input.HasAimPoint &&
+                GrabTargeting.LeftHandCloser(input.AimPoint, body.ShoulderWorld(true), body.ShoulderWorld(false));
+            return input;
+        }
+
+        /// <summary>Crosshair target: the assisted grabbable if one is near the crosshair, else what the crosshair hits.</summary>
+        void ResolveAimPoint(PlayerCameraRig rig, TrenchcoatBody body, out Vector3 point, out bool hasPoint)
+        {
+            var cam = rig.OutputCamera.transform;
+            _candidates.Clear();
+            var all = Grabbable.All;
+            for (int i = 0; i < all.Count; i++)
+                if (!all[i].IsHeld) _candidates.Add(new GrabCandidate { Id = i, Position = all[i].transform.position });
+
+            int? pick = GrabTargeting.Pick(cam.position, cam.forward, _candidates, body.ChestWorld, AssistReach, AssistConeDegrees);
+            AssistTarget = pick.HasValue ? all[pick.Value] : null;
+            if (AssistTarget)
+            {
+                point = AssistTarget.transform.position;
+                hasPoint = true;
+                AimInReach = true;
+                return;
+            }
+
+            // Nearest hit along the crosshair that isn't the coat itself.
+            int count = Physics.RaycastNonAlloc(cam.position, cam.forward, _rayHits, 50f, ~0, QueryTriggerInteraction.Ignore);
+            float best = float.MaxValue;
+            point = Vector3.zero;
+            hasPoint = false;
+            for (int i = 0; i < count; i++)
+            {
+                var h = _rayHits[i];
+                if (h.collider.transform.IsChildOf(body.transform) || h.distance >= best) continue;
+                best = h.distance;
+                point = h.point;
+                hasPoint = Vector3.Distance(h.point, body.ChestWorld) <= MaxAimDistance;
+            }
+            AimInReach = hasPoint && Vector3.Distance(point, body.ChestWorld) <= AssistReach;
         }
 
         /// <summary>One-line control hint for the HUD.</summary>
@@ -67,7 +122,7 @@ namespace TrashPandas.Runtime.Input
             bool legs = (parts & BodyPart.Legs) != 0, arms = (parts & BodyPart.Arms) != 0, head = (parts & BodyPart.Head) != 0;
             var hint = "Mouse: camera   ";
             if (legs) hint += "WASD walk (camera-relative) · Space jump · Ctrl crouch   ";
-            if (arms) hint += "Hold L/R click: reach & grab where you look   ";
+            if (arms) hint += "Aim with the crosshair · hold Left click: grab (closest hand) · Right click: both hands (big things) · release to throw   ";
             if (head) hint += "Head looks where you look";
             return hint;
         }

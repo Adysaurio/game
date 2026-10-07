@@ -19,6 +19,10 @@ namespace TrashPandas.Core.Trenchcoat
         public bool RightReach;
         public Vector3 LeftAim;   // world-space, normalized or zero
         public Vector3 RightAim;
+        public Vector3 LeftPoint; // world-space reach point, valid when Has*Point
+        public Vector3 RightPoint;
+        public bool HasLeftPoint;
+        public bool HasRightPoint;
 
         public bool HeadSlumped;
         public Vector3 HeadAim;   // world-space, normalized or zero

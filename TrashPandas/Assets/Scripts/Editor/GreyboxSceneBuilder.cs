@@ -1,5 +1,6 @@
 using System.IO;
 using TrashPandas.Runtime.Cameras;
+using TrashPandas.Runtime.Grabbing;
 using TrashPandas.Runtime.Raccoon;
 using TrashPandas.Runtime.Trenchcoat;
 using Unity.Cinemachine;
@@ -31,6 +32,10 @@ namespace TrashPandas.EditorTools
             var curtain = Mat("Curtain", new Color(0.8f, 0.3f, 0.35f));
             var hedge = Mat("Hedge", new Color(0.2f, 0.45f, 0.2f));
             var pants = Mat("Pants", new Color(0.25f, 0.27f, 0.35f));
+            var glass = Mat("Glass", new Color(0.7f, 0.85f, 1f));
+            var plate = Mat("Plate", new Color(0.97f, 0.97f, 0.95f));
+            var wallet = Mat("Wallet", new Color(0.35f, 0.2f, 0.12f));
+            var cake = Mat("Cake", new Color(1f, 0.92f, 0.8f));
 
             var raccoonPrefab = BuildRaccoonPrefab(fur);
 
@@ -53,6 +58,19 @@ namespace TrashPandas.EditorTools
                 foreach (var leg in new[] { new Vector3(-0.9f, 0f, -0.5f), new Vector3(0.9f, 0f, -0.5f), new Vector3(-0.9f, 0f, 0.5f), new Vector3(0.9f, 0f, 0.5f) })
                     Box("Leg", pos + leg + new Vector3(0f, 0.375f, 0f), new Vector3(0.08f, 0.75f, 0.08f), wood).transform.SetParent(table.transform, true);
             }
+
+            // Things to grab: glasses, plates and wallets on every table; a two-hand cake on the far middle table.
+            const float tableTop = 0.85f;
+            for (int i = 0; i < 6; i++)
+            {
+                var t = new Vector3(-6f + (i % 3) * 6f, 0f, 4f + (i / 3) * 5f);
+                Prop($"Glass_{i}a", PrimitiveType.Cylinder, t + new Vector3(-0.6f, tableTop + 0.1f, -0.35f), new Vector3(0.08f, 0.1f, 0.08f), glass, 0.2f, false);
+                Prop($"Glass_{i}b", PrimitiveType.Cylinder, t + new Vector3(0.5f, tableTop + 0.1f, -0.4f), new Vector3(0.08f, 0.1f, 0.08f), glass, 0.2f, false);
+                Prop($"Plate_{i}", PrimitiveType.Cylinder, t + new Vector3(0f, tableTop + 0.02f, -0.3f), new Vector3(0.28f, 0.015f, 0.28f), plate, 0.4f, false);
+                Prop($"Wallet_{i}", PrimitiveType.Cube, t + new Vector3(0.75f, tableTop + 0.03f, 0.2f), new Vector3(0.2f, 0.05f, 0.12f), wallet, 0.3f, false);
+            }
+            var cakeGo = Prop("Cake", PrimitiveType.Cylinder, new Vector3(0f, tableTop + 0.2f, 8.6f), new Vector3(0.5f, 0.2f, 0.5f), cake, 3f, true);
+            Visual(PrimitiveType.Cylinder, "Tier2", cakeGo.transform, new Vector3(0f, 1.4f, 0f), new Vector3(0.65f, 0.6f, 0.65f), cake);
 
             // Climbable curtain with a ledge on top.
             var curtainGo = Box("Curtain_Climbable", new Vector3(10f, 2f, 0f), new Vector3(2f, 4f, 0.1f), curtain);
@@ -147,6 +165,7 @@ namespace TrashPandas.EditorTools
             var rightLeg = Leg("RightLeg", root.transform, TrenchcoatBody.RightHip, pants);
 
             var body = root.AddComponent<TrenchcoatBody>();
+            root.AddComponent<HandGrabber>();
             body.Torso = torso;
             body.Head = head;
             body.LeftHand = left;
@@ -182,6 +201,26 @@ namespace TrashPandas.EditorTools
             var prefab = PrefabUtility.SaveAsPrefabAsset(root, PrefabPath);
             Object.DestroyImmediate(root);
             return prefab.GetComponent<RaccoonController>();
+        }
+
+        static GameObject Prop(string name, PrimitiveType type, Vector3 position, Vector3 scale, Material mat, float mass, bool bothHands)
+        {
+            var go = GameObject.CreatePrimitive(type);
+            go.name = name;
+            go.transform.position = position;
+            go.transform.localScale = scale;
+            go.GetComponent<Renderer>().sharedMaterial = mat;
+            if (type == PrimitiveType.Cylinder)
+            {
+                // Cylinder primitives use a capsule collider; a box keeps flat things (plates) from rolling away.
+                Object.DestroyImmediate(go.GetComponent<Collider>());
+                go.AddComponent<BoxCollider>();
+            }
+            var rb = go.AddComponent<Rigidbody>();
+            rb.mass = mass;
+            rb.interpolation = RigidbodyInterpolation.Interpolate;
+            go.AddComponent<Grabbable>().RequiresBothHands = bothHands;
+            return go;
         }
 
         static GameObject Box(string name, Vector3 position, Vector3 size, Material mat)
