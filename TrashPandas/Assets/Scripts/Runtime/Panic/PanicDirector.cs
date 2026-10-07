@@ -103,7 +103,9 @@ namespace TrashPandas.Runtime.Panic
             }
             else if (TrenchcoatController.Instance)
             {
-                for (int p = 0; p < TrenchcoatController.Instance.PlayerCountInRound; p++) _players.Add(p);
+                // Debug mode: the other seats are virtual players with no one at the keys — their raccoons
+                // pop out for the chaos, but only yours decides when the round ends.
+                _players.Add(TrenchcoatController.Instance.LocalPlayerId);
                 TrenchcoatController.Instance.BurstAll();
             }
 

@@ -25,6 +25,7 @@ namespace TrashPandas.Runtime.Net
         NetworkedRaccoon _cameraOnRaccoon;
         float _botHopAt = 8f;
         bool _spectating;
+        float _caughtAt = -1f;
         bool _eventCamera;
         readonly TrashPandas.Runtime.Npc.EventParticipation _events = new TrashPandas.Runtime.Npc.EventParticipation();
         public bool IsSpectating => _spectating;
@@ -51,6 +52,14 @@ namespace TrashPandas.Runtime.Net
             int? slot = snapshot.SlotOfClient(nm.LocalClientId);
 
             var raccoon = NetworkedRaccoon.LocalOwned;
+            // Caught: after a beat on your own dizzy raccoon, watch the chase from above.
+            if (raccoon && raccoon.Controller.Frozen)
+            {
+                if (_caughtAt < 0f) _caughtAt = Time.time;
+                var pd = TrashPandas.Runtime.Panic.PanicDirector.Instance;
+                if (Time.time - _caughtAt > 1.5f && pd && pd.Overview && !_spectating) { _spectating = true; CameraRig.SetTarget(pd.Overview, 16f, 0f); }
+                return;
+            }
             if ((DevAutomation.Bot == "hop" || DevAutomation.Bot == "hopflee" || DevAutomation.Bot == "hopgap") && slot.HasValue && Time.realtimeSinceStartup > _botHopAt) { _botHopAt = float.MaxValue; _coat.RequestLeaveRpc(); }
             if (_reader.TogglePressed)
             {

@@ -29,6 +29,8 @@ namespace TrashPandas.Runtime.Cameras
         bool _locked;
 
         public bool CursorFreed { get; private set; }
+        /// <summary>Set by full-screen UI (results screen) that needs a clickable cursor.</summary>
+        public static bool UiWantsCursor;
 
         // --- Conversation framing (social events) --------------------------------------------------
         Transform _focus, _convA, _convB;
@@ -128,7 +130,7 @@ namespace TrashPandas.Runtime.Cameras
             if (keyboard != null && keyboard.escapeKey.wasPressedThisFrame) CursorFreed = true;
             else if (CursorFreed && mouse != null && mouse.leftButton.wasPressedThisFrame) CursorFreed = false;
 
-            bool wantLocked = !CursorFreed && Application.isFocused;
+            bool wantLocked = !CursorFreed && !UiWantsCursor && Application.isFocused;
             if (wantLocked != _locked)
             {
                 _locked = wantLocked;
@@ -138,6 +140,7 @@ namespace TrashPandas.Runtime.Cameras
             }
 
             if (InConversation) { UpdateConversationFocus(); return; } // the shot is composed, not steered
+            if (UiWantsCursor) return;
             if (!_locked || mouse == null) return;
             Vector2 delta = _filter.Filter(mouse.delta.ReadValue());
             Orbit.HorizontalAxis.Value = Mathf.Repeat(Orbit.HorizontalAxis.Value + delta.x * Sensitivity + 180f, 360f) - 180f;

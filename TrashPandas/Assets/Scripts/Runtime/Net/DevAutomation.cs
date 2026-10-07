@@ -152,7 +152,7 @@ namespace TrashPandas.Runtime.Net
                 panic += $" armed={armed} left={snap.SecondsLeft:F0}s";
                 var opc = UnityEngine.Object.FindFirstObjectByType<OnlinePlayerController>();
                 if (opc) panic += $" spectating={opc.IsSpectating}";
-                if (Args.Contains("-autorestart") && pd.Phase == TrashPandas.Runtime.Panic.RoundPhase.Results && SessionHost.Instance && SessionHost.Instance.IsHost && !s_restarted)
+                if (Args.Contains("-autorestart") && pd.Phase == TrashPandas.Runtime.Panic.RoundPhase.Results && (!SimulationAuthority.IsOnline || (SessionHost.Instance && SessionHost.Instance.IsHost)) && !s_restarted)
                 { s_restarted = true; Log("autorestart"); pd.PlayAgain(); }
             }
             string speeds = "";
