@@ -253,3 +253,16 @@ Los sistemas se comunican por eventos (p. ej., `SuspicionSystem` escucha "puesto
 
 - Mac con Apple M4, 16 GB de RAM y ~70 GB libres. Suficiente; conviene cerrar aplicaciones pesadas al usar Unity y Blender al mismo tiempo.
 - Unity aún no está instalado. Blender sí lo está; su MCP no conecta y hay que repararlo antes de la etapa 6.
+
+## 15. Medidas de juego que el arte debe respetar
+
+> Agregado el 2026-10-07. Las proporciones de la escena gris son provisionales; estas medidas no, porque el juego depende de ellas.
+
+| Elemento | Medida | Por qué |
+|---|---|---|
+| El señor (gabardina) | ~2.1 m de alto, radio de colisión 0.35 m | Altura de los hombros (1.55 m) y alcance de la mano (~1.0 m) para tomar cosas de las mesas |
+| Mesas | Cubierta a 0.85 m, espacio libre debajo ≥ 0.75 m | El mapache agachado (0.3 m) se esconde debajo; el señor no cabe |
+| Mapache | 0.6 m de pie, 0.3 m agachado, radio 0.2 m | Cabe por el hueco del seto solo agachado |
+| Hueco del seto | 1 m de ancho × 0.5 m de alto | Los humanos no caben: es la ruta de escape segura |
+| Humanos | ~1.75 m (1.3 m sentados), radio 0.28 m | Línea de visión (ojos a ~1.6 m) y oclusión con mesas |
+| Velocidades | Señor 2.2 · mapache 4.4 · perseguidores 3.6 · gato en pánico 4.6 m/s | El balance de la persecución depende de las proporciones entre ellas |

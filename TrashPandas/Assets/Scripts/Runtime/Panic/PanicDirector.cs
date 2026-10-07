@@ -20,11 +20,13 @@ namespace TrashPandas.Runtime.Panic
     public sealed class PanicDirector : NetworkBehaviour
     {
         public Vector3[] Exits = new Vector3[0];
+        /// <summary>Rings + floating arrows; only visible once RUN! starts.</summary>
+        public GameObject[] ExitMarkers = new GameObject[0];
         public string[] ExitNames = new string[0];
         public float ExitRadius = 1.3f;
         public float TimeLimit = 90f;
-        public float ChaserSpeed = 3.3f;
-        public float CatSpeed = 4.2f;
+        public float ChaserSpeed = 3.6f;
+        public float CatSpeed = 4.6f;
         public float HitImpulse = 5.5f;
         public float CatPushImpulse = 3.5f;
         public Transform Overview;
@@ -37,6 +39,7 @@ namespace TrashPandas.Runtime.Panic
         PanicSnapshot _offlineSnapshot;
 
         readonly HitTracker _hits = new HitTracker();
+        readonly PanicGrace _grace = new PanicGrace(surpriseSeconds: 2f, noHitSeconds: 3f);
         readonly RoundOutcome _outcome = new RoundOutcome();
         readonly List<Chaser> _chasers = new List<Chaser>();
         readonly List<ChaseTarget> _targets = new List<ChaseTarget>();
@@ -81,6 +84,8 @@ namespace TrashPandas.Runtime.Panic
 
         void Update()
         {
+            bool showExits = Phase != RoundPhase.Infiltration;
+            foreach (var m in ExitMarkers) if (m && m.activeSelf != showExits) m.SetActive(showExits);
             if (!SimulationAuthority.IsSimulating) return;
             var suspicion = SuspicionDirector.Instance;
             if (Phase == RoundPhase.Infiltration && suspicion && suspicion.Caught) BeginPanic(suspicion);
@@ -103,11 +108,14 @@ namespace TrashPandas.Runtime.Panic
             }
             else if (TrenchcoatController.Instance)
             {
-                for (int p = 0; p < TrenchcoatController.Instance.PlayerCountInRound; p++) _players.Add(p);
+                // Debug mode: the other seats are virtual players with no one at the keys — their raccoons
+                // pop out for the chaos, but only yours decides when the round ends.
+                _players.Add(TrenchcoatController.Instance.LocalPlayerId);
                 TrenchcoatController.Instance.BurstAll();
             }
 
             _hits.Reset();
+            _grace.Begin(Time.time);
             _missingSince.Clear();
             _outcome.Begin(_players, Time.time, TimeLimit);
 
@@ -157,10 +165,18 @@ namespace TrashPandas.Runtime.Panic
                 _targets.Add(new ChaseTarget { Id = p, Position = r.transform.position });
             }
 
+            bool shocked = !_grace.ChasersMayMove(now);
             foreach (var c in _chasers)
             {
                 var pawn = c.Brain.Pawn;
                 if (!pawn) continue;
+                if (shocked)
+                {
+                    // "¡¡RUUUN!!" — a beat of pure shock: they freeze and stare while the raccoons scatter.
+                    pawn.Stop();
+                    if (_targets.Count > 0) pawn.LookAt(_targets[0].Position);
+                    continue;
+                }
                 bool hasWeapon = c.Weapon && c.Weapon.Holder == pawn;
                 if (c.Weapon && c.Weapon.Holder && c.Weapon.Holder != pawn) c.Weapon = null; // someone else got it
                 Vector3? weaponPos = !c.IsCat && c.Weapon && !hasWeapon ? c.Weapon.transform.position : (Vector3?)null;
@@ -170,7 +186,7 @@ namespace TrashPandas.Runtime.Panic
                 pawn.GoTo(o.Destination);
                 pawn.LookAt(o.State == ChaserState.Chase ? o.Destination : (Vector3?)null);
 
-                if (!o.Swing || !_raccoonOf.TryGetValue(o.TargetId, out var target)) continue;
+                if (!o.Swing || !_grace.MayHit(now) || !_raccoonOf.TryGetValue(o.TargetId, out var target)) continue;
                 Vector3 to = target.transform.position - pawn.transform.position;
                 to.y = 0f;
                 if (to.magnitude > c.Mind.SwingRange + 0.3f) continue;

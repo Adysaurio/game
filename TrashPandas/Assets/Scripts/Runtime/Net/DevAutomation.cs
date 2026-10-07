@@ -18,6 +18,8 @@ namespace TrashPandas.Runtime.Net
     public sealed class DevAutomation : MonoBehaviour
     {
         public static string Bot { get; private set; }
+        /// <summary>When the hop bots leave the coat (seconds into the level), -hopat N; default 3.</summary>
+        public static float HopAt { get; private set; } = 3f;
 
         /// <summary>Dev bots: once the panic starts, run for an exit — "hopflee" the sewer (open path),
         /// "hopgap" crouching through the hedge gap where humans can't follow.</summary>
@@ -33,6 +35,20 @@ namespace TrashPandas.Runtime.Net
         }
 
         /// <summary>Crouch only at the hedge (crouching halves speed).</summary>
+        /// <summary>Dev bots for social events: "obey" plays every part right; "ignore" does nothing.</summary>
+        public static void ApplyEventBot(TrashPandas.Core.Events.SocialEvent ev, ref TrashPandas.Core.Events.TaskInput input, ref int answerKey)
+        {
+            if (Bot == "ignore") { input = default; answerKey = 0; return; }
+            if (Bot != "obey") return;
+            answerKey = System.Array.IndexOf(ev.OptionKinds, TrashPandas.Core.Events.HeadAnswer.Good) + 1;
+            input = new TrashPandas.Core.Events.TaskInput
+            {
+                Primary = true, Secondary = true,
+                Crouch = ev.Legs == TrashPandas.Core.Events.LegsTask.Kneel,
+                Jump = ev.Legs == TrashPandas.Core.Events.LegsTask.DanceStep,
+            };
+        }
+
         public static bool FleeCrouchAt(Vector3 pos) => Bot == "hopgap" && FleeActive && pos.z < -6.3f;
         static bool FleeActive
         {
@@ -69,6 +85,7 @@ namespace TrashPandas.Runtime.Net
             s_instance = this;
             DontDestroyOnLoad(gameObject);
             Bot = Value("-bot");
+            if (float.TryParse(Value("-hopat"), System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out float hopAt)) HopAt = hopAt;
             int.TryParse(Value("-autostart"), out _autoStart);
             if (float.TryParse(Value("-quitafter"), System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out float q)) _quitAt = q;
             _telemetry = Args.Contains("-telemetry");
@@ -135,9 +152,17 @@ namespace TrashPandas.Runtime.Net
                 panic += $" armed={armed} left={snap.SecondsLeft:F0}s";
                 var opc = UnityEngine.Object.FindFirstObjectByType<OnlinePlayerController>();
                 if (opc) panic += $" spectating={opc.IsSpectating}";
-                if (Args.Contains("-autorestart") && pd.Phase == TrashPandas.Runtime.Panic.RoundPhase.Results && SessionHost.Instance && SessionHost.Instance.IsHost && !s_restarted)
+                if (Args.Contains("-autorestart") && pd.Phase == TrashPandas.Runtime.Panic.RoundPhase.Results && (!SimulationAuthority.IsOnline || (SessionHost.Instance && SessionHost.Instance.IsHost)) && !s_restarted)
                 { s_restarted = true; Log("autorestart"); pd.PlayAgain(); }
             }
+            string speeds = "";
+            foreach (var pw in UnityEngine.Object.FindObjectsByType<TrashPandas.Runtime.Npc.NpcPawn>(FindObjectsSortMode.None))
+                if (!string.IsNullOrEmpty(pw.SpeakerId)) speeds += $"{pw.SpeakerId}:{pw.Speed:F1} ";
+            panic += $" speeds[{speeds.Trim()}]";
+            var ed = TrashPandas.Runtime.Npc.SocialEventDirector.Instance;
+            if (ed) { var es = ed.Snapshot; panic += $" event={ed.Phase}#{es.Serial}:{ed.Current.Speaker} t={es.SecondsLeft:F1} result={es.ResultDelta:F0}[{es.HeadOutcome}{es.ArmsOutcome}{es.LegsOutcome}] tasks={ed.Current.Arms}/{ed.Current.Legs}"; }
+            var rig = UnityEngine.Object.FindFirstObjectByType<TrashPandas.Runtime.Cameras.PlayerCameraRig>();
+            if (rig) panic += $" cam={(rig.VirtualCamera.Follow ? rig.VirtualCamera.Follow.name : "-")}{(rig.InConversation ? "(talk)" : "")}";
             return panic + $" suspicion={d.Suspicion:F1} caught={d.Caught} curious={curious} alarmed={alarmed} cat={cat} frame[missing={f.MissingParts} seen={f.CoatWitnessed} weird={f.SeenWeirdness:F2} hiss={f.CatHissing}] dt={Time.deltaTime:F3}";
         }
 
@@ -150,7 +175,7 @@ namespace TrashPandas.Runtime.Net
                 var offlineBody = UnityEngine.Object.FindFirstObjectByType<TrashPandas.Runtime.Trenchcoat.TrenchcoatBody>();
                 var glass = UnityEngine.GameObject.Find("Glass_1a");
                 Log(offlineBody
-                    ? $"offline-debug coat={offlineBody.transform.position} kinematic={offlineBody.GetComponent<Rigidbody>().isKinematic} glassKinematic={(glass ? glass.GetComponent<Rigidbody>().isKinematic.ToString() : "-")}{NpcSummary()}"
+                    ? $"offline-debug held=[{string.Join(",", TrashPandas.Runtime.Grabbing.Grabbable.All.Where(g => g && g.IsHeld).Select(g => g.name))}] coat={offlineBody.transform.position} kinematic={offlineBody.GetComponent<Rigidbody>().isKinematic} glassKinematic={(glass ? glass.GetComponent<Rigidbody>().isKinematic.ToString() : "-")}{NpcSummary()}"
                     : "offline");
                 return;
             }

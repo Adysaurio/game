@@ -11,10 +11,13 @@ namespace TrashPandas.Runtime.Panic
         float _panicStartedAt = -1f;
         GUIStyle _big, _mid, _small, _exit;
 
+        void OnDisable() => TrashPandas.Runtime.Cameras.PlayerCameraRig.UiWantsCursor = false;
+
         void OnGUI()
         {
             var d = PanicDirector.Instance;
             var cam = Camera.main;
+            TrashPandas.Runtime.Cameras.PlayerCameraRig.UiWantsCursor = d && d.Phase == RoundPhase.Results;
             if (!d || d.Phase == RoundPhase.Infiltration) { _panicStartedAt = -1f; return; }
             UiScale.Apply();
             if (_panicStartedAt < 0f) _panicStartedAt = Time.time;
@@ -96,7 +99,7 @@ namespace TrashPandas.Runtime.Panic
             bool isHost = online && SessionHost.Instance && SessionHost.Instance.IsHost;
             if (!online || (isHost && SessionHost.Instance.Roster.CanStart))
             {
-                if (GUI.Button(new Rect(box.x + 40, box.yMax - 50, w - 80, 36), "Play again")) d.PlayAgain();
+                if (GUI.Button(new Rect(box.x + 40, box.yMax - 50, w - 80, 36), "Play again  (Enter)")) d.PlayAgain();
             }
             else if (isHost)
             {
@@ -104,8 +107,8 @@ namespace TrashPandas.Runtime.Panic
                 if (GUI.Button(new Rect(box.x + 40, box.yMax - 46, w - 80, 34), "Back to menu")) _ = SessionHost.Instance.LeaveAsync();
             }
             else GUI.Label(new Rect(box.x, box.yMax - 50, w, 36), "Waiting for the host to start again…", _small);
-            Cursor.lockState = CursorLockMode.None;
-            Cursor.visible = true;
+            if (Event.current.type == EventType.KeyDown && (Event.current.keyCode == KeyCode.Return || Event.current.keyCode == KeyCode.KeypadEnter)
+                && (!online || (isHost && SessionHost.Instance.Roster.CanStart))) d.PlayAgain();
         }
     }
 }

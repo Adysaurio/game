@@ -14,6 +14,8 @@ namespace TrashPandas.Runtime.Npc
     public sealed class NpcPawn : NetworkBehaviour
     {
         public NpcKind Kind;
+        /// <summary>Social-event speaker id ("MotherInLaw", "Waiter", "Priest", "Bride"), empty for regular guests.</summary>
+        public string SpeakerId = "";
         public Transform Head;
         public bool Seated;
         public float EyeHeight = 1.6f;
@@ -61,6 +63,18 @@ namespace TrashPandas.Runtime.Npc
             }
             EnableNavigation();
             if (_agent) { _agent.speed = speed; _agent.acceleration = 20f; }
+        }
+
+        public float Speed => _agent ? _agent.speed : 0f;
+
+        public void SetSpeed(float speed)
+        {
+            if (_agent) _agent.speed = speed;
+        }
+
+        public void Stop()
+        {
+            if (_agent && _agent.enabled && _agent.isOnNavMesh) _agent.ResetPath();
         }
 
         public void GoTo(Vector3 destination)

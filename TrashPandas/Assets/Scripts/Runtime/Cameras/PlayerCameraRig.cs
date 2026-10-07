@@ -29,6 +29,57 @@ namespace TrashPandas.Runtime.Cameras
         bool _locked;
 
         public bool CursorFreed { get; private set; }
+        /// <summary>Set by full-screen UI (results screen) that needs a clickable cursor.</summary>
+        public static bool UiWantsCursor;
+
+        // --- Conversation framing (social events) --------------------------------------------------
+        Transform _focus, _convA, _convB;
+        Transform _savedTarget;
+        float _savedRadius, _savedLook, _savedYaw, _savedPitch;
+        public bool InConversation => _convA;
+
+        /// <summary>
+        /// RPG-style two-shot: frame both characters from over the first one's shoulder and take the camera
+        /// away from the mouse until <see cref="EndConversation"/>.
+        /// </summary>
+        public void BeginConversation(Transform a, Transform b)
+        {
+            if (!a || !b) return;
+            if (!InConversation)
+            {
+                _savedTarget = VirtualCamera.Follow;
+                _savedRadius = Orbit.Radius;
+                _savedLook = Orbit.TargetOffset.y;
+                _savedYaw = Orbit.HorizontalAxis.Value;
+                _savedPitch = Orbit.VerticalAxis.Value;
+            }
+            _convA = a; _convB = b;
+            if (!_focus) _focus = new GameObject("ConversationFocus").transform;
+            UpdateConversationFocus();
+            SetTarget(_focus, 3.4f, 0f);
+            Vector3 d = Vector3.ProjectOnPlane(b.position - a.position, Vector3.up).normalized;
+            Vector3 side = Vector3.Cross(Vector3.up, d);
+            Vector3 offset = (side * 0.75f - d * 0.65f).normalized; // behind and beside the first character
+            Orbit.HorizontalAxis.Value = Mathf.Atan2(-offset.x, -offset.z) * Mathf.Rad2Deg;
+            Orbit.VerticalAxis.Value = 10f;
+        }
+
+        /// <param name="restore">False when something else (RUN!) is about to point the camera elsewhere.</param>
+        public void EndConversation(bool restore = true)
+        {
+            if (!InConversation) return;
+            _convA = _convB = null;
+            if (!restore) return;
+            if (_savedTarget) SetTarget(_savedTarget, _savedRadius, _savedLook);
+            Orbit.HorizontalAxis.Value = _savedYaw;
+            Orbit.VerticalAxis.Value = _savedPitch;
+        }
+
+        void UpdateConversationFocus()
+        {
+            if (!_focus || !_convA || !_convB) return;
+            _focus.position = (_convA.position + _convB.position) * 0.5f + Vector3.up * 1.45f;
+        }
 
         /// <summary>Where the player's camera looks, in world space.</summary>
         public Vector3 AimDirection => OutputCamera ? OutputCamera.transform.forward : Vector3.forward;
@@ -81,7 +132,7 @@ namespace TrashPandas.Runtime.Cameras
             if (keyboard != null && keyboard.escapeKey.wasPressedThisFrame) CursorFreed = true;
             else if (CursorFreed && mouse != null && mouse.leftButton.wasPressedThisFrame) CursorFreed = false;
 
-            bool wantLocked = !CursorFreed && Application.isFocused;
+            bool wantLocked = !CursorFreed && !UiWantsCursor && Application.isFocused;
             if (wantLocked != _locked)
             {
                 _locked = wantLocked;
@@ -90,6 +141,8 @@ namespace TrashPandas.Runtime.Cameras
                 _filter.NotifyLockChanged();
             }
 
+            if (InConversation) { UpdateConversationFocus(); return; } // the shot is composed, not steered
+            if (UiWantsCursor) return;
             if (!_locked || mouse == null) return;
             Vector2 delta = _filter.Filter(mouse.delta.ReadValue());
             Orbit.HorizontalAxis.Value = Mathf.Repeat(Orbit.HorizontalAxis.Value + delta.x * Sensitivity + 180f, 360f) - 180f;

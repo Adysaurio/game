@@ -25,6 +25,9 @@ namespace TrashPandas.Runtime.Net
         NetworkedRaccoon _cameraOnRaccoon;
         float _botHopAt = 8f;
         bool _spectating;
+        float _caughtAt = -1f;
+        bool _eventCamera;
+        readonly TrashPandas.Runtime.Npc.EventParticipation _events = new TrashPandas.Runtime.Npc.EventParticipation();
         public bool IsSpectating => _spectating;
         NetworkedTrenchcoat _coat;
 
@@ -49,6 +52,14 @@ namespace TrashPandas.Runtime.Net
             int? slot = snapshot.SlotOfClient(nm.LocalClientId);
 
             var raccoon = NetworkedRaccoon.LocalOwned;
+            // Caught: after a beat on your own dizzy raccoon, watch the chase from above.
+            if (raccoon && raccoon.Controller.Frozen)
+            {
+                if (_caughtAt < 0f) _caughtAt = Time.time;
+                var pd = TrashPandas.Runtime.Panic.PanicDirector.Instance;
+                if (Time.time - _caughtAt > 1.5f && pd && pd.Overview && !_spectating) { _spectating = true; CameraRig.SetTarget(pd.Overview, 16f, 0f); }
+                return;
+            }
             if ((DevAutomation.Bot == "hop" || DevAutomation.Bot == "hopflee" || DevAutomation.Bot == "hopgap") && slot.HasValue && Time.realtimeSinceStartup > _botHopAt) { _botHopAt = float.MaxValue; _coat.RequestLeaveRpc(); }
             if (_reader.TogglePressed)
             {
@@ -58,6 +69,7 @@ namespace TrashPandas.Runtime.Net
 
             if (raccoon && !slot.HasValue)
             {
+                if (CameraRig.InConversation) { CameraRig.EndConversation(restore: false); _eventCamera = false; _cameraOnRaccoon = null; }
                 if (_cameraOnRaccoon != raccoon)
                 {
                     _cameraOnRaccoon = raccoon;
@@ -78,11 +90,20 @@ namespace TrashPandas.Runtime.Net
                 return;
             }
 
+            bool engaged = _events.Tick(_reader, _reader.Move(), offlinePlayer: 0);
             if (slot.HasValue)
             {
                 var parts = snapshot.PartsOf(slot.Value);
-                UpdateCamera(parts);
-                var input = _reader.ReadSlotInput(CameraRig, _coat.Body, now);
+                var ed = TrashPandas.Runtime.Npc.SocialEventDirector.Instance;
+                bool talking = ed && (engaged || ed.Phase == TrashPandas.Runtime.Npc.EventPhase.Resolved || ed.Phase == TrashPandas.Runtime.Npc.EventPhase.Talking);
+                if (talking != _eventCamera)
+                {
+                    _eventCamera = talking;
+                    if (talking) CameraRig.BeginConversation(_coat.Body.transform, ed.SpeakerTransform);
+                    else { CameraRig.EndConversation(); _armsCamera = null; }
+                }
+                if (!talking) UpdateCamera(parts);
+                var input = TrashPandas.Core.Events.ConversationInput.Filter(_reader.ReadSlotInput(CameraRig, _coat.Body, now), engaged);
                 ApplyBot(ref input);
                 if (Time.unscaledTime >= _nextSend)
                 {
@@ -120,6 +141,7 @@ namespace TrashPandas.Runtime.Net
         void OnGUI()
         {
             UiScale.Apply();
+            if (CameraRig.InConversation) return; // the conversation owns the screen
             if (!_coat) return;
             var nm = NetworkManager.Singleton;
             var snapshot = _coat.Slots;

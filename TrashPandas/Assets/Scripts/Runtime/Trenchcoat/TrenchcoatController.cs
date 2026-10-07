@@ -41,12 +41,34 @@ namespace TrashPandas.Runtime.Trenchcoat
         bool? _armsCamera;
         HandGrabber _grabber;
         bool _showHelp = true;
+        /// <summary>Debug: drive the whole body at once (default) instead of one seat at a time.</summary>
+        public bool SoloMode = true;
+        readonly TrashPandas.Runtime.Npc.EventParticipation _events = new TrashPandas.Runtime.Npc.EventParticipation();
+        bool _eventCamera;
+
+        void UpdateEventCamera(bool engaged)
+        {
+            var d = TrashPandas.Runtime.Npc.SocialEventDirector.Instance;
+            bool talking = d && (engaged || d.Phase == TrashPandas.Runtime.Npc.EventPhase.Resolved || d.Phase == TrashPandas.Runtime.Npc.EventPhase.Talking) && !_possession.ActiveIsOutside;
+            if (_burst) return; // after RUN the camera belongs to your raccoon
+            if (talking == _eventCamera) return;
+            _eventCamera = talking;
+            if (talking) CameraRig.BeginConversation(Body.transform, d.SpeakerTransform);
+            else if (_possession.ActiveIsOutside && _raccoon)
+            {
+                // Hopped out mid-conversation: the camera follows your raccoon, not the coat.
+                CameraRig.EndConversation(restore: false);
+                CameraRig.SetTarget(_raccoon.transform, RaccoonCameraRadius, RaccoonLookHeight);
+            }
+            else { CameraRig.EndConversation(); _armsCamera = null; UpdateCoatCamera(); }
+        }
         readonly List<RaccoonController> _botRaccoons = new List<RaccoonController>();
 
         public static TrenchcoatController Instance { get; private set; }
         /// <summary>The player the person at the keyboard controls (offline debug).</summary>
         public int LocalPlayerId => _possession != null ? _possession.ActivePlayerId : 0;
         public int PlayerCountInRound => _slots != null ? _slots.SlotCount : 0;
+        public BodyPart ControlledParts => _slots != null ? _slots.ControlledParts : BodyPart.None;
         bool _burst;
 
         /// <summary>RUN!: everyone still inside pops out as a raccoon, flung outward.</summary>
@@ -54,6 +76,8 @@ namespace TrashPandas.Runtime.Trenchcoat
         {
             if (_burst) return;
             _burst = true;
+            CameraRig.EndConversation(restore: false); // RUN! interrupts any conversation close-up
+            _eventCamera = false;
             StopRecording(Time.time);
             Vector3 center = Body.transform.position;
             for (int player = 0; player < _slots.SlotCount; player++)
@@ -73,6 +97,8 @@ namespace TrashPandas.Runtime.Trenchcoat
                 else _botRaccoons.Add(raccoon);
             }
             Body.Explode();
+            // If you were already outside, make sure the camera is on your raccoon (not the vanished coat).
+            if (_raccoon && _possession.ActiveIsOutside) CameraRig.SetTarget(_raccoon.transform, RaccoonCameraRadius, RaccoonLookHeight);
         }
 
         /// <summary>The local raccoon was removed (escaped or caught): watch the garden from above.</summary>
@@ -109,7 +135,7 @@ namespace TrashPandas.Runtime.Trenchcoat
         {
             if (_possession.ActiveIsOutside) return;
             var parts = _slots.PartsOf(_slots.SlotOf(_possession.ActivePlayerId).Value);
-            bool arms = (parts & BodyPart.Arms) != 0 && (parts & BodyPart.Legs) == 0;
+            bool arms = !SoloMode && (parts & BodyPart.Arms) != 0 && (parts & BodyPart.Legs) == 0;
             if (_armsCamera == arms) return;
             _armsCamera = arms;
             if (arms) CameraRig.SetTarget(Body.transform, ArmsCameraRadius, ArmsLookHeight);
@@ -119,15 +145,25 @@ namespace TrashPandas.Runtime.Trenchcoat
         void Update()
         {
             float now = Time.time;
-            int selected = _reader.SelectPressed();
+            // Social event response window: number keys answer instead of switching seats.
+            bool engaged = _events.Tick(_reader, _reader.Move(), offlinePlayer: 0);
+            UpdateEventCamera(engaged);
+            int selected = engaged ? -1 : _reader.SelectPressed();
             if (selected >= 0 || _reader.CyclePressed) StopRecording(now);
             if (selected >= 0) _possession.TrySelect(selected);
             if (_reader.CyclePressed) _possession.CycleNext();
             if (_reader.TogglePressed) Toggle(now);
-            if ((Net.DevAutomation.Bot == "hop" || Net.DevAutomation.Bot == "hopflee" || Net.DevAutomation.Bot == "hopgap") && !_botHopped && Time.timeSinceLevelLoad > 3f) { _botHopped = true; Toggle(now); } // dev automation
+            if ((Net.DevAutomation.Bot == "hop" || Net.DevAutomation.Bot == "hopflee" || Net.DevAutomation.Bot == "hopgap") && !_botHopped && Time.timeSinceLevelLoad > Net.DevAutomation.HopAt) { _botHopped = true; Toggle(now); } // dev automation
             if (_reader.RecordPressed) ToggleRecording(now);
             UpdateCoatCamera();
             if (UnityEngine.InputSystem.Keyboard.current?.f1Key.wasPressedThisFrame == true) _showHelp = !_showHelp;
+            if (UnityEngine.InputSystem.Keyboard.current?.f2Key.wasPressedThisFrame == true)
+            {
+                SoloMode = !SoloMode;
+                _armsCamera = null;
+                UpdateCoatCamera();
+                _status = SoloMode ? "SOLO: you control the whole body" : "ROLES: one seat at a time (1-5 / Tab)";
+            }
             if (_reader.ClearGhostsPressed) { _ghosts.Clear(); _recording = null; _status = "Ghosts cleared"; }
 
             _inputs.Clear();
@@ -144,10 +180,18 @@ namespace TrashPandas.Runtime.Trenchcoat
             }
             else
             {
-                var live = _reader.ReadSlotInput(CameraRig, Body, now);
+                var live = TrashPandas.Core.Events.ConversationInput.Filter(_reader.ReadSlotInput(CameraRig, Body, now), engaged);
                 if (Net.DevAutomation.Bot == "walk") live.Move = new Vector2(0f, 1f); // dev automation
+                if (Net.DevAutomation.Bot == "walkgrab") { live.Move = Body.transform.position.z < 2.6f ? new Vector2(0f, 1f) : Vector2.zero; live.GrabOne = true; }
                 if (Net.DevAutomation.Bot == "tocat") live.Move = TowardCat();
                 _inputs[_possession.ActivePlayerId] = live; // you always override your own ghost
+                if (SoloMode)
+                {
+                    // Solo: one person drives every seat that's still inside (ghosts still play their own seats).
+                    for (int p = 0; p < _slots.SlotCount; p++)
+                        if (_slots.SlotOf(p).HasValue && !(_ghosts.TryGetValue(p, out var g) && g.HasRecording && p != _possession.ActivePlayerId))
+                            _inputs[p] = live;
+                }
                 if (_recording == _possession.ActivePlayerId) _ghosts[_possession.ActivePlayerId].Record(now, live);
             }
 
@@ -228,7 +272,7 @@ namespace TrashPandas.Runtime.Trenchcoat
             UiScale.Apply();
             if (_possession.ActiveIsOutside) return;
             var parts = _slots.PartsOf(_slots.SlotOf(_possession.ActivePlayerId).Value);
-            if ((parts & BodyPart.Arms) == 0) return;
+            if ((parts & BodyPart.Arms) == 0 && !(SoloMode && (_slots.ControlledParts & BodyPart.Arms) != 0)) return;
 
             bool holding = _grabber && (_grabber.HeldLeft || _grabber.HeldRight || _grabber.HeldBoth);
             Color color = holding ? new Color(1f, 0.85f, 0.2f)
@@ -251,6 +295,7 @@ namespace TrashPandas.Runtime.Trenchcoat
         void OnGUI()
         {
             UiScale.Apply();
+            if (CameraRig.InConversation) return; // the conversation owns the screen
             DrawCrosshair();
             var style = new GUIStyle(GUI.skin.label) { fontSize = 12 };
             var lines = new List<string>();
@@ -270,7 +315,7 @@ namespace TrashPandas.Runtime.Trenchcoat
                 if (_possession.ActiveIsOutside)
                     lines.Add("RACCOON  Mouse camera · WASD run · Space jump (hold=higher) · Ctrl crouch · walk into red curtain to climb · E near coat");
                 else
-                    lines.Add(DebugInputReader.HintFor(_slots.PartsOf(_slots.SlotOf(_possession.ActivePlayerId).Value)));
+                    lines.Add((SoloMode ? "[SOLO — F2: roles]  " : "[ROLES — F2: solo]  ") + DebugInputReader.HintFor(SoloMode ? _slots.ControlledParts : _slots.PartsOf(_slots.SlotOf(_possession.ActivePlayerId).Value)));
                 lines.Add($"Tab/1-5 switch · E out/in · R record ghost · Backspace clear ghosts · [ ] camera speed ({CameraRig.Sensitivity:F2}) · ←→ orbit · Esc free mouse · F1 hide help");
             }
             if (_status.Length > 0) lines.Add(_status);

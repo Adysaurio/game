@@ -69,6 +69,13 @@ namespace TrashPandas.Runtime.Npc
             if (IsServer) foreach (var b in _brains) b.Pawn.EnableNavigation();
         }
 
+        /// <summary>One-off change from a social event.</summary>
+        public void AdjustSuspicion(float delta)
+        {
+            _model.Adjust(delta);
+            Publish();
+        }
+
         public void ResetSuspicion()
         {
             _model.Reset();
@@ -191,8 +198,12 @@ namespace TrashPandas.Runtime.Npc
         }
 
         /// <summary>Waiters follow their route; standing guests mill around; seated guests stay put.</summary>
+        /// <summary>Taken over by a social event (walking up to the coat): don't stroll.</summary>
+        public bool Busy;
+
         public void Stroll(float dt, GuestState state)
         {
+            if (Busy) return;
             if (Pawn.Seated || Time.time < _nextStroll) return;
             if (state == GuestState.Alarmed)
             {

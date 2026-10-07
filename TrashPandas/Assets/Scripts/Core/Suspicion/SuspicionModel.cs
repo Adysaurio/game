@@ -84,6 +84,14 @@ namespace TrashPandas.Core.Suspicion
             return true;
         }
 
+        /// <summary>A one-off change (social event result). Raising also restarts the calm delay.</summary>
+        public void Adjust(float delta)
+        {
+            if (Caught) return;
+            if (delta > 0f) _calmFor = 0.0;
+            Add(delta);
+        }
+
         public void Reset()
         {
             _value = 0.0;
