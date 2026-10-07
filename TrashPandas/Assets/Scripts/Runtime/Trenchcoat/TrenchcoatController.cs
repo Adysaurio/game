@@ -138,7 +138,7 @@ namespace TrashPandas.Runtime.Trenchcoat
             if (selected >= 0) _possession.TrySelect(selected);
             if (_reader.CyclePressed) _possession.CycleNext();
             if (_reader.TogglePressed) Toggle(now);
-            if ((Net.DevAutomation.Bot == "hop" || Net.DevAutomation.Bot == "hopflee" || Net.DevAutomation.Bot == "hopgap") && !_botHopped && Time.timeSinceLevelLoad > 3f) { _botHopped = true; Toggle(now); } // dev automation
+            if ((Net.DevAutomation.Bot == "hop" || Net.DevAutomation.Bot == "hopflee" || Net.DevAutomation.Bot == "hopgap") && !_botHopped && Time.timeSinceLevelLoad > Net.DevAutomation.HopAt) { _botHopped = true; Toggle(now); } // dev automation
             if (_reader.RecordPressed) ToggleRecording(now);
             UpdateCoatCamera();
             if (UnityEngine.InputSystem.Keyboard.current?.f1Key.wasPressedThisFrame == true) _showHelp = !_showHelp;

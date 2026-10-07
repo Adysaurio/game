@@ -18,6 +18,8 @@ namespace TrashPandas.Runtime.Net
     public sealed class DevAutomation : MonoBehaviour
     {
         public static string Bot { get; private set; }
+        /// <summary>When the hop bots leave the coat (seconds into the level), -hopat N; default 3.</summary>
+        public static float HopAt { get; private set; } = 3f;
 
         /// <summary>Dev bots: once the panic starts, run for an exit — "hopflee" the sewer (open path),
         /// "hopgap" crouching through the hedge gap where humans can't follow.</summary>
@@ -83,6 +85,7 @@ namespace TrashPandas.Runtime.Net
             s_instance = this;
             DontDestroyOnLoad(gameObject);
             Bot = Value("-bot");
+            if (float.TryParse(Value("-hopat"), System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out float hopAt)) HopAt = hopAt;
             int.TryParse(Value("-autostart"), out _autoStart);
             if (float.TryParse(Value("-quitafter"), System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out float q)) _quitAt = q;
             _telemetry = Args.Contains("-telemetry");

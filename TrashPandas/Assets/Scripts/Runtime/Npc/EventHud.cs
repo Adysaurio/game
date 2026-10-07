@@ -38,6 +38,8 @@ namespace TrashPandas.Runtime.Npc
             {
                 GUI.color = new Color(1f, 0.35f, 0.3f);
                 GUI.Label(new Rect(0, 60, W, 50), $"EVENT IN {Mathf.CeilToInt(snap.SecondsLeft)}!", _big);
+                GUI.color = new Color(0f, 0f, 0f, 0.55f);
+                GUI.DrawTexture(new Rect(W * 0.5f - 300f, 106, 600f, 32), Texture2D.whiteTexture);
                 GUI.color = Color.white;
                 GUI.Label(new Rect(0, 108, W, 30), $"{ev.SpeakerName} is coming over. Everyone back in the coat!", _mid);
                 var cam = Camera.main;
@@ -56,12 +58,13 @@ namespace TrashPandas.Runtime.Npc
                 return;
             }
 
-            float w = Mathf.Min(620f, W - 40f), x = (W - w) / 2f;
+            // Right-hand side, so the close-up of the coat and the speaker stays visible.
+            float w = Mathf.Min(470f, W - 40f), x = W - w - 20f;
             var parts = MyParts();
             if (d.Phase == EventPhase.Engaged)
             {
-                float h = 250f;
-                float y = H - h - 90f;
+                float h = 260f;
+                float y = Mathf.Max(60f, H * 0.5f - h * 0.5f);
                 GUI.color = new Color(0f, 0f, 0f, 0.78f);
                 GUI.DrawTexture(new Rect(x, y, w, h), Texture2D.whiteTexture);
                 GUI.color = new Color(1f, 0.82f, 0.3f);
@@ -90,6 +93,9 @@ namespace TrashPandas.Runtime.Npc
 
             // Resolved
             bool good = snap.ResultDelta <= 0f;
+            GUI.color = good ? new Color(0.45f, 1f, 0.55f) : new Color(1f, 0.4f, 0.35f);
+            GUI.color = new Color(0f, 0f, 0f, 0.55f);
+            GUI.DrawTexture(new Rect(W * 0.5f - 330f, H * 0.28f - 6f, 660f, 84f), Texture2D.whiteTexture);
             GUI.color = good ? new Color(0.45f, 1f, 0.55f) : new Color(1f, 0.4f, 0.35f);
             GUI.Label(new Rect(0, H * 0.28f, W, 40), good ? "SMOOTH! Suspicion " + Mathf.RoundToInt(snap.ResultDelta) : "AWKWARD... Suspicion +" + Mathf.RoundToInt(snap.ResultDelta), _big);
             GUI.color = Color.white;
