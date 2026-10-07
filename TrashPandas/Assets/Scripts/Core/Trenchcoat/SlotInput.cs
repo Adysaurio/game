@@ -6,7 +6,8 @@ namespace TrashPandas.Core.Trenchcoat
     public struct SlotInput
     {
         public Vector2 Move;          // legs: x = sidestep (A/D), y = drive (W/S)
-        public float Turn;            // legs: -1..1 turn rate from the mouse
+        public float Turn;            // legs: -1..1 turn rate (gamepad stick)
+        public float YawDelta;        // legs: degrees to turn this frame (mouse)
         public bool Crouch;
         public float JumpPressedAt;   // NegativeInfinity = never
         public Vector3 HandTarget;    // arms, body-local

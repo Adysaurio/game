@@ -71,5 +71,26 @@ namespace TrashPandas.Tests
             Assert.AreEqual(0, slots.SlotOf(0));
             Assert.AreEqual(1, slots.SlotOf(1));
         }
+
+        [Test]
+        public void TrySelect_InsidePlayer_BecomesActive()
+        {
+            var model = new DebugPossessionModel(new SlotSystem(4));
+            Assert.IsTrue(model.TrySelect(2));
+            Assert.AreEqual(2, model.ActivePlayerId);
+        }
+
+        [Test]
+        public void TrySelect_InvalidOrWhileOutside_DoesNothing()
+        {
+            var model = new DebugPossessionModel(new SlotSystem(3));
+            Assert.IsFalse(model.TrySelect(7), "no such player");
+            Assert.IsFalse(model.TrySelect(-1));
+            Assert.AreEqual(0, model.ActivePlayerId);
+
+            model.LeaveCoat();
+            Assert.IsFalse(model.TrySelect(1), "can't abandon the loose raccoon");
+            Assert.AreEqual(0, model.ActivePlayerId);
+        }
     }
 }

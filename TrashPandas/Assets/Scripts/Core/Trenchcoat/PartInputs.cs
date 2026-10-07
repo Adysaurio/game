@@ -10,6 +10,8 @@ namespace TrashPandas.Core.Trenchcoat
         public float Steer;
         /// <summary>-1..1 sidestep (A/D), positive = right.</summary>
         public float Strafe;
+        /// <summary>Degrees to turn this frame (mouse), positive = right.</summary>
+        public float YawDelta;
         /// <summary>Time (s) of the last jump press; NegativeInfinity = never.</summary>
         public float JumpPressedAt;
         public bool Crouch;

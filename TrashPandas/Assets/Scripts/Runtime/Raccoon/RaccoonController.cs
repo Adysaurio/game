@@ -7,7 +7,6 @@ namespace TrashPandas.Runtime.Raccoon
     public sealed class RaccoonController : MonoBehaviour
     {
         public float RunSpeed = 3.5f;
-        public float TurnSpeed = 220f;
         public float JumpVelocity = 5.5f;
         public float Gravity = -20f;
         public float ClimbSpeed = 2.5f;
@@ -16,17 +15,17 @@ namespace TrashPandas.Runtime.Raccoon
 
         CharacterController _cc;
         Vector2 _move;
-        float _turn;
+        float _pendingYaw;
         bool _jumpPressed;
         bool _crouchHeld;
         float _verticalVelocity;
 
         /// <param name="move">WASD, x = sidestep, y = forward.</param>
-        /// <param name="turn">-1..1 turn rate from the mouse.</param>
-        public void SetInput(Vector2 move, float turn, bool jumpPressed, bool crouchHeld)
+        /// <param name="yawDelta">Degrees to turn this frame (mouse).</param>
+        public void SetInput(Vector2 move, float yawDelta, bool jumpPressed, bool crouchHeld)
         {
             _move = move;
-            _turn = turn;
+            _pendingYaw += yawDelta;
             _jumpPressed |= jumpPressed;   // latched until consumed in Update
             _crouchHeld = crouchHeld;
         }
@@ -39,7 +38,8 @@ namespace TrashPandas.Runtime.Raccoon
             _cc.height = height;
             _cc.center = new Vector3(0f, height * 0.5f, 0f);
 
-            transform.Rotate(0f, _turn * TurnSpeed * Time.deltaTime, 0f);
+            transform.Rotate(0f, _pendingYaw, 0f);
+            _pendingYaw = 0f;
             Vector3 wish = transform.forward * _move.y + transform.right * _move.x;
             if (wish.sqrMagnitude > 1f) wish.Normalize();
 

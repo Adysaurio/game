@@ -181,5 +181,29 @@ namespace TrashPandas.Tests
             Assert.IsTrue(none.LeftLegLimp);
             Assert.IsTrue(none.RightLegLimp);
         }
+
+        [Test]
+        public void Mix_YawDelta_AveragesLegs_LimpsWithOneLeg_ZeroWithoutLegs()
+        {
+            var input = PartInputs.Idle;
+            input.LegLeft.YawDelta = 10f;
+            input.LegRight.YawDelta = 20f;
+            Assert.AreEqual(15f, TrenchcoatIntentMixer.Mix(input, BodyPart.All, 0f, Settings).YawDelta, Eps);
+
+            var onlyLeft = BodyPart.All & ~BodyPart.LegRight;
+            Assert.AreEqual(10f * Settings.LimpSpeedFactor, TrenchcoatIntentMixer.Mix(input, onlyLeft, 0f, Settings).YawDelta, Eps);
+
+            Assert.AreEqual(0f, TrenchcoatIntentMixer.Mix(input, BodyPart.Arms | BodyPart.Head, 0f, Settings).YawDelta, Eps);
+        }
+
+        [Test]
+        public void Mix_YawDelta_RejectsNaNAndHugeSpikes()
+        {
+            var input = PartInputs.Idle;
+            input.LegLeft.YawDelta = float.NaN;
+            input.LegRight.YawDelta = 1000f;
+            Assert.AreEqual(45f, TrenchcoatIntentMixer.Mix(input, BodyPart.All, 0f, Settings).YawDelta, Eps,
+                "NaN counts as 0, spikes are capped at 90 degrees per frame");
+        }
     }
 }

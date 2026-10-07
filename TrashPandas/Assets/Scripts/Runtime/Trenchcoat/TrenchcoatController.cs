@@ -16,6 +16,10 @@ namespace TrashPandas.Runtime.Trenchcoat
         public RaccoonController RaccoonPrefab;
         public FollowCamera Camera;
         public float ReturnDistance = 1.6f;
+        [Header("Mouse sensitivity (tweak live in Play mode)")]
+        public float TurnSensitivity = 0.25f;
+        public float HandSensitivity = 0.004f;
+        public float LookSensitivity = 0.15f;
 
         readonly MixerSettings _mixer = new MixerSettings();
         readonly Dictionary<int, SlotInput> _inputs = new Dictionary<int, SlotInput>();
@@ -24,6 +28,7 @@ namespace TrashPandas.Runtime.Trenchcoat
         DebugPossessionModel _possession;
         RaccoonController _raccoon;
         string _status = "";
+        bool _cursorFreed;
 
         void Awake()
         {
@@ -34,20 +39,28 @@ namespace TrashPandas.Runtime.Trenchcoat
 
         void Update()
         {
+            _reader.TurnSensitivity = TurnSensitivity;
+            _reader.HandSensitivity = HandSensitivity;
+            _reader.LookSensitivity = LookSensitivity;
+            // Esc frees the mouse (e.g. to use the inspector); clicking the game view captures it again.
+            if (_reader.EscapePressed) _cursorFreed = true;
+            else if (_cursorFreed && _reader.ClickPressed) _cursorFreed = false;
+            SetCursorLocked(!_cursorFreed);
+
             if (_reader.CyclePressed) _possession.CycleNext();
+            int selected = _reader.SelectPressed();
+            if (selected >= 0) _possession.TrySelect(selected);
             if (_reader.TogglePressed) Toggle();
 
             _inputs.Clear();
             if (_possession.ActiveIsOutside)
             {
-                _raccoon.SetInput(_reader.Move(), _reader.MouseTurn(Time.deltaTime), _reader.JumpPressed, _reader.CrouchHeld);
-                SetCursorLocked(true);
+                _raccoon.SetInput(_reader.Move(), _reader.MouseYaw(), _reader.JumpPressed, _reader.CrouchHeld);
             }
             else
             {
                 var parts = _slots.PartsOf(_slots.SlotOf(_possession.ActivePlayerId).Value);
                 _inputs[_possession.ActivePlayerId] = _reader.ReadSlotInput(parts, Time.time, Time.deltaTime);
-                SetCursorLocked(DebugInputReader.WantsLockedCursor(parts));
             }
 
             var partInputs = SlotInputRouter.Route(_slots, _inputs);
@@ -86,8 +99,8 @@ namespace TrashPandas.Runtime.Trenchcoat
 
         void OnGUI()
         {
-            GUILayout.BeginArea(new Rect(10, 10, 360, 260), GUI.skin.box);
-            GUILayout.Label($"DEBUG — {_slots.SlotCount} players   [Tab] switch  [E] out/in  [Esc] free mouse");
+            GUILayout.BeginArea(new Rect(10, 10, 560, 300), GUI.skin.box);
+            GUILayout.Label($"DEBUG — {_slots.SlotCount} players   [1-{_slots.SlotCount}] / [Tab] switch   [E] out/in   [Esc] free mouse");
             for (int i = 0; i < _slots.SlotCount; i++)
             {
                 var occupant = _slots.OccupantOf(i);
@@ -96,7 +109,17 @@ namespace TrashPandas.Runtime.Trenchcoat
                 GUILayout.Label($"Slot {i} [{_slots.PartsOf(i)}]: {who}{me}");
             }
             GUILayout.Label($"Missing: {_slots.MissingParts}");
-            if (_possession.ActiveIsOutside) GUILayout.Label($"P{_possession.ActivePlayerId} is a loose raccoon");
+            if (_possession.ActiveIsOutside)
+            {
+                GUILayout.Label($"P{_possession.ActivePlayerId} is a loose raccoon");
+                GUILayout.Label("WASD move · Mouse turn · Space jump · Ctrl crouch · walk into red/marked hedge to climb");
+            }
+            else
+            {
+                var slot = _slots.SlotOf(_possession.ActivePlayerId).Value;
+                GUILayout.Label($"YOU control: {_slots.PartsOf(slot)}");
+                GUILayout.Label(DebugInputReader.HintFor(_slots.PartsOf(slot)));
+            }
             if (_status.Length > 0) GUILayout.Label(_status);
             GUILayout.EndArea();
         }

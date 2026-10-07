@@ -14,7 +14,7 @@ namespace TrashPandas.Tests
             slots.TryEnter(1, 0); // Legs
             var inputs = new Dictionary<int, SlotInput>
             {
-                [1] = new SlotInput { Move = new Vector2(0.5f, 1f), Turn = -0.3f, JumpPressedAt = 3f, Crouch = true },
+                [1] = new SlotInput { Move = new Vector2(0.5f, 1f), Turn = -0.3f, YawDelta = 12f, JumpPressedAt = 3f, Crouch = true },
             };
 
             var parts = SlotInputRouter.Route(slots, inputs);
@@ -24,6 +24,8 @@ namespace TrashPandas.Tests
             Assert.AreEqual(0.5f, parts.LegLeft.Strafe, "A/D sidestep");
             Assert.AreEqual(-0.3f, parts.LegLeft.Steer, "mouse turns");
             Assert.AreEqual(-0.3f, parts.LegRight.Steer);
+            Assert.AreEqual(12f, parts.LegLeft.YawDelta);
+            Assert.AreEqual(12f, parts.LegRight.YawDelta);
             Assert.AreEqual(3f, parts.LegLeft.JumpPressedAt);
             Assert.AreEqual(3f, parts.LegRight.JumpPressedAt);
             Assert.IsTrue(parts.LegRight.Crouch);

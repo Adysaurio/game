@@ -12,6 +12,8 @@ namespace TrashPandas.Core.Trenchcoat
         public float LimpSpeedFactor = 0.4f;
         /// <summary>Turn drift toward the missing leg, scaled by speed.</summary>
         public float LimpTurnBias = 0.3f;
+        /// <summary>Largest mouse turn accepted in one frame, in degrees.</summary>
+        public float MaxYawDeltaPerFrame = 90f;
     }
 
     /// <summary>Combines per-part inputs into one body intent. All comedy rules live here.</summary>
@@ -49,6 +51,8 @@ namespace TrashPandas.Core.Trenchcoat
                 float steer = (Unit(input.LegLeft.Steer) + Unit(input.LegRight.Steer)) * 0.5f;
                 intent.Forward = (driveL + driveR) * 0.5f;
                 intent.Strafe = (Unit(input.LegLeft.Strafe) + Unit(input.LegRight.Strafe)) * 0.5f;
+                intent.YawDelta = (Sanitize(input.LegLeft.YawDelta, s.MaxYawDeltaPerFrame)
+                                 + Sanitize(input.LegRight.YawDelta, s.MaxYawDeltaPerFrame)) * 0.5f;
                 intent.Turn = Mathf.Clamp(steer + (driveL - driveR) * s.DesyncTurnFactor, -1f, 1f);
                 intent.Jump = IsCoordinatedJump(input.LegLeft.JumpPressedAt, input.LegRight.JumpPressedAt, now, s.JumpWindow);
                 intent.Crouch = input.LegLeft.Crouch || input.LegRight.Crouch;
@@ -58,6 +62,7 @@ namespace TrashPandas.Core.Trenchcoat
                 var leg = hasLeft ? input.LegLeft : input.LegRight;
                 intent.Forward = Unit(leg.Drive) * s.LimpSpeedFactor;
                 intent.Strafe = Unit(leg.Strafe) * s.LimpSpeedFactor;
+                intent.YawDelta = Sanitize(leg.YawDelta, s.MaxYawDeltaPerFrame) * s.LimpSpeedFactor;
                 float towardMissing = hasLeft ? 1f : -1f; // missing right leg drags right
                 float drift = towardMissing * s.LimpTurnBias * Mathf.Abs(intent.Forward);
                 intent.Turn = Mathf.Clamp(Unit(leg.Steer) + drift, -1f, 1f);

@@ -8,6 +8,7 @@ namespace TrashPandas.Core.Trenchcoat
         public float Forward;     // -1..1
         public float Turn;        // -1..1, positive = right
         public float Strafe;      // -1..1 sidestep, positive = right
+        public float YawDelta;    // degrees to turn this frame (mouse), positive = right
         public bool Jump;
         public bool Crouch;
         public bool Collapsed;    // no legs: the body slumps down

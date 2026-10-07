@@ -38,6 +38,15 @@ namespace TrashPandas.Core.Debugging
             return false;
         }
 
+        /// <summary>Jump straight to a player that is inside the coat (number keys).</summary>
+        public bool TrySelect(int playerId)
+        {
+            if (ActiveIsOutside || playerId < 0 || playerId >= _slots.SlotCount) return false;
+            if (!_slots.SlotOf(playerId).HasValue) return false;
+            ActivePlayerId = playerId;
+            return true;
+        }
+
         public bool LeaveCoat() => _slots.Leave(ActivePlayerId);
 
         public bool ReturnToCoat()

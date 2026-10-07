@@ -39,8 +39,13 @@ namespace TrashPandas.Runtime.Trenchcoat
         BodyIntent _intent;
         float _lastJumpTime = -10f;
         float _wobblePhase;
+        float _pendingYaw;
 
-        public void SetIntent(BodyIntent intent) => _intent = intent;
+        public void SetIntent(BodyIntent intent)
+        {
+            _intent = intent;
+            _pendingYaw += intent.YawDelta; // mouse turns arrive per frame; physics consumes them per step
+        }
 
         void Awake()
         {
@@ -54,7 +59,9 @@ namespace TrashPandas.Runtime.Trenchcoat
             float speed = _intent.Crouch ? MoveSpeed * 0.5f : MoveSpeed;
             Vector3 planar = (transform.forward * _intent.Forward + transform.right * (_intent.Strafe * StrafeFactor)) * speed;
             _rb.linearVelocity = new Vector3(planar.x, _rb.linearVelocity.y, planar.z);
-            _rb.MoveRotation(_rb.rotation * Quaternion.Euler(0f, _intent.Turn * TurnSpeed * Time.fixedDeltaTime, 0f));
+            float yaw = _intent.Turn * TurnSpeed * Time.fixedDeltaTime + _pendingYaw;
+            _pendingYaw = 0f;
+            _rb.MoveRotation(_rb.rotation * Quaternion.Euler(0f, yaw, 0f));
 
             if (_intent.Jump && IsGrounded() && Time.time - _lastJumpTime > JumpCooldown)
             {

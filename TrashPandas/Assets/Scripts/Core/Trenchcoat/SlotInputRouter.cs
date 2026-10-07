@@ -28,6 +28,7 @@ namespace TrashPandas.Core.Trenchcoat
                 Drive = input.Move.y,
                 Steer = input.Turn,
                 Strafe = input.Move.x,
+                YawDelta = input.YawDelta,
                 JumpPressedAt = input.JumpPressedAt,
                 Crouch = input.Crouch,
             };
