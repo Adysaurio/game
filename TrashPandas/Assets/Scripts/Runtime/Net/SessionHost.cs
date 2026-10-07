@@ -28,7 +28,9 @@ namespace TrashPandas.Runtime.Net
         public bool IsHost => IsOnline && NetworkManager.Singleton.IsServer;
 
         ISessionConnector _connector;
-        bool _leaving;
+        bool _leaving;          // a leave is in progress (by choice or after losing the host)
+        bool _leftByChoice;     // the local player pressed Leave/F10
+        bool _wasConnected;     // we reached the host at least once this session
 
         void Awake()
         {
@@ -45,12 +47,14 @@ namespace TrashPandas.Runtime.Net
             var nm = NetworkManager.Singleton;
             nm.OnClientConnectedCallback += OnClientConnected;
             nm.OnClientDisconnectCallback += OnClientDisconnected;
+            nm.OnClientStopped += OnClientStopped;
             _subscribed = true;
         }
 
         public async Task<string> HostAsync(ISessionConnector connector)
         {
             EnsureSubscribed();
+            _leftByChoice = _wasConnected = false;
             Roster = new SessionRoster();
             _connector = connector;
             RoomCode = await connector.HostAsync(SessionRoster.MaxPlayers);
@@ -62,6 +66,7 @@ namespace TrashPandas.Runtime.Net
         public Task JoinAsync(ISessionConnector connector, string code)
         {
             EnsureSubscribed();
+            _leftByChoice = _wasConnected = false;
             Roster = new SessionRoster();
             _connector = connector;
             return connector.JoinAsync(code);
@@ -75,7 +80,14 @@ namespace TrashPandas.Runtime.Net
             NetworkManager.Singleton.SceneManager.LoadScene(GameScene, LoadSceneMode.Single);
         }
 
-        public async Task LeaveAsync(string message = null)
+        /// <summary>Leave on purpose (menu button, F10, or a connection error shown by the menu).</summary>
+        public Task LeaveAsync(string message = null)
+        {
+            _leftByChoice = true;
+            return StopAndReturnToMenuAsync(message);
+        }
+
+        async Task StopAndReturnToMenuAsync(string message)
         {
             if (_leaving) return;
             _leaving = true;
@@ -86,14 +98,16 @@ namespace TrashPandas.Runtime.Net
                 _connector = null;
                 RoomCode = null;
                 Roster = new SessionRoster();
-                _leaving = false;
                 if (SceneManager.GetActiveScene().name != MenuScene) SceneManager.LoadScene(MenuScene);
+                // _leaving stays set until NetworkManager reports it stopped (see OnClientStopped).
+                if (!NetworkManager.Singleton || !NetworkManager.Singleton.IsListening) _leaving = false;
             }
         }
 
         void OnClientConnected(ulong clientId)
         {
             var nm = NetworkManager.Singleton;
+            if (clientId == nm.LocalClientId) _wasConnected = true;
             if (!nm.IsServer) return;
             if (!Roster.Join(clientId))
                 nm.DisconnectClient(clientId, Roster.RoundStarted ? "The game already started." : "The room is full.");
@@ -108,9 +122,18 @@ namespace TrashPandas.Runtime.Net
                 if (clientId != nm.LocalClientId) Roster.Leave(clientId);
                 return;
             }
-            // On a client, this callback means we lost the host (or were refused).
-            string reason = string.IsNullOrEmpty(nm.DisconnectReason) ? "The host left the game." : nm.DisconnectReason;
-            _ = LeaveAsync(reason);
+            // On a client, losing the host is handled in OnClientStopped (it also covers transport failures).
+        }
+
+        /// <summary>Fires on every local stop: leaving, host gone, transport failure, session closed by the service.</summary>
+        void OnClientStopped(bool wasHost)
+        {
+            var nm = NetworkManager.Singleton;
+            string message = ConnectionMessages.ForClientStopped(_wasConnected, _leftByChoice, wasHost ? null : nm.DisconnectReason);
+            bool alreadyLeaving = _leaving;
+            _leaving = false;
+            if (alreadyLeaving || _leftByChoice) { _leftByChoice = false; if (message != null) LastMessage = message; return; }
+            _ = StopAndReturnToMenuAsync(message);
         }
     }
 }

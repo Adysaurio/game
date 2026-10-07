@@ -51,6 +51,7 @@ namespace TrashPandas.Runtime.Net
         {
             if (_connected || s_autoConnectDone || !SessionHost.Instance) return;
             _connected = s_autoConnectDone = true; // only once per launch, not on every return to the menu
+            if (Args.Contains("-debugmode")) { UnityEngine.SceneManagement.SceneManager.LoadScene("Greybox_Trenchcoat"); return; }
             if (Args.Contains("-autohost-local")) await SessionHost.Instance.HostAsync(new LocalConnector());
             else if (Args.Contains("-autojoin-local")) await SessionHost.Instance.JoinAsync(new LocalConnector(), LocalConnector.DefaultAddress);
         }
@@ -76,7 +77,15 @@ namespace TrashPandas.Runtime.Net
         {
             var nm = NetworkManager.Singleton;
             var coat = NetworkedTrenchcoat.Instance;
-            if (!nm || !nm.IsListening) { Log("offline"); return; }
+            if (!nm || !nm.IsListening)
+            {
+                var offlineBody = UnityEngine.Object.FindFirstObjectByType<TrashPandas.Runtime.Trenchcoat.TrenchcoatBody>();
+                var glass = UnityEngine.GameObject.Find("Glass_1a");
+                Log(offlineBody
+                    ? $"offline-debug coat={offlineBody.transform.position} kinematic={offlineBody.GetComponent<Rigidbody>().isKinematic} glassKinematic={(glass ? glass.GetComponent<Rigidbody>().isKinematic.ToString() : "-")}"
+                    : "offline");
+                return;
+            }
             if (!coat) { Log($"lobby clients={nm.ConnectedClientsIds.Count}"); return; }
             var snap = coat.Slots;
             string seats = string.Join(",", Enumerable.Range(0, snap.SlotCount).Select(i => snap.OccupantClient(i)?.ToString() ?? "-"));

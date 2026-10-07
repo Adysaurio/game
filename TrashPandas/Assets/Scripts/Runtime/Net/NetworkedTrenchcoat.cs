@@ -17,6 +17,8 @@ namespace TrashPandas.Runtime.Net
     public sealed class NetworkedTrenchcoat : NetworkBehaviour
     {
         public float VisualSendRate = 20f;
+        [Tooltip("A player whose input stops arriving for this long is treated as idle (crash, Wi-Fi drop).")]
+        public float InputTimeout = 0.5f;
         public float ReturnDistance = 1.6f;
         public NetworkObject RaccoonPrefab;
 
@@ -26,6 +28,8 @@ namespace TrashPandas.Runtime.Net
         readonly NetworkVariable<SlotsSnapshot> _slots = new NetworkVariable<SlotsSnapshot>();
         readonly Dictionary<int, SlotInput> _latestInput = new Dictionary<int, SlotInput>();
         readonly InputSequencer _sequencer = new InputSequencer();
+        readonly JumpStampRebaser _jumpStamps = new JumpStampRebaser();
+        readonly Dictionary<int, SlotInput> _freshInput = new Dictionary<int, SlotInput>();
         readonly MixerSettings _mixer = new MixerSettings();
         readonly Dictionary<int, NetworkObject> _raccoons = new Dictionary<int, NetworkObject>();
         float _nextVisualSend;
@@ -57,8 +61,12 @@ namespace TrashPandas.Runtime.Net
         {
             var roster = SessionHost.Instance ? SessionHost.Instance.Roster : null;
             int? player = roster?.PlayerIdOf(rpcParams.Receive.SenderClientId);
-            if (!player.HasValue || !_sequencer.Accept(player.Value, input.Sequence)) return;
-            _latestInput[player.Value] = input.Input;
+            if (!player.HasValue || roster.Slots == null || !roster.Slots.SlotOf(player.Value).HasValue) return; // not seated
+            float now = NetworkManager.ServerTime.TimeAsFloat;
+            if (!_sequencer.Accept(player.Value, input.Sequence, now)) return;
+            var slotInput = input.Input;
+            slotInput.JumpPressedAt = _jumpStamps.Rebase(player.Value, slotInput.JumpPressedAt, now);
+            _latestInput[player.Value] = slotInput;
         }
 
         /// <summary>Hop out of the coat: the seat empties and the host spawns a raccoon you control.</summary>
@@ -102,7 +110,10 @@ namespace TrashPandas.Runtime.Net
             if (slots == null) return;
 
             float now = NetworkManager.ServerTime.TimeAsFloat;
-            var intent = TrenchcoatIntentMixer.Mix(SlotInputRouter.Route(slots, _latestInput), slots.ControlledParts, now, _mixer);
+            _freshInput.Clear();
+            foreach (var pair in _latestInput)
+                if (_sequencer.IsFresh(pair.Key, now, InputTimeout)) _freshInput[pair.Key] = pair.Value;
+            var intent = TrenchcoatIntentMixer.Mix(SlotInputRouter.Route(slots, _freshInput), slots.ControlledParts, now, _mixer);
             Body.SetIntent(intent);
 
             if (Time.unscaledTime >= _nextVisualSend)

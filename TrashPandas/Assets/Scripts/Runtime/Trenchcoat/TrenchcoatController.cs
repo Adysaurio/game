@@ -53,6 +53,14 @@ namespace TrashPandas.Runtime.Trenchcoat
             UpdateCoatCamera();
         }
 
+        void Start()
+        {
+            // Offline, nothing gets spawned: undo NetworkRigidbody's "kinematic until spawned" so physics runs.
+            // (In Start, not Awake: NetworkRigidbody sets itself up in its own Awake.)
+            foreach (var nrb in FindObjectsByType<Unity.Netcode.Components.NetworkRigidbody>(FindObjectsInactive.Include, FindObjectsSortMode.None))
+                nrb.SetIsKinematic(false);
+        }
+
         /// <summary>Over-the-shoulder when the active role aims hands; wide when it walks.</summary>
         void UpdateCoatCamera()
         {
@@ -89,6 +97,7 @@ namespace TrashPandas.Runtime.Trenchcoat
             else
             {
                 var live = _reader.ReadSlotInput(CameraRig, Body, now);
+                if (Net.DevAutomation.Bot == "walk") live.Move = new Vector2(0f, 1f); // dev automation
                 _inputs[_possession.ActivePlayerId] = live; // you always override your own ghost
                 if (_recording == _possession.ActivePlayerId) _ghosts[_possession.ActivePlayerId].Record(now, live);
             }

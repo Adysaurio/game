@@ -49,7 +49,7 @@ namespace TrashPandas.EditorTools
 
             var net = new GameObject("Network");
             net.AddComponent<NetworkManager>();
-            net.AddComponent<Unity.Netcode.Transports.UTP.UnityTransport>();
+            net.AddComponent<Unity.Netcode.Transports.UTP.UnityTransport>().DisconnectTimeoutMS = 8000;
             net.AddComponent<NetworkBootstrap>();
             net.AddComponent<SessionHost>();
 
