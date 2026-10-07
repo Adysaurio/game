@@ -160,7 +160,7 @@ namespace TrashPandas.Runtime.Trenchcoat
             }
             else
             {
-                var live = _reader.ReadSlotInput(CameraRig, Body, now);
+                var live = TrashPandas.Core.Events.ConversationInput.Filter(_reader.ReadSlotInput(CameraRig, Body, now), engaged);
                 if (Net.DevAutomation.Bot == "walk") live.Move = new Vector2(0f, 1f); // dev automation
                 if (Net.DevAutomation.Bot == "tocat") live.Move = TowardCat();
                 _inputs[_possession.ActivePlayerId] = live; // you always override your own ghost

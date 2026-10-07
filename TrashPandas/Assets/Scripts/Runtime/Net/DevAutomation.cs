@@ -155,6 +155,10 @@ namespace TrashPandas.Runtime.Net
                 if (Args.Contains("-autorestart") && pd.Phase == TrashPandas.Runtime.Panic.RoundPhase.Results && SessionHost.Instance && SessionHost.Instance.IsHost && !s_restarted)
                 { s_restarted = true; Log("autorestart"); pd.PlayAgain(); }
             }
+            string speeds = "";
+            foreach (var pw in UnityEngine.Object.FindObjectsByType<TrashPandas.Runtime.Npc.NpcPawn>(FindObjectsSortMode.None))
+                if (!string.IsNullOrEmpty(pw.SpeakerId)) speeds += $"{pw.SpeakerId}:{pw.Speed:F1} ";
+            panic += $" speeds[{speeds.Trim()}]";
             var ed = TrashPandas.Runtime.Npc.SocialEventDirector.Instance;
             if (ed) { var es = ed.Snapshot; panic += $" event={ed.Phase}#{es.Serial}:{ed.Current.Speaker} t={es.SecondsLeft:F1} result={es.ResultDelta:F0}[{es.HeadOutcome}{es.ArmsOutcome}{es.LegsOutcome}]"; }
             return panic + $" suspicion={d.Suspicion:F1} caught={d.Caught} curious={curious} alarmed={alarmed} cat={cat} frame[missing={f.MissingParts} seen={f.CoatWitnessed} weird={f.SeenWeirdness:F2} hiss={f.CatHissing}] dt={Time.deltaTime:F3}";

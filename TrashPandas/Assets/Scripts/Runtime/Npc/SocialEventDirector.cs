@@ -13,6 +13,7 @@ namespace TrashPandas.Runtime.Npc
     /// Social events (spec §6b): every so often a human walks up to the coat; everyone must be back inside;
     /// then each role does its part within a few seconds. Simulated on the host (or offline).
     /// </summary>
+    [DefaultExecutionOrder(-50)] // before PanicDirector, so cancelling on RUN never undoes its panic speed
     public sealed class SocialEventDirector : NetworkBehaviour
     {
         public float ResponseWindow = 5f;
@@ -31,6 +32,8 @@ namespace TrashPandas.Runtime.Npc
         NpcPawn _speaker;
         NpcBrain _speakerBrain;
         byte _serial;
+        float _speakerBaseSpeed;
+        readonly System.Random _random = new System.Random(System.Environment.TickCount);
 
         public EventSnapshot Snapshot => SimulationAuthority.IsOnline ? _net.Value : _offline;
         public EventPhase Phase => (EventPhase)Snapshot.Phase;
@@ -101,10 +104,18 @@ namespace TrashPandas.Runtime.Npc
             if (!coat) return;
             float now = Time.timeSinceLevelLoad;
 
-            // RUN! cancels any event cleanly; the speaker joins the panic.
-            if (suspicion.Caught)
+            // RUN! (or any time outside infiltration) cancels events cleanly; the speaker joins the panic.
+            var panic = TrashPandas.Runtime.Panic.PanicDirector.Instance;
+            bool infiltrating = !suspicion.Caught && (!panic || panic.Phase == TrashPandas.Runtime.Panic.RoundPhase.Infiltration);
+            if (!infiltrating)
             {
-                if (_offline.Phase != (byte)EventPhase.Idle) { ReleaseSpeaker(); SetPhase(EventPhase.Idle, 0f); }
+                if (_offline.Phase != (byte)EventPhase.Idle)
+                {
+                    ReleaseSpeaker(restoreSpeed: false); // the panic owns their speed now
+                    _scheduler.EventFinished(now);
+                    SetPhase(EventPhase.Idle, 0f);
+                    Publish();
+                }
                 return;
             }
 
@@ -124,7 +135,7 @@ namespace TrashPandas.Runtime.Npc
                     if (now >= _phaseEndsAt) Resolve(suspicion, now);
                     break;
                 case EventPhase.Resolved:
-                    if (now >= _phaseEndsAt) { ReleaseSpeaker(); _scheduler.EventFinished(now); SetPhase(EventPhase.Idle, 0f); }
+                    if (now >= _phaseEndsAt) { ReleaseSpeaker(restoreSpeed: true); _scheduler.EventFinished(now); SetPhase(EventPhase.Idle, 0f); }
                     break;
             }
             _offline.SecondsLeft = Mathf.Max(0f, _phaseEndsAt - now);
@@ -135,13 +146,12 @@ namespace TrashPandas.Runtime.Npc
 
         void StartWarning(TrenchcoatBody coat, float now)
         {
-            // Pick an event whose speaker exists in this scene.
-            var candidates = new List<int>();
+            // Who comes over (never the same person twice in a row), among the speakers in this scene.
             var pawns = FindObjectsByType<NpcPawn>(FindObjectsSortMode.InstanceID);
-            for (int i = 0; i < SocialEventCatalog.All.Count; i++)
-                foreach (var p in pawns) if (p.SpeakerId == SocialEventCatalog.All[i].Speaker) { candidates.Add(i); break; }
-            if (candidates.Count == 0) { _scheduler.EventFinished(now); return; }
-            int index = candidates[_scheduler.PickSpeaker(candidates.Count)];
+            var available = new HashSet<string>();
+            foreach (var p in pawns) if (!string.IsNullOrEmpty(p.SpeakerId)) available.Add(p.SpeakerId);
+            int index = EventPicker.Pick(SocialEventCatalog.All, available, _scheduler, _random);
+            if (index < 0) { _scheduler.EventFinished(now); return; }
             var ev = SocialEventCatalog.All[index];
             foreach (var p in pawns) if (p.SpeakerId == ev.Speaker) { _speaker = p; break; }
 
@@ -151,6 +161,7 @@ namespace TrashPandas.Runtime.Npc
             float warning = WarningTime.Compute(farthest);
 
             // Walk at whatever pace makes them arrive about when the warning ends.
+            _speakerBaseSpeed = _speaker.Speed;
             float walk = Vector3.Distance(_speaker.transform.position, MeetingPoint(coat));
             _speaker.SetSpeed(Mathf.Clamp(walk / warning, 0.8f, 3f));
             _speakerBrain = null;
@@ -217,10 +228,10 @@ namespace TrashPandas.Runtime.Npc
             return 0; // offline: the person at the keyboard answers for every role (see TrenchcoatController)
         }
 
-        void ReleaseSpeaker()
+        void ReleaseSpeaker(bool restoreSpeed)
         {
             if (_speakerBrain != null) _speakerBrain.Busy = false;
-            if (_speaker) _speaker.SetSpeed(_speaker.Kind == NpcKind.Waiter ? 1.6f : 1.1f);
+            if (_speaker && restoreSpeed) _speaker.SetSpeed(_speakerBaseSpeed);
             _speaker = null;
             _speakerBrain = null;
         }

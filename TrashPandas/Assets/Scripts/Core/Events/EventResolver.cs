@@ -41,14 +41,16 @@ namespace TrashPandas.Core.Events
                 else Add(result, EventRole.Head, PartOutcome.Failed, EventScoring.BadAnswer);
             }
 
-            if (e.Arms != ArmsTask.None) Judge(result, EventRole.Arms, (present & BodyPart.Arms) == BodyPart.Arms, responseFor(EventRole.Arms)?.ArmsDone ?? false);
-            if (e.Legs != LegsTask.None) Judge(result, EventRole.Legs, (present & BodyPart.Legs) == BodyPart.Legs, responseFor(EventRole.Legs)?.LegsDone ?? false);
+            Judge(result, EventRole.Arms, e.Arms != ArmsTask.None, (present & BodyPart.Arms) == BodyPart.Arms, responseFor(EventRole.Arms)?.ArmsDone ?? false);
+            Judge(result, EventRole.Legs, e.Legs != LegsTask.None, (present & BodyPart.Legs) == BodyPart.Legs, responseFor(EventRole.Legs)?.LegsDone ?? false);
             return result;
         }
 
-        static void Judge(EventResult r, EventRole role, bool present, bool done)
+        /// <summary>An empty seat always costs (spec §6b); a present role is only judged if the event asks it to do something.</summary>
+        static void Judge(EventResult r, EventRole role, bool hasTask, bool present, bool done)
         {
             if (!present) Add(r, role, PartOutcome.Missing, EventScoring.MissingPart);
+            else if (!hasTask) return;
             else if (done) Add(r, role, PartOutcome.Good, 0f);
             else Add(r, role, PartOutcome.Failed, EventScoring.FailedAction);
         }

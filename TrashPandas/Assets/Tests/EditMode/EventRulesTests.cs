@@ -135,12 +135,54 @@ namespace TrashPandas.Tests
         }
 
         [Test]
-        public void EventsWithoutLegsTask_OnlyJudgeHeadAndArms()
+        public void EmptySeat_CostsEvenWhenThatRoleHasNoTask()
         {
             var e = new SocialEvent { Options = new[] { "a", "b", "c" }, OptionKinds = new[] { HeadAnswer.Good, HeadAnswer.Odd, HeadAnswer.Absurd }, Arms = ArmsTask.Handshake, Legs = LegsTask.None };
             var r = EventResolver.Resolve(e, BodyPart.All & ~BodyPart.Legs, _ => Perfect);
-            Assert.AreEqual(2, r.Parts.Count, "missing legs don't matter when nobody asks them to do anything");
+            Assert.AreEqual(EventScoring.GoodAnswer + EventScoring.MissingPart, r.Delta, 1e-3f, "spec §6b: an empty seat always counts");
+        }
+
+        [Test]
+        public void RoleWithoutTask_PresentCostsNothing()
+        {
+            var e = new SocialEvent { Options = new[] { "a", "b", "c" }, OptionKinds = new[] { HeadAnswer.Good, HeadAnswer.Odd, HeadAnswer.Absurd }, Arms = ArmsTask.Handshake, Legs = LegsTask.None };
+            var r = EventResolver.Resolve(e, BodyPart.All, _ => Perfect);
             Assert.AreEqual(EventScoring.GoodAnswer, r.Delta, 1e-3f);
+        }
+
+        [Test]
+        public void SpeakerPick_NeverSamePersonTwiceInARow_WithRealCatalog()
+        {
+            var scheduler = new EventScheduler(3);
+            var available = new System.Collections.Generic.HashSet<string> { "MotherInLaw", "Waiter", "Priest", "Bride" };
+            string last = null;
+            for (int i = 0; i < 300; i++)
+            {
+                int index = EventPicker.Pick(SocialEventCatalog.All, available, scheduler, new System.Random(i));
+                string speaker = SocialEventCatalog.All[index].Speaker;
+                Assert.AreNotEqual(last, speaker, $"pick {i}");
+                last = speaker;
+            }
+        }
+
+        [Test]
+        public void SpeakerPick_OnlyFromSpeakersInTheScene()
+        {
+            var available = new System.Collections.Generic.HashSet<string> { "Priest" };
+            int index = EventPicker.Pick(SocialEventCatalog.All, available, new EventScheduler(1), new System.Random(1));
+            Assert.AreEqual("Priest", SocialEventCatalog.All[index].Speaker);
+            Assert.AreEqual(-1, EventPicker.Pick(SocialEventCatalog.All, new System.Collections.Generic.HashSet<string>(), new EventScheduler(1), new System.Random(1)));
+        }
+
+        [Test]
+        public void DuringConversation_ClicksDontGrab()
+        {
+            var input = new SlotInput { GrabOne = true, GrabBoth = true, Move = Vector2.up, Crouch = true };
+            var filtered = ConversationInput.Filter(input, inConversation: true);
+            Assert.IsFalse(filtered.GrabOne || filtered.GrabBoth, "the handshake click must not grab or throw things");
+            Assert.AreEqual(Vector2.up, filtered.Move, "legs still move (and can fail 'don't move')");
+            Assert.IsTrue(filtered.Crouch, "kneeling still works");
+            Assert.IsTrue(ConversationInput.Filter(input, inConversation: false).GrabOne);
         }
 
         [Test]

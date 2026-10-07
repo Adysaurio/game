@@ -65,6 +65,8 @@ namespace TrashPandas.Runtime.Npc
             if (_agent) { _agent.speed = speed; _agent.acceleration = 20f; }
         }
 
+        public float Speed => _agent ? _agent.speed : 0f;
+
         public void SetSpeed(float speed)
         {
             if (_agent) _agent.speed = speed;

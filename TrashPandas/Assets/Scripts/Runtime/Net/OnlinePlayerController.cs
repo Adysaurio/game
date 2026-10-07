@@ -93,7 +93,7 @@ namespace TrashPandas.Runtime.Net
                     else { CameraRig.EndConversation(); _armsCamera = null; }
                 }
                 if (!talking) UpdateCamera(parts);
-                var input = _reader.ReadSlotInput(CameraRig, _coat.Body, now);
+                var input = TrashPandas.Core.Events.ConversationInput.Filter(_reader.ReadSlotInput(CameraRig, _coat.Body, now), engaged);
                 ApplyBot(ref input);
                 if (Time.unscaledTime >= _nextSend)
                 {
