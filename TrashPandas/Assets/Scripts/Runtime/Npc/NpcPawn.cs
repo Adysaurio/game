@@ -82,6 +82,9 @@ namespace TrashPandas.Runtime.Npc
             if (_agent && _agent.enabled && _agent.isOnNavMesh) _agent.SetDestination(destination);
         }
 
+        /// <summary>Moods during the RUN (above the Guest/Cat states), drawn as speech bubbles.</summary>
+        public const byte MoodChasing = 10, MoodSearching = 11, MoodWinded = 12, MoodStunned = 13, MoodWindup = 14, MoodCalmAgain = 15;
+
         public void SetMood(byte mood)
         {
             _offlineMood = mood;

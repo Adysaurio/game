@@ -348,19 +348,19 @@ namespace TrashPandas.Runtime.Panic
                         pawn.Stop();
                         if (_raccoonOf.TryGetValue(o.TargetId, out var wt)) pawn.LookAt(wt.transform.position);
                         if (c.Last != PursuitState.Windup && c.Weapon) c.Weapon.PlaySwing();
-                        pawn.SetMood((byte)Core.Npc.GuestState.Alarmed);
+                        pawn.SetMood(NpcPawn.MoodWindup);
                         break;
                     case PursuitState.Winded:
                     case PursuitState.Stunned:
                     case PursuitState.Idle:
                         pawn.Stop();
                         pawn.LookAt(null);
-                        pawn.SetMood((byte)(o.State == PursuitState.Idle ? Core.Npc.GuestState.Calm : Core.Npc.GuestState.Curious));
+                        pawn.SetMood(o.State == PursuitState.Idle ? NpcPawn.MoodCalmAgain : o.State == PursuitState.Winded ? NpcPawn.MoodWinded : NpcPawn.MoodStunned);
                         break;
                     default: // Chase, Search, Return
                         pawn.GoTo(o.Destination);
                         pawn.LookAt(o.State == PursuitState.Chase ? o.Destination : (Vector3?)null);
-                        pawn.SetMood((byte)(o.State == PursuitState.Chase ? Core.Npc.GuestState.Alarmed : Core.Npc.GuestState.Curious));
+                        pawn.SetMood(o.State == PursuitState.Chase ? NpcPawn.MoodChasing : o.State == PursuitState.Search ? NpcPawn.MoodSearching : NpcPawn.MoodCalmAgain);
                         break;
                 }
                 c.Last = o.State;

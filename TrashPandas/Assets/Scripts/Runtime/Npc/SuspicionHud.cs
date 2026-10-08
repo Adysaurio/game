@@ -21,6 +21,32 @@ namespace TrashPandas.Runtime.Npc
                 d.ResetSuspicion();
         }
 
+        GUIStyle _bubble;
+        static readonly string[] Chase = { "THIEF!", "RACCOON!", "GET IT!", "MY CAKE!", "COME BACK HERE!", "NOT TODAY!", "SECURITY!" };
+        static readonly string[] Search = { "where'd it go?", "here, kitty…?", "I KNOW you're here", "hmm…", "show yourself!" };
+        static readonly string[] Winded = { "huff… huff…", "too old for this", "*wheeze*", "gimme a sec…" };
+        static readonly string[] Stunned = { "@_@", "OW!", "my eye!", "who threw that?!" };
+
+        /// <summary>A line that fits the mood, stable for a few seconds per person.</summary>
+        static string PanicLine(NpcPawn pawn, byte mood)
+        {
+            int seed = pawn.name.GetHashCode() ^ (int)(Time.time / 3.5f);
+            string Pick(string[] lines) => lines[(seed & 0x7fffffff) % lines.Length];
+            switch (mood)
+            {
+                case NpcPawn.MoodWindup: return "!!";
+                case NpcPawn.MoodChasing:
+                    if (pawn.Kind == NpcKind.Cat) return "HSSSS!";
+                    if (pawn.SpeakerId == "MotherInLaw") return "THERE! GET IT!";
+                    if (pawn.SpeakerId == "Priest") return "LORD HAVE MERCY";
+                    return Pick(Chase);
+                case NpcPawn.MoodSearching: return Pick(Search);
+                case NpcPawn.MoodWinded: return Pick(Winded);
+                case NpcPawn.MoodStunned: return Pick(Stunned);
+                default: return null;
+            }
+        }
+
         void OnGUI()
         {
             if (TrashPandas.Runtime.Squad.RoundIntro.Playing) return; // the intro has the screen
@@ -48,6 +74,27 @@ namespace TrashPandas.Runtime.Npc
                 var pawn = brain.Pawn;
                 if (!pawn) continue;
                 string icon = null; Color color = Color.white;
+                if (pawn.Mood >= NpcPawn.MoodChasing)
+                {
+                    // The RUN: little speech bubbles with personality (Goose-style reactions).
+                    string line = PanicLine(pawn, pawn.Mood);
+                    if (line == null) continue;
+                    Vector3 bp = cam.WorldToScreenPoint(pawn.Eye + Vector3.up * 0.6f);
+                    if (bp.z <= 0f || bp.z > 30f) continue;
+                    Vector2 q = UiScale.FromScreen(bp);
+                    bool windup = pawn.Mood == NpcPawn.MoodWindup;
+                    var style = windup ? _icon : (_bubble ??= new GUIStyle(GUI.skin.label) { fontSize = 15, fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleCenter });
+                    float bw = windup ? 60f : Mathf.Max(70f, line.Length * 10.5f + 18f);
+                    if (!windup)
+                    {
+                        GUI.color = new Color(1f, 1f, 1f, 0.92f);
+                        GUI.DrawTexture(new Rect(q.x - bw / 2f, q.y - 14f, bw, 26f), Texture2D.whiteTexture);
+                    }
+                    GUI.color = windup ? new Color(1f, 0.2f, 0.15f, 0.6f + 0.4f * Mathf.PingPong(Time.time * 6f, 1f)) : new Color(0.1f, 0.1f, 0.12f);
+                    GUI.Label(new Rect(q.x - bw / 2f, q.y - 14f, bw, 26f), line, style);
+                    GUI.color = Color.white;
+                    continue;
+                }
                 if (pawn.Kind == NpcKind.Cat)
                 {
                     var s = (CatState)pawn.Mood;
