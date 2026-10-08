@@ -111,6 +111,18 @@ namespace TrashPandas.Runtime.Net
         [Rpc(SendTo.Owner)]
         public void FreezeRpc(Vector3 jail) { Controller.Frozen = true; Controller.TeleportTo(jail); }
 
+        /// <summary>Owner → host: my raccoon bumped a light prop (props are host-simulated).</summary>
+        [Rpc(SendTo.Server)]
+        public void PushPropRpc(int itemIndex, Vector3 impulse, Vector3 at, RpcParams rpc = default)
+        {
+            var carry = Squad.CarryDirector.Instance;
+            if (rpc.Receive.SenderClientId != OwnerClientId || !carry || itemIndex < 0 || itemIndex >= carry.Items.Count) return;
+            var g = carry.Items[itemIndex];
+            if (!g || g.IsHeld || !g.Body || g.Body.isKinematic || g.Body.mass > 2f) return;
+            if (Vector3.Distance(g.transform.position, transform.position) > 2.5f) return; // sanity
+            g.Body.AddForceAtPosition(Vector3.ClampMagnitude(impulse, 4f), at, ForceMode.Impulse);
+        }
+
         /// <summary>Host → owner: a friend opened the cage.</summary>
         [Rpc(SendTo.Owner)]
         public void UnfreezeRpc() => Controller.Frozen = false;

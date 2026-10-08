@@ -346,6 +346,7 @@ namespace TrashPandas.EditorTools
             pd.ArchRadius = 1.8f;
             // The pet carrier for caught raccoons, by the house door (friends can free them).
             pd.CagePosition = new Vector3(-4.5f, 0f, 16.2f);
+            pd.CageRadius = 1.4f;
             var cageMat = Mat("Cage", new Color(0.55f, 0.75f, 0.95f));
             var cage = new GameObject("PetCarrier").transform;
             cage.position = pd.CagePosition;

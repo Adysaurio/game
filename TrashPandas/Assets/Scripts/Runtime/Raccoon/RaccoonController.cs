@@ -97,7 +97,9 @@ namespace TrashPandas.Runtime.Raccoon
             if (!ReferenceEquals(Mount, null)) Dismount(Vector3.zero);
             bool was = _cc.enabled;
             _cc.enabled = false;
-            transform.position = position;
+            var nt = GetComponent<Unity.Netcode.Components.NetworkTransform>();
+            if (nt && nt.IsSpawned && nt.CanCommitToTransform) nt.Teleport(position, transform.rotation, transform.localScale); // remote copies jump, they don't slide
+            else transform.position = position;
             _cc.enabled = was;
             _planar = Vector3.zero;
             _verticalVelocity = 0f;
@@ -153,6 +155,7 @@ namespace TrashPandas.Runtime.Raccoon
         /// <summary>Knocked by a broom (or the cat): flung along <paramref name="impulse"/> and dizzy for a moment.</summary>
         public void ApplyHit(Vector3 impulse, float stunSeconds)
         {
+            if (Frozen) return; // caged: nothing knocks you out of the carrier
             // Juice: if this is the raccoon on my screen, the camera feels it.
             var shake = Cameras.CameraShake.Instance;
             var cam = Camera.main;
@@ -249,12 +252,23 @@ namespace TrashPandas.Runtime.Raccoon
             if (!grounded && _verticalVelocity < 0f && AutoMount && (_jumpedSinceGrounded || DroppedFromAbove)) TryLandOnHead();
         }
 
+        float _nextPush;
+
         /// <summary>Bumping into light things knocks them about (Astro Bot: every touch gets a reaction).</summary>
         void OnControllerColliderHit(ControllerColliderHit hit)
         {
             var rb = hit.rigidbody;
-            if (!rb || rb.isKinematic || rb.mass > 2f || hit.moveDirection.y < -0.3f) return;
-            rb.AddForceAtPosition(new Vector3(hit.moveDirection.x, 0.15f, hit.moveDirection.z) * (1.2f + _planar.magnitude * 0.35f), hit.point, ForceMode.Impulse);
+            if (!rb || rb.mass > 2f || hit.moveDirection.y < -0.3f || Time.time < _nextPush) return;
+            Vector3 impulse = new Vector3(hit.moveDirection.x, 0.15f, hit.moveDirection.z) * (1.2f + _planar.magnitude * 0.35f);
+            if (!rb.isKinematic) { rb.AddForceAtPosition(impulse, hit.point, ForceMode.Impulse); return; }
+            // Online client: props are simulated by the host; ask it to push.
+            var net = GetComponent<Net.NetworkedRaccoon>();
+            var g = rb.GetComponent<Grabbing.Grabbable>();
+            if (net && net.IsSpawned && !net.IsServer && g && !g.IsHeld && Squad.CarryDirector.Instance)
+            {
+                _nextPush = Time.time + 0.15f;
+                net.PushPropRpc(Squad.CarryDirector.Instance.IndexOf(g), impulse, hit.point);
+            }
         }
 
         /// <summary>Off for raccoons this machine doesn't own (their owner decides).</summary>

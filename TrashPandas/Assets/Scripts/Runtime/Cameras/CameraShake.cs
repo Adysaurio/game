@@ -13,6 +13,7 @@ namespace TrashPandas.Runtime.Cameras
 
         void Awake() { Instance = this; _seed = Random.value * 100f; }
         void OnDestroy() { if (Instance == this) Instance = null; Time.timeScale = 1f; }
+        void OnDisable() { if (_hitStopUntil > 0f) { _hitStopUntil = 0f; Time.timeScale = 1f; } }
 
         /// <summary>Add trauma (0..1). The shake grows with trauma squared, so small kicks stay subtle.</summary>
         public void Kick(float trauma) => _trauma = Mathf.Clamp01(_trauma + trauma);

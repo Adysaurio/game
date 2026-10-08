@@ -79,7 +79,7 @@ namespace TrashPandas.Runtime.Panic
         public int MaxChasersPerRaccoon = 2;
         [Tooltip("Where caught raccoons wait; a free friend standing next to it opens it.")]
         public Vector3 CagePosition;
-        public float CageRadius = 1.4f;
+        public float CageRadius = 0f; // the scene builder enables the cage
         public float RescueSeconds = 1f;
         public float ThrowStunSeconds = 1.8f;
         float _rescueProgress;
@@ -336,7 +336,7 @@ namespace TrashPandas.Runtime.Panic
 
                 var o = c.Mind.Update(dt, new PursuitInput { Self = pawn.transform.position, HasWeapon = hasWeapon || c.IsCat, Weapon = weaponPos, Visible = assigned[i] });
                 // The mother-in-law screams the moment she spots one: everyone nearby comes to look.
-                if (c.Screams && o.State == PursuitState.Chase && c.Last != PursuitState.Chase && assigned[i].HasValue)
+                if (c.Screams && o.State == PursuitState.Chase && (c.Last == PursuitState.Idle || c.Last == PursuitState.Return || c.Last == PursuitState.Search) && assigned[i].HasValue)
                     foreach (var other in _chasers)
                         if (other != c && other.Brain.Pawn && Vector3.Distance(other.Brain.Pawn.transform.position, pawn.transform.position) < 12f)
                             other.Mind.Hear(assigned[i].Value.Position);
@@ -371,6 +371,7 @@ namespace TrashPandas.Runtime.Panic
                 c.Last = o.State;
 
                 if (!o.Strike || !_grace.MayHit(now) || !_raccoonOf.TryGetValue(o.TargetId, out var target)) continue;
+                if (_outcome.StatusOf(o.TargetId) != PlayerOutcome.Running || target.Frozen) continue; // already caged
                 Vector3 to = target.transform.position - pawn.transform.position;
                 to.y = 0f;
                 if (to.magnitude > c.Mind.P.SwingRange + 0.4f) continue; // dodged!
@@ -399,13 +400,14 @@ namespace TrashPandas.Runtime.Panic
                 foreach (int p in _players)
                     if (_outcome.StatusOf(p) == PlayerOutcome.Caught) { Payout.Caught(p); TrashPandas.Runtime.Loot.LootDirector.Instance?.DropMouth(p); }
                 SetPhase(RoundPhase.Results);
+                foreach (var c in _chasers) if (c.Brain.Pawn) { c.Brain.Pawn.Stop(); c.Brain.Pawn.SetMood(NpcPawn.MoodCalmAgain); }
             }
             Publish();
         }
 
         void Publish()
         {
-            var snap = new PanicSnapshot { SecondsLeft = _outcome.SecondsLeft(Time.time), CleanExit = _cleanExit };
+            var snap = new PanicSnapshot { SecondsLeft = _outcome.SecondsLeft(Time.time), CleanExit = _cleanExit, RescuePercent = (byte)Mathf.RoundToInt(RescueProgress01Host * 100f) };
             var roster = SimulationAuthority.IsOnline && SessionHost.Instance ? SessionHost.Instance.Roster : null;
             foreach (int p in _players)
             {
@@ -435,7 +437,7 @@ namespace TrashPandas.Runtime.Panic
         void Cage(RaccoonController r)
         {
             int slot = CagedCount() - 1;
-            Vector3 at = CagePosition + new Vector3(-0.5f + (slot % 3) * 0.5f, 0.1f, 0f);
+            Vector3 at = CagePosition + new Vector3(-0.7f + (slot % 5) * 0.35f, 0.1f, 0f);
             r.CollapseTower();
             Freeze(r, at);
         }
@@ -481,7 +483,9 @@ namespace TrashPandas.Runtime.Panic
 
         readonly List<int> _rescuers = new List<int>();
 
-        public float RescueProgress01 => RescueSeconds > 0f ? Mathf.Clamp01(_rescueProgress / RescueSeconds) : 0f;
+        float RescueProgress01Host => RescueSeconds > 0f ? Mathf.Clamp01(_rescueProgress / RescueSeconds) : 0f;
+        /// <summary>0..1 on every machine (replicated in the snapshot).</summary>
+        public float RescueProgress01 => Snapshot.RescuePercent / 100f;
 
         /// <summary>Debug squad: when the raccoon you drive is caught, you take over the next free one (to go and rescue).</summary>
         void HandOverBeforeCatch(int caught)
@@ -489,7 +493,7 @@ namespace TrashPandas.Runtime.Panic
             var squad = Squad.SquadController.Instance;
             if (SimulationAuthority.IsOnline || !squad || squad.ActivePlayerId != caught) return;
             int next = squad.ActivateNextFree(caught);
-            if (next >= 0 && _outcome.Join(next)) _players.Add(next);
+            if (next >= 0 && _outcome.Join(next)) { _players.Add(next); AddDeliveredShare(next); }
         }
 
         /// <summary>Debug squad: switching to another raccoon mid-panic brings it into the run (to go and rescue).</summary>
@@ -498,7 +502,13 @@ namespace TrashPandas.Runtime.Panic
             var squad = Squad.SquadController.Instance;
             if (SimulationAuthority.IsOnline || !squad || !squad.Active) return;
             int p = squad.ActivePlayerId;
-            if (_outcome.Join(p)) _players.Add(p);
+            if (_outcome.Join(p)) { _players.Add(p); AddDeliveredShare(p); }
+        }
+
+        void AddDeliveredShare(int p)
+        {
+            var loot = TrashPandas.Runtime.Loot.LootDirector.Instance;
+            if (loot && Squad.GameMode.Raccoons) Payout.AddShare(p, loot.Ledger.Of(p));
         }
 
         static void Unfreeze(RaccoonController r)

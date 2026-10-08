@@ -183,13 +183,7 @@ namespace TrashPandas.Runtime.Squad
             return true;
         }
 
-        /// <summary>"rescue": raccoon 0 stands in the open until caught; then we switch to raccoon 1 and walk it to the cage.</summary>
-        public static bool RescueTick(System.Collections.Generic.IReadOnlyList<RaccoonController> squad, ref int active)
-        {
-            var pd = Panic.PanicDirector.Instance;
-            return false; // the director hands control over automatically when raccoon 0 is caught
-        }
-
+        /// <summary>"rescue": raccoon 0 stands in the open until caught (the director then hands control to the next one), which walks to the cage.</summary>
         public static Vector2? RescueMove(RaccoonController r)
         {
             var pd = Panic.PanicDirector.Instance;

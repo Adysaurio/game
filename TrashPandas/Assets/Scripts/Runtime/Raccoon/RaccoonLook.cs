@@ -22,6 +22,7 @@ namespace TrashPandas.Runtime.Raccoon
             new Color(0.3f, 0.8f, 0.35f), new Color(0.7f, 0.35f, 0.9f),
         };
 
+        static Material s_dustMaterial;
         RaccoonController _raccoon;
         Vector3 _lastPos;
         float _vy, _lastVy, _squash, _stretch, _phase, _nextBlink, _blinkT = -1f, _dustCooldown;
@@ -71,7 +72,8 @@ namespace TrashPandas.Runtime.Raccoon
                       new[] { new GradientAlphaKey(0.8f, 0f), new GradientAlphaKey(0f, 1f) });
             color.color = g;
             var r = go.GetComponent<ParticleSystemRenderer>();
-            r.sharedMaterial = new Material(Shader.Find("Universal Render Pipeline/Particles/Unlit") ?? Shader.Find("Sprites/Default"));
+            s_dustMaterial ??= new Material(Shader.Find("Universal Render Pipeline/Particles/Unlit") ?? Shader.Find("Sprites/Default"));
+            r.sharedMaterial = s_dustMaterial;
             return ps;
         }
 

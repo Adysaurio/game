@@ -78,6 +78,8 @@ namespace TrashPandas.Runtime.Squad
             if (!raccoon || !_carry.ContainsKey(raccoon.PlayerId)) return;
             var g = _items[_carry[raccoon.PlayerId]];
             if (g.RequiresBothHands) { Drop(raccoon.PlayerId, Vector3.zero); return; } // you can't throw the cake
+            var impact = g.GetComponent<ImpactNoise>();
+            if (impact) impact.ThrownUntil = Time.time + 2f;
             Drop(raccoon.PlayerId, direction.normalized * Mathf.Lerp(3f, 10f, strength) + Vector3.up * 2.5f);
         }
 
@@ -233,13 +235,15 @@ namespace TrashPandas.Runtime.Squad
     public sealed class ImpactNoise : MonoBehaviour
     {
         float _quietUntil;
+        /// <summary>Only things a raccoon threw (recently) daze a human — not a plate kicked by accident.</summary>
+        [System.NonSerialized] public float ThrownUntil;
         void OnCollisionEnter(Collision c)
         {
             if (!SimulationAuthority.IsSimulating || Time.timeSinceLevelLoad < 2f || Time.time < _quietUntil) return;
             if (c.relativeVelocity.magnitude < 3f) return;
             // A plate to the face: a panicked human is dazed for a moment (the co-op answer to a chase).
             var pawn = c.collider.GetComponentInParent<Npc.NpcPawn>();
-            if (pawn && Panic.PanicDirector.Instance && Panic.PanicDirector.Instance.Phase == Panic.RoundPhase.Panic)
+            if (pawn && Time.time < ThrownUntil && Panic.PanicDirector.Instance && Panic.PanicDirector.Instance.Phase == Panic.RoundPhase.Panic)
                 Panic.PanicDirector.Instance.StunChaser(pawn);
             _quietUntil = Time.time + 0.5f;
             NoiseBus.Emit(NoiseKind.Crash, transform.position);
