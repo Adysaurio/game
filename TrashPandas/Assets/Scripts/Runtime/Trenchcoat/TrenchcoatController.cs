@@ -131,6 +131,65 @@ namespace TrashPandas.Runtime.Trenchcoat
         }
 
         /// <summary>Over-the-shoulder when the active role aims hands; wide when it walks.</summary>
+        /// <summary>Dev automation: walk to the nearest wallet, grab it, hold it against the chest (Q).</summary>
+        readonly System.Collections.Generic.HashSet<TrashPandas.Runtime.Loot.LootItem> _botSkip = new System.Collections.Generic.HashSet<TrashPandas.Runtime.Loot.LootItem>();
+        Vector3 _botLastPos;
+        UnityEngine.AI.NavMeshPath _botPath;
+        float _botStuck;
+
+        void BotStash(ref SlotInput live)
+        {
+            var grabber = Body.GetComponent<TrashPandas.Runtime.Grabbing.HandGrabber>();
+            var held = grabber ? (grabber.HeldLeft ? grabber.HeldLeft : grabber.HeldRight) : null;
+            bool holding = held && held.GetComponent<TrashPandas.Runtime.Loot.LootItem>();
+            live.GrabOne = holding;
+            if (held && !holding) { live.GrabOne = false; return; } // grabbed the wrong thing: let go
+            if (holding)
+            {
+                live.Move = Vector2.zero;
+                live.AimPoint = Body.ChestWorld + Body.transform.forward * 0.15f;
+                live.HasAimPoint = true;
+                return;
+            }
+            TrashPandas.Runtime.Loot.LootItem best = null;
+            float bestD = float.MaxValue;
+            foreach (var item in FindObjectsByType<TrashPandas.Runtime.Loot.LootItem>(FindObjectsSortMode.None))
+            {
+                if (item.State != TrashPandas.Runtime.Loot.LootState.Active || _botSkip.Contains(item)) continue;
+                float d = Vector3.Distance(item.transform.position, Body.transform.position);
+                if (d < bestD) { bestD = d; best = item; }
+            }
+            if (!best) return;
+            Vector3 to = best.transform.position - Body.transform.position;
+            to.y = 0f;
+            // Stuck against a table with the item out of reach: try another one.
+            if (Body.transform.position.sqrMagnitude > 0.01f && (Body.transform.position - _botLastPos).magnitude < 0.02f && to.magnitude > 1.2f)
+            { if ((_botStuck += Time.deltaTime) > 1f) { _botSkip.Add(best); _botStuck = 0f; } }
+            else _botStuck = 0f;
+            _botLastPos = Body.transform.position;
+            if (Time.frameCount % 60 == 0) Debug.Log($"[BOT] target={best.name} at {best.transform.position} dist={to.magnitude:F2} skipped={_botSkip.Count} grab={to.magnitude < 1.4f}");
+            // Walk the navmesh to a free spot beside the item, then reach for it.
+            Vector3 dir = to;
+            if (to.magnitude > 0.85f && UnityEngine.AI.NavMesh.SamplePosition(new Vector3(best.transform.position.x, 0f, best.transform.position.z) - to.normalized * 0.75f, out var near, 1.2f, UnityEngine.AI.NavMesh.AllAreas)
+                && UnityEngine.AI.NavMesh.SamplePosition(Body.transform.position, out var me, 1.5f, UnityEngine.AI.NavMesh.AllAreas))
+            {
+                _botPath ??= new UnityEngine.AI.NavMeshPath();
+                if (UnityEngine.AI.NavMesh.CalculatePath(me.position, near.position, UnityEngine.AI.NavMesh.AllAreas, _botPath) && _botPath.corners.Length > 1)
+                {
+                    var corner = _botPath.corners[1];
+                    dir = corner - Body.transform.position;
+                    dir.y = 0f;
+                    if (dir.magnitude < 0.3f && _botPath.corners.Length > 2) { dir = _botPath.corners[2] - Body.transform.position; dir.y = 0f; }
+                }
+            }
+            bool arrived = to.magnitude <= 0.85f;
+            live.Move = arrived ? Vector2.zero : new Vector2(dir.x, dir.z).normalized;
+            live.GrabOne = to.magnitude < 1.4f;
+            live.AimPoint = best.transform.position;
+            live.HasAimPoint = true;
+            live.PreferLeftHand = Vector3.Dot(to, Body.transform.right) < 0f;
+        }
+
         void UpdateCoatCamera()
         {
             if (_possession.ActiveIsOutside) return;
@@ -182,6 +241,7 @@ namespace TrashPandas.Runtime.Trenchcoat
             {
                 var live = TrashPandas.Core.Events.ConversationInput.Filter(_reader.ReadSlotInput(CameraRig, Body, now), engaged);
                 if (Net.DevAutomation.Bot == "walk") live.Move = new Vector2(0f, 1f); // dev automation
+                if (Net.DevAutomation.Bot == "stash") BotStash(ref live);
                 if (Net.DevAutomation.Bot == "walkgrab") { live.Move = Body.transform.position.z < 2.6f ? new Vector2(0f, 1f) : Vector2.zero; live.GrabOne = true; }
                 if (Net.DevAutomation.Bot == "tocat") live.Move = TowardCat();
                 _inputs[_possession.ActivePlayerId] = live; // you always override your own ghost

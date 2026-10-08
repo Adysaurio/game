@@ -110,14 +110,21 @@ namespace TrashPandas.EditorTools
 
             // Things to grab: glasses, plates and wallets on every table; a two-hand cake on the far middle table.
             const float tableTop = 0.85f;
+            var lootSpots = new System.Collections.Generic.List<Vector3>();
             for (int i = 0; i < 6; i++)
             {
                 var t = new Vector3(-6f + (i % 3) * 6f, 0f, 4f + (i / 3) * 5f);
                 Prop($"Glass_{i}a", PrimitiveType.Cylinder, t + new Vector3(-0.6f, tableTop + 0.1f, -0.35f), new Vector3(0.08f, 0.1f, 0.08f), glass, 0.2f, false);
                 Prop($"Glass_{i}b", PrimitiveType.Cylinder, t + new Vector3(0.5f, tableTop + 0.1f, -0.4f), new Vector3(0.08f, 0.1f, 0.08f), glass, 0.2f, false);
                 Prop($"Plate_{i}", PrimitiveType.Cylinder, t + new Vector3(0f, tableTop + 0.02f, -0.3f), new Vector3(0.28f, 0.015f, 0.28f), plate, 0.4f, false);
-                Prop($"Wallet_{i}", PrimitiveType.Cube, t + new Vector3(0.75f, tableTop + 0.03f, 0.2f), new Vector3(0.2f, 0.05f, 0.12f), wallet, 0.3f, false);
+                Prop($"Wallet_{i}", PrimitiveType.Cube, t + new Vector3(0.75f, tableTop + 0.03f, 0.2f), new Vector3(0.2f, 0.05f, 0.12f), wallet, 0.3f, false)
+                    .AddComponent<TrashPandas.Runtime.Loot.LootItem>().Kind = TrashPandas.Core.Loot.LootKind.Wallet;
+                lootSpots.Add(t + new Vector3(0.75f, tableTop + 0.03f, -0.4f));
+                lootSpots.Add(t + new Vector3(-0.75f, tableTop + 0.03f, 0.4f));
             }
+            var lootDirector = new GameObject("LootDirector");
+            lootDirector.AddComponent<NetworkObject>();
+            lootDirector.AddComponent<TrashPandas.Runtime.Loot.LootDirector>().LootSpots = lootSpots.ToArray();
             var cakeGo = Prop("Cake", PrimitiveType.Cylinder, new Vector3(0f, tableTop + 0.2f, 8.6f), new Vector3(0.5f, 0.2f, 0.5f), cake, 3f, true);
             Visual(PrimitiveType.Cylinder, "Tier2", cakeGo.transform, new Vector3(0f, 1.4f, 0f), new Vector3(0.65f, 0.6f, 0.65f), cake);
 

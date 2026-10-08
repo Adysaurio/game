@@ -1,4 +1,6 @@
 using System.Collections;
+using System.Collections.Generic;
+using TrashPandas.Core.Grabbing;
 using TrashPandas.Runtime.Trenchcoat;
 using UnityEngine;
 
@@ -12,6 +14,8 @@ namespace TrashPandas.Runtime.Grabbing
     public sealed class HandGrabber : MonoBehaviour
     {
         public float GrabRadius = 0.25f;
+        [Tooltip("An aim point this close to an item locks the hand onto it.")]
+        public float LockRadius = 0.2f;
         public float TwoHandGrabRadius = 0.45f;
         public float ThrowMultiplier = 1.6f;
         public float IgnoreCoatAfterThrow = 0.35f;
@@ -60,8 +64,9 @@ namespace TrashPandas.Runtime.Grabbing
 
             if (!_both && leftReach && rightReach && !_left && !_right)
                 TryGrab(ref _both, _twoHandAnchor, TwoHandGrabRadius, bigOnly: true);
-            if (!_both && leftReach && !_left) TryGrab(ref _left, _body.LeftHand, GrabRadius, bigOnly: false);
-            if (!_both && rightReach && !_right) TryGrab(ref _right, _body.RightHand, GrabRadius, bigOnly: false);
+            var intent = _body.CurrentIntent;
+            if (!_both && leftReach && !_left) TryGrab(ref _left, _body.LeftHand, GrabRadius, bigOnly: false, intent.HasLeftPoint, intent.LeftPoint);
+            if (!_both && rightReach && !_right) TryGrab(ref _right, _body.RightHand, GrabRadius, bigOnly: false, intent.HasRightPoint, intent.RightPoint);
 
             // Carried items follow their holder (hand or two-hand anchor), keeping their own scale.
             foreach (var pair in _holders)
@@ -71,6 +76,15 @@ namespace TrashPandas.Runtime.Grabbing
             }
         }
 
+        /// <summary>Let go of one specific item (it was put in the pocket), without throwing it.</summary>
+        public void Drop(Grabbable g)
+        {
+            if (!g) return;
+            if (_both == g) Release(ref _both, Vector3.zero);
+            else if (_left == g) Release(ref _left, Vector3.zero);
+            else if (_right == g) Release(ref _right, Vector3.zero);
+        }
+
         public void ReleaseAll()
         {
             if (_both) Release(ref _both, Vector3.zero);
@@ -78,13 +92,33 @@ namespace TrashPandas.Runtime.Grabbing
             if (_right) Release(ref _right, Vector3.zero);
         }
 
-        void TryGrab(ref Grabbable slot, Transform holder, float radius, bool bigOnly)
+        static int IndexInAll(Grabbable g)
         {
+            var all = Grabbable.All;
+            for (int i = 0; i < all.Count; i++) if (all[i] == g) return i;
+            return -1;
+        }
+
+        readonly List<GrabCandidate> _lockCandidates = new List<GrabCandidate>();
+
+        void TryGrab(ref Grabbable slot, Transform holder, float radius, bool bigOnly, bool hasAim = false, Vector3 aim = default)
+        {
+            // If the hand is aiming at a specific item, only that one may be grabbed.
+            int? locked = null;
+            if (hasAim)
+            {
+                _lockCandidates.Clear();
+                var all = Grabbable.All;
+                for (int i = 0; i < all.Count; i++)
+                    if (all[i] && !all[i].IsHeld && all[i].RequiresBothHands == bigOnly)
+                        _lockCandidates.Add(new GrabCandidate { Id = i, Position = all[i].transform.position });
+                locked = GrabTargeting.LockedTarget(aim, _lockCandidates, LockRadius);
+            }
             int count = Physics.OverlapSphereNonAlloc(holder.position, radius, _hits, ~0, QueryTriggerInteraction.Ignore);
             for (int i = 0; i < count; i++)
             {
                 var g = _hits[i].GetComponentInParent<Grabbable>();
-                if (!g || g.IsHeld || g.RequiresBothHands != bigOnly) continue;
+                if (!g || g.IsHeld || g.RequiresBothHands != bigOnly || !GrabTargeting.MayGrab(IndexInAll(g), locked)) continue;
                 Attach(g, holder);
                 slot = g;
                 return;

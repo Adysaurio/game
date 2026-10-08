@@ -163,6 +163,8 @@ namespace TrashPandas.Runtime.Net
             if (ed) { var es = ed.Snapshot; panic += $" event={ed.Phase}#{es.Serial}:{ed.Current.Speaker} t={es.SecondsLeft:F1} result={es.ResultDelta:F0}[{es.HeadOutcome}{es.ArmsOutcome}{es.LegsOutcome}] tasks={ed.Current.Arms}/{ed.Current.Legs}"; }
             var rig = UnityEngine.Object.FindFirstObjectByType<TrashPandas.Runtime.Cameras.PlayerCameraRig>();
             if (rig) panic += $" cam={(rig.VirtualCamera.Follow ? rig.VirtualCamera.Follow.name : "-")}{(rig.InConversation ? "(talk)" : "")}";
+            var ld = TrashPandas.Runtime.Loot.LootDirector.Instance;
+            if (ld) { var ls = ld.Snapshot; panic += $" pocket=${ls.Total} objectives={ls.ObjectivesPicked:X2}/{ls.ObjectivesDone:X2} clock={ls.SecondsLeft:F0}"; }
             return panic + $" suspicion={d.Suspicion:F1} caught={d.Caught} curious={curious} alarmed={alarmed} cat={cat} frame[missing={f.MissingParts} seen={f.CoatWitnessed} weird={f.SeenWeirdness:F2} hiss={f.CatHissing}] dt={Time.deltaTime:F3}";
         }
 
