@@ -164,6 +164,7 @@ namespace TrashPandas.Runtime.Squad
                 if (!r || r.PlayerId < 0) continue;
                 var g = ItemOf(r.PlayerId);
                 r.CarryFactor = g && g.RequiresBothHands ? (s.Lifted(r.PlayerId) ? HeavyCarrierSpeed : StrainSpeed) : 1f;
+                r.CarryingHeavy = g && g.RequiresBothHands;
             }
         }
 

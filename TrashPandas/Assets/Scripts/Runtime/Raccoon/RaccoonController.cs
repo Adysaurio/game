@@ -38,6 +38,77 @@ namespace TrashPandas.Runtime.Raccoon
         public bool IsStunned => Time.time < _stunnedUntil;
         public bool IsRunning => _runHeld && !_crouchHeld && _planar.sqrMagnitude > 1f;
         public bool IsSneaking => _crouchHeld;
+
+        // --- Raccoon towers ---------------------------------------------------------------------------
+        /// <summary>The raccoon I'm standing on (null = on my own feet).</summary>
+        public RaccoonController Mount { get; private set; }
+        /// <summary>Raised on the bottom raccoon's machine when the tower should fall (it ran, or got hit).</summary>
+        public event System.Action Collapsed;
+        /// <summary>Who can ride this raccoon right now (set by the carry state: not while hauling something heavy).</summary>
+        [System.NonSerialized] public bool CarryingHeavy;
+        /// <summary>Riders seen on this machine (anyone whose Mount is me, directly or higher up).</summary>
+        public int RidersAbove
+        {
+            get
+            {
+                int n = 0;
+                foreach (var r in All) if (r && r != this && r.IsAbove(this)) n++;
+                return n;
+            }
+        }
+        public RaccoonController Bottom { get { var b = this; while (b.Mount) b = b.Mount; return b; } }
+        public int TowerSize => 1 + Bottom.RidersAbove;
+        public Vector3 HeadTop => transform.position + Vector3.up * (StandHeight + 0.02f);
+
+        bool IsAbove(RaccoonController other) { var m = Mount; while (m) { if (m == other) return true; m = m.Mount; } return false; }
+
+        static readonly System.Collections.Generic.List<RaccoonController> All = new System.Collections.Generic.List<RaccoonController>();
+        void OnEnable() { All.RemoveAll(r => !r); if (!All.Contains(this)) All.Add(this); }
+        void OnDisable() { All.Remove(this); if (Mount) Dismount(Vector3.zero); }
+
+        /// <summary>Stand on <paramref name="target"/>'s head (if the tower rules allow it).</summary>
+        public bool TryMount(RaccoonController target)
+        {
+            if (!target || target == this || target.IsAbove(this)) return false;
+            // Climb to the top of that tower.
+            var top = target;
+            for (bool found = true; found;)
+            {
+                found = false;
+                foreach (var r in All) if (r && r != this && r.Mount == top) { top = r; found = true; break; }
+            }
+            if (!Core.Raccoons.TowerRules.CanMount(top.Bottom.CarryingHeavy, top.Frozen || top.Bottom.Frozen, top.TowerSize)) return false;
+            Mount = top;
+            _cc.enabled = false;
+            _planar = Vector3.zero;
+            _verticalVelocity = 0f;
+            return true;
+        }
+
+        /// <summary>Non-owner copy online: mirror who this raccoon stands on (for counting riders), no physics.</summary>
+        public void SetRemoteMount(RaccoonController mount) => Mount = mount;
+
+        public void Dismount(Vector3 push)
+        {
+            if (!Mount) return;
+            Mount = null;
+            if (!enabled) return;
+            _cc.enabled = true;
+            _planar = new Vector3(push.x, 0f, push.z);
+            _verticalVelocity = Mathf.Max(push.y, 2f);
+        }
+
+        /// <summary>Owner of the bottom raccoon: everyone above falls off.</summary>
+        public void CollapseTower()
+        {
+            Collapsed?.Invoke();
+            foreach (var r in All.ToArray())
+                if (r && r != this && r.IsAbove(this))
+                {
+                    var dir = Random.insideUnitCircle.normalized * 2.5f;
+                    r.Dismount(new Vector3(dir.x, 3f, dir.y));
+                }
+        }
         /// <summary>Raised where the noise happens (running is reported continuously by the owner).</summary>
         public event System.Action<Core.Raccoons.NoiseKind, Vector3> Noise;
         float _stunnedUntil;
@@ -56,6 +127,8 @@ namespace TrashPandas.Runtime.Raccoon
         /// <summary>Knocked by a broom (or the cat): flung along <paramref name="impulse"/> and dizzy for a moment.</summary>
         public void ApplyHit(Vector3 impulse, float stunSeconds)
         {
+            if (Mount) Dismount(impulse);
+            if (RidersAbove > 0 && Core.Raccoons.TowerRules.Collapses(false, bottomHit: true)) CollapseTower();
             _planar = new Vector3(impulse.x, 0f, impulse.z);
             _verticalVelocity = Mathf.Max(_verticalVelocity, 3f);
             _stunnedUntil = Mathf.Max(_stunnedUntil, Time.time + stunSeconds);
@@ -81,6 +154,15 @@ namespace TrashPandas.Runtime.Raccoon
         void Update()
         {
             float dt = Time.deltaTime;
+            if (Mount)
+            {
+                // Riding: stand on the head below; jump to hop off.
+                if (!Mount || !Mount.isActiveAndEnabled) { Dismount(Vector3.zero); return; }
+                transform.position = Mount.HeadTop;
+                if (_move.sqrMagnitude > 0.01f) transform.rotation = Quaternion.RotateTowards(transform.rotation, Quaternion.LookRotation(new Vector3(_move.x, 0f, _move.y)), TurnSpeed * dt);
+                if (_jump.TryConsume(Time.time)) { Dismount(transform.forward * 1.5f + Vector3.up * JumpVelocity); }
+                return;
+            }
             float height = _crouchHeld ? CrouchHeight : StandHeight;
             _cc.height = height;
             _cc.center = new Vector3(0f, height * 0.5f, 0f);
@@ -89,8 +171,10 @@ namespace TrashPandas.Runtime.Raccoon
             _jump.SetGrounded(grounded, Time.time);
 
             if (Frozen) { _move = Vector2.zero; }
+            int riders = RidersAbove;
+            if (riders > 0 && Core.Raccoons.TowerRules.Collapses(bottomRunning: _runHeld && _move.sqrMagnitude > 0.1f, bottomHit: false)) { CollapseTower(); riders = 0; }
             float speed = _crouchHeld ? SneakSpeed : _runHeld ? RunSpeed : WalkSpeed;
-            Vector3 wish = new Vector3(_move.x, 0f, _move.y) * speed * SpeedMultiplier * CarryFactor;
+            Vector3 wish = new Vector3(_move.x, 0f, _move.y) * speed * SpeedMultiplier * CarryFactor * Core.Raccoons.TowerRules.SpeedFactor(riders);
             if (grounded && !_wasGrounded && _verticalVelocity < -HardLandingSpeed) Noise?.Invoke(Core.Raccoons.NoiseKind.HardLanding, transform.position);
             _wasGrounded = grounded;
             float rate = IsStunned ? Deceleration * 0.25f : wish.sqrMagnitude > _planar.sqrMagnitude ? Acceleration : Deceleration;
@@ -121,6 +205,20 @@ namespace TrashPandas.Runtime.Raccoon
             }
 
             _cc.Move((_planar + Vector3.up * _verticalVelocity) * dt);
+            if (!grounded && _verticalVelocity < 0f && AutoMount) TryLandOnHead();
+        }
+
+        /// <summary>Off for raccoons this machine doesn't own (their owner decides).</summary>
+        [System.NonSerialized] public bool AutoMount = true;
+
+        void TryLandOnHead()
+        {
+            foreach (var r in All)
+            {
+                if (!r || r == this || r.IsAbove(this)) continue;
+                Vector3 d = transform.position - r.HeadTop;
+                if (Mathf.Abs(d.y) < 0.18f && new Vector2(d.x, d.z).magnitude < 0.3f) { TryMount(r); return; }
+            }
         }
 
         bool IsFacingClimbable()

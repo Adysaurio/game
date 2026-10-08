@@ -80,6 +80,31 @@ namespace TrashPandas.Runtime.Squad
             }
         }
 
+        /// <summary>"tower": raccoon 1 drops onto raccoon 0's head; 0 walks (slower), then runs (the tower falls).</summary>
+        public static void TowerTick(System.Collections.Generic.IReadOnlyList<RaccoonController> squad)
+        {
+            if (squad.Count < 2 || !squad[0] || !squad[1]) return;
+            float t = Time.timeSinceLevelLoad;
+            var bottom = squad[0];
+            var rider = squad[1];
+            if (t > 1f && !s_dropped)
+            {
+                s_dropped = true;
+                var cc = rider.GetComponent<CharacterController>();
+                cc.enabled = false;
+                rider.transform.position = bottom.HeadTop + Vector3.up * 0.4f;
+                cc.enabled = true;
+            }
+            for (int i = 2; i < squad.Count; i++) if (squad[i]) squad[i].SetInput(Vector2.zero, false, false, false);
+            rider.SetInput(Vector2.zero, false, false, false);
+            bool walk = t > 2.5f;
+            bool run = t > 6f;
+            bottom.SetInput(walk ? new Vector2(0f, -1f) : Vector2.zero, false, false, false, run);
+            if (Time.frameCount % 30 == 0)
+                Debug.Log($"[TOWER] t={t:F1} bottom={bottom.transform.position:F2} rider={rider.transform.position:F2} mounted={(rider.Mount == bottom)} riders={bottom.RidersAbove}");
+        }
+        static bool s_dropped;
+
         static float s_nextTap;
         public static bool FetchTap(RaccoonController r)
         {

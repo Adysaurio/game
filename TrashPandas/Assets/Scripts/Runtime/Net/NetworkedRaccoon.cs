@@ -1,5 +1,6 @@
 using TrashPandas.Runtime.Raccoon;
 using Unity.Netcode;
+using UnityEngine;
 
 namespace TrashPandas.Runtime.Net
 {
@@ -17,10 +18,44 @@ namespace TrashPandas.Runtime.Net
         /// <summary>Which player this raccoon is, for every machine (the host sets it before spawning).</summary>
         readonly NetworkVariable<int> _playerId = new NetworkVariable<int>(-1);
 
+        /// <summary>Player id of the raccoon I'm standing on (-1 = none). The owner writes it.</summary>
+        readonly NetworkVariable<int> _mountedOn = new NetworkVariable<int>(-1, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Owner);
+
         void Awake() => Controller = GetComponent<RaccoonController>();
+
+        void Update()
+        {
+            if (!IsSpawned) return;
+            if (IsOwner)
+            {
+                int m = Controller.Mount ? Controller.Mount.PlayerId : -1;
+                if (_mountedOn.Value != m) _mountedOn.Value = m;
+                return;
+            }
+            RaccoonController mount = null;
+            if (_mountedOn.Value >= 0)
+                foreach (var r in FindObjectsByType<RaccoonController>(FindObjectsSortMode.None)) if (r.PlayerId == _mountedOn.Value) { mount = r; break; }
+            if (Controller.Mount != mount) Controller.SetRemoteMount(mount);
+        }
+
+        /// <summary>Owner of the bottom raccoon → everyone: the tower falls; each owner knocks its own riders off.</summary>
+        [Rpc(SendTo.NotOwner)]
+        void CollapseRpc()
+        {
+            foreach (var r in FindObjectsByType<RaccoonController>(FindObjectsSortMode.None))
+            {
+                if (!r.enabled || r == Controller) continue; // only raccoons this machine moves
+                var m = r.Mount;
+                while (m && m != Controller) m = m.Mount;
+                if (!m) continue;
+                var dir = Random.insideUnitCircle.normalized * 2.5f;
+                r.Dismount(new Vector3(dir.x, 3f, dir.y));
+            }
+        }
 
         public override void OnNetworkSpawn()
         {
+            if (IsOwner) Controller.Collapsed += () => { if (IsSpawned) CollapseRpc(); };
             if (IsServer) _playerId.Value = Controller.PlayerId;
             else Controller.PlayerId = _playerId.Value;
             _playerId.OnValueChanged += (_, v) => Controller.PlayerId = v;

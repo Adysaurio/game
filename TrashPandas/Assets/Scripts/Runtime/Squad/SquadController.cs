@@ -85,6 +85,7 @@ namespace TrashPandas.Runtime.Squad
                 }
             }
             if (Net.DevAutomation.Bot == "heavy") { SquadBots.HeavyTick(_raccoons); return; }
+            if (Net.DevAutomation.Bot == "tower") { SquadBots.TowerTick(_raccoons); return; }
             for (int i = 0; i < _raccoons.Count; i++)
             {
                 var r = _raccoons[i];
