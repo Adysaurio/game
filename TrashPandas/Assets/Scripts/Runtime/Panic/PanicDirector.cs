@@ -65,9 +65,40 @@ namespace TrashPandas.Runtime.Panic
         sealed class Chaser
         {
             public NpcBrain Brain;
-            public ChaserMind Mind = new ChaserMind();
+            public PursuitMind Mind;
             public PanicWeapon Weapon;
+            public bool Screams; // the mother-in-law: "THERE!" sends nearby humans to look
             public bool IsCat => Brain.Pawn.Kind == NpcKind.Cat;
+            public PursuitState Last;
+        }
+
+        [Header("Escapable RUN")]
+        [Tooltip("How far a panicked human sees a raccoon (a sneaking one only half as far).")]
+        public float PanicSightRange = 14f;
+        public float PanicFov = 200f;
+        public int MaxChasersPerRaccoon = 2;
+        [Tooltip("Where caught raccoons wait; a free friend standing next to it opens it.")]
+        public Vector3 CagePosition;
+        public float CageRadius = 1.4f;
+        public float RescueSeconds = 1f;
+        public float ThrowStunSeconds = 1.8f;
+        float _rescueProgress;
+        readonly List<PursuitAssigner.Chaser> _assignInput = new List<PursuitAssigner.Chaser>();
+
+        /// <summary>Each human chases differently (Pac-Man ghosts): speed and personality.</summary>
+        (float speed, PursuitPersonality p, bool screams) PersonalityOf(NpcPawn pawn)
+        {
+            if (pawn.Kind == NpcKind.Cat) return (CatSpeed, new PursuitPersonality { SwingRange = 0.9f, Windup = 0.2f, SearchSeconds = 2.5f, ChaseBeforeWinded = 6f, WindedSeconds = 1.5f }, false);
+            if (pawn.Kind == NpcKind.Waiter) return (ChaserSpeed * 1.15f, new PursuitPersonality { ChaseBeforeWinded = 6f, WindedSeconds = 2.8f, SearchSeconds = 4f }, false);
+            if (pawn.SpeakerId == "MotherInLaw") return (ChaserSpeed * 0.8f, new PursuitPersonality { SearchSeconds = 9f, ChaseBeforeWinded = 14f, Windup = 0.7f }, true);
+            if (pawn.SpeakerId == "Priest") return (ChaserSpeed * 0.75f, new PursuitPersonality { SearchSeconds = 3f, Windup = 0.8f }, false);
+            return (ChaserSpeed, new PursuitPersonality(), false);
+        }
+
+        /// <summary>A thrown plate (or glass, or cake) hit a human: dazed for a moment.</summary>
+        public void StunChaser(NpcPawn pawn, float seconds = -1f)
+        {
+            foreach (var c in _chasers) if (c.Brain.Pawn == pawn) c.Mind.Stun(seconds > 0f ? seconds : ThrowStunSeconds);
         }
 
         public PlayerOutcome StatusOf(int player) => _outcome.StatusOf(player);
@@ -179,9 +210,10 @@ namespace TrashPandas.Runtime.Panic
             foreach (var brain in suspicion.Brains)
             {
                 if (!brain.Pawn) continue;
-                brain.Pawn.Panic(brain.Pawn.Kind == NpcKind.Cat ? CatSpeed : ChaserSpeed);
+                var (speed, personality, screams) = PersonalityOf(brain.Pawn);
+                brain.Pawn.Panic(speed);
                 brain.Pawn.SetMood((byte)Core.Npc.GuestState.Alarmed);
-                _chasers.Add(new Chaser { Brain = brain });
+                _chasers.Add(new Chaser { Brain = brain, Mind = new PursuitMind(brain.Pawn.transform.position, personality), Screams = screams });
             }
 
             // Everyone but the cat runs for the nearest free weapon.
@@ -262,8 +294,28 @@ namespace TrashPandas.Runtime.Panic
             }
 
             bool shocked = !_grace.ChasersMayMove(now);
+
+            // Who sees whom (line of sight; sneaking raccoons are harder to spot), then spread the pressure.
+            var suspicion = SuspicionDirector.Instance;
+            _assignInput.Clear();
             foreach (var c in _chasers)
             {
+                var sees = new List<ChaseTarget>();
+                var pawn = c.Brain.Pawn;
+                if (pawn && suspicion)
+                    foreach (var t in _targets)
+                    {
+                        if (!_raccoonOf.TryGetValue(t.Id, out var rr) || rr.Frozen) continue;
+                        float range = rr.IsSneaking ? PanicSightRange * 0.5f : PanicSightRange;
+                        if (suspicion.CanSee(pawn, rr.transform.position + Vector3.up * 0.3f, rr.transform, range, PanicFov)) sees.Add(t);
+                    }
+                _assignInput.Add(new PursuitAssigner.Chaser { Position = pawn ? pawn.transform.position : Vector3.zero, Sees = sees });
+            }
+            var assigned = PursuitAssigner.Assign(_assignInput, MaxChasersPerRaccoon);
+
+            for (int i = 0; i < _chasers.Count; i++)
+            {
+                var c = _chasers[i];
                 var pawn = c.Brain.Pawn;
                 if (!pawn) continue;
                 if (shocked)
@@ -277,30 +329,63 @@ namespace TrashPandas.Runtime.Panic
                 if (c.Weapon && c.Weapon.Holder && c.Weapon.Holder != pawn) c.Weapon = null; // someone else got it
                 Vector3? weaponPos = !c.IsCat && c.Weapon && !hasWeapon ? c.Weapon.transform.position : (Vector3?)null;
 
-                var o = c.Mind.Update(dt, pawn.transform.position, hasWeapon, weaponPos, _targets);
-                if (o.State == ChaserState.FetchWeapon && Vector3.Distance(pawn.transform.position, o.Destination) < 1.1f) c.Weapon.PickUp(pawn);
-                pawn.GoTo(o.Destination);
-                pawn.LookAt(o.State == ChaserState.Chase ? o.Destination : (Vector3?)null);
+                var o = c.Mind.Update(dt, new PursuitInput { Self = pawn.transform.position, HasWeapon = hasWeapon || c.IsCat, Weapon = weaponPos, Visible = assigned[i] });
+                // The mother-in-law screams the moment she spots one: everyone nearby comes to look.
+                if (c.Screams && o.State == PursuitState.Chase && c.Last != PursuitState.Chase && assigned[i].HasValue)
+                    foreach (var other in _chasers)
+                        if (other != c && other.Brain.Pawn && Vector3.Distance(other.Brain.Pawn.transform.position, pawn.transform.position) < 12f)
+                            other.Mind.Hear(assigned[i].Value.Position);
 
-                if (!o.Swing || !_grace.MayHit(now) || !_raccoonOf.TryGetValue(o.TargetId, out var target)) continue;
+                switch (o.State)
+                {
+                    case PursuitState.FetchWeapon:
+                        if (Vector3.Distance(pawn.transform.position, o.Destination) < 1.1f) c.Weapon.PickUp(pawn);
+                        pawn.GoTo(o.Destination);
+                        pawn.LookAt(null);
+                        break;
+                    case PursuitState.Windup:
+                        // The telegraph: stop, face the raccoon, raise the weapon. Time to dodge.
+                        pawn.Stop();
+                        if (_raccoonOf.TryGetValue(o.TargetId, out var wt)) pawn.LookAt(wt.transform.position);
+                        if (c.Last != PursuitState.Windup && c.Weapon) c.Weapon.PlaySwing();
+                        pawn.SetMood((byte)Core.Npc.GuestState.Alarmed);
+                        break;
+                    case PursuitState.Winded:
+                    case PursuitState.Stunned:
+                    case PursuitState.Idle:
+                        pawn.Stop();
+                        pawn.LookAt(null);
+                        pawn.SetMood((byte)(o.State == PursuitState.Idle ? Core.Npc.GuestState.Calm : Core.Npc.GuestState.Curious));
+                        break;
+                    default: // Chase, Search, Return
+                        pawn.GoTo(o.Destination);
+                        pawn.LookAt(o.State == PursuitState.Chase ? o.Destination : (Vector3?)null);
+                        pawn.SetMood((byte)(o.State == PursuitState.Chase ? Core.Npc.GuestState.Alarmed : Core.Npc.GuestState.Curious));
+                        break;
+                }
+                c.Last = o.State;
+
+                if (!o.Strike || !_grace.MayHit(now) || !_raccoonOf.TryGetValue(o.TargetId, out var target)) continue;
                 Vector3 to = target.transform.position - pawn.transform.position;
                 to.y = 0f;
-                if (to.magnitude > c.Mind.SwingRange + 0.3f) continue;
+                if (to.magnitude > c.Mind.P.SwingRange + 0.4f) continue; // dodged!
                 Vector3 dir = to.sqrMagnitude > 1e-4f ? to.normalized : pawn.transform.forward;
 
                 if (c.IsCat) { Push(target, dir * CatPushImpulse, 0.4f); continue; }
-                if (c.Weapon) c.Weapon.PlaySwing();
                 var result = _hits.TryHit(o.TargetId, now);
                 if (result == HitResult.Ignored) continue;
                 Push(target, dir * HitImpulse, _hits.StunSeconds);
+                if (result == HitResult.Caught) HandOverBeforeCatch(o.TargetId);
                 if (result == HitResult.Caught && _outcome.MarkCaught(o.TargetId))
                 {
-                    Freeze(target);
-                    Payout.Caught(o.TargetId);
                     TrashPandas.Runtime.Loot.LootDirector.Instance?.DropMouth(o.TargetId);
+                    Payout.Caught(o.TargetId);
+                    Cage(target);
                 }
             }
 
+            TickRescue(dt);
+            JoinSwitchedRaccoon();
             _outcome.Tick(now);
             if (_outcome.IsOver)
             {
@@ -327,11 +412,92 @@ namespace TrashPandas.Runtime.Panic
             else r.ApplyHit(impulse, stun);
         }
 
-        static void Freeze(RaccoonController r)
+        int CagedCount()
         {
+            int n = 0;
+            foreach (int p in _players) if (_outcome.StatusOf(p) == PlayerOutcome.Caught) n++;
+            return n;
+        }
+
+        /// <summary>Caught: into the pet carrier by the house. Friends can open it.</summary>
+        void Cage(RaccoonController r)
+        {
+            int slot = CagedCount() - 1;
+            Vector3 at = CagePosition + new Vector3(-0.5f + (slot % 3) * 0.5f, 0.1f, 0f);
+            r.CollapseTower();
+            Freeze(r, at);
+        }
+
+        /// <summary>A free raccoon standing next to the cage for a moment opens it: everyone inside is back in the run.</summary>
+        void TickRescue(float dt)
+        {
+            if (CagedCount() == 0 || CageRadius <= 0f) { _rescueProgress = 0f; return; }
+            bool friendThere = false;
+            foreach (int p in _players)
+            {
+                if (_outcome.StatusOf(p) != PlayerOutcome.Running || !_raccoonOf.TryGetValue(p, out var r) || r.Frozen) continue;
+                Vector3 d = r.transform.position - CagePosition;
+                d.y = 0f;
+                if (d.magnitude <= CageRadius) friendThere = true;
+            }
+            _rescueProgress = friendThere ? _rescueProgress + dt : Mathf.Max(0f, _rescueProgress - dt * 2f);
+            if (_rescueProgress < RescueSeconds) return;
+            _rescueProgress = 0f;
+            foreach (int p in _players.ToArray())
+            {
+                if (_outcome.StatusOf(p) != PlayerOutcome.Caught || !_outcome.Rescue(p)) continue;
+                _hits.Forget(p);
+                Payout.Rescued(p);
+                if (_raccoonOf.TryGetValue(p, out var r)) Unfreeze(r);
+            }
+        }
+
+        /// <summary>Dev telemetry: how many humans are in each pursuit state.</summary>
+        public string ChaserStates
+        {
+            get
+            {
+                var counts = new Dictionary<PursuitState, int>();
+                foreach (var c in _chasers) { counts.TryGetValue(c.Last, out int n); counts[c.Last] = n + 1; }
+                var parts = new List<string>();
+                foreach (var kv in counts) parts.Add($"{kv.Key}:{kv.Value}");
+                return string.Join(",", parts);
+            }
+        }
+
+        public float RescueProgress01 => RescueSeconds > 0f ? Mathf.Clamp01(_rescueProgress / RescueSeconds) : 0f;
+
+        /// <summary>Debug squad: when the raccoon you drive is caught, you take over the next free one (to go and rescue).</summary>
+        void HandOverBeforeCatch(int caught)
+        {
+            var squad = Squad.SquadController.Instance;
+            if (SimulationAuthority.IsOnline || !squad || squad.ActivePlayerId != caught) return;
+            int next = squad.ActivateNextFree(caught);
+            if (next >= 0 && _outcome.Join(next)) _players.Add(next);
+        }
+
+        /// <summary>Debug squad: switching to another raccoon mid-panic brings it into the run (to go and rescue).</summary>
+        void JoinSwitchedRaccoon()
+        {
+            var squad = Squad.SquadController.Instance;
+            if (SimulationAuthority.IsOnline || !squad || !squad.Active) return;
+            int p = squad.ActivePlayerId;
+            if (_outcome.Join(p)) _players.Add(p);
+        }
+
+        static void Unfreeze(RaccoonController r)
+        {
+            r.Frozen = false;
             var net = r.GetComponent<NetworkedRaccoon>();
-            r.Frozen = true; // on the host too, so host-side checks see it
-            if (SimulationAuthority.IsOnline && net && net.IsSpawned) net.FreezeRpc();
+            if (SimulationAuthority.IsOnline && net && net.IsSpawned) net.UnfreezeRpc();
+        }
+
+        static void Freeze(RaccoonController r, Vector3 jail)
+        {
+            r.Frozen = true;
+            var net = r.GetComponent<NetworkedRaccoon>();
+            if (SimulationAuthority.IsOnline && net && net.IsSpawned) { net.FreezeRpc(jail); return; }
+            r.TeleportTo(jail);
         }
 
         void Remove(RaccoonController r)

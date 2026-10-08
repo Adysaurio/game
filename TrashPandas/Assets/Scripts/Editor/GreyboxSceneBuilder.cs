@@ -343,6 +343,15 @@ namespace TrashPandas.EditorTools
             pd.GardenCenter = GardenCenter;
             pd.ArchCenter = ArchCenter;
             pd.ArchRadius = 1.8f;
+            // The pet carrier for caught raccoons, by the house door (friends can free them).
+            pd.CagePosition = new Vector3(-4.5f, 0f, 16.2f);
+            var cageMat = Mat("Cage", new Color(0.55f, 0.75f, 0.95f));
+            var cage = new GameObject("PetCarrier").transform;
+            cage.position = pd.CagePosition;
+            Visual(PrimitiveType.Cube, "Floor", cage, new Vector3(0f, 0.02f, 0f), new Vector3(2.0f, 0.04f, 1.0f), cageMat);
+            Visual(PrimitiveType.Cube, "Roof", cage, new Vector3(0f, 0.9f, 0f), new Vector3(2.0f, 0.06f, 1.0f), cageMat);
+            for (int b = 0; b < 9; b++)
+                Visual(PrimitiveType.Cylinder, $"Bar_{b}", cage, new Vector3(-0.95f + b * 0.2375f, 0.45f, 0.5f), new Vector3(0.04f, 0.45f, 0.04f), cageMat);
             pd.Overview = overview;
             new GameObject("PanicHud").AddComponent<PanicHud>();
             new GameObject("LootHud").AddComponent<TrashPandas.Runtime.Loot.LootHud>();

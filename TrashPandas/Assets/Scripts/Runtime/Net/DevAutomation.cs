@@ -25,7 +25,7 @@ namespace TrashPandas.Runtime.Net
         /// "hopgap" crouching through the hedge gap where humans can't follow.</summary>
         public static Vector2? FleeMove(Vector3 from)
         {
-            if (Bot != "hopflee" && Bot != "flee" && Bot != "hopgap" && Bot != "mouthflee" && Bot != "stashflee") return null;
+            if (Bot != "hopflee" && Bot != "flee" && Bot != "hopgap" && Bot != "mouthflee" && Bot != "stashflee" && Bot != "sneakflee") return null;
             var pd = TrashPandas.Runtime.Panic.PanicDirector.Instance;
             if (!pd || pd.Phase != TrashPandas.Runtime.Panic.RoundPhase.Panic) return null;
             var open = pd.OpenExitPositions;
@@ -71,6 +71,7 @@ namespace TrashPandas.Runtime.Net
                 return new Vector2(Mathf.Sin(Time.time * 3f), Mathf.Cos(Time.time * 3f)) * 0.8f;
             }
             if (Bot == "fetch") return TrashPandas.Runtime.Squad.SquadBots.FetchMove(r);
+            if (Bot == "flee" || Bot == "sneakflee") return FleeMove(r.transform.position) ?? Vector2.zero;
             if (Bot == "towerhost" || Bot == "towerclient") return TrashPandas.Runtime.Squad.SquadBots.OnlineTowerMove(r, Bot == "towerclient");
             if (Bot == "heavyonline") return TrashPandas.Runtime.Squad.SquadBots.OnlineHeavyMove(r);
             return null;
@@ -79,9 +80,9 @@ namespace TrashPandas.Runtime.Net
         public static bool SquadRun => (Bot == "noisy" && Time.timeSinceLevelLoad > 4f) || (Bot == "towerhost" && Time.timeSinceLevelLoad > 24f);
         static bool s_noisyPlaced;
         /// <summary>Dev: -nointro, and the bots that test specific mechanics skip the intro.</summary>
-        public static bool SkipIntro => Array.IndexOf(Args, "-nointro") >= 0 || Bot == "heavy" || Bot == "tower";
+        public static bool SkipIntro => Array.IndexOf(Args, "-nointro") >= 0 || Bot == "heavy" || Bot == "tower" || Bot == "flee" || Bot == "sneakflee" || Bot == "rescue";
         /// <summary>Bots built around the garden start (heavy, tower) keep spawning there.</summary>
-        public static bool SquadNearOrigin => Bot == "heavy" || Bot == "tower";
+        public static bool SquadNearOrigin => Bot == "heavy" || Bot == "tower" || Bot == "flee" || Bot == "sneakflee" || Bot == "rescue";
         public static bool SquadTap(TrashPandas.Runtime.Raccoon.RaccoonController r) =>
             (Bot == "fetch" && TrashPandas.Runtime.Squad.SquadBots.FetchTap(r)) || (Bot == "heavyonline" && TrashPandas.Runtime.Squad.SquadBots.OnlineHeavyTap(r));
         /// <summary>Bots that grab something specific (not what the highlight picked).</summary>
@@ -227,6 +228,7 @@ namespace TrashPandas.Runtime.Net
             if (rig) panic += $" cam={(rig.VirtualCamera.Follow ? rig.VirtualCamera.Follow.name : "-")}{(rig.InConversation ? "(talk)" : "")}";
             var ld = TrashPandas.Runtime.Loot.LootDirector.Instance;
             var pdx = TrashPandas.Runtime.Panic.PanicDirector.Instance;
+            if (pdx) panic += $" chasers[{pdx.ChaserStates}]";
             if (pdx) panic += $" P0loot=${pdx.Snapshot.LootOf(0)} clean={pdx.Snapshot.CleanExit} openExits={string.Join(",", pdx.OpenExitPositions)}";
             var mine = NetworkedRaccoon.LocalOwned;
             if (ld && mine)

@@ -40,5 +40,6 @@ namespace TrashPandas.Core.Panic
             _state.TryGetValue(player, out var s) && s.hits > 0 && now - s.lastHit < _stun;
 
         public void Reset() => _state.Clear();
+        public void Forget(int player) => _state.Remove(player);
     }
 }

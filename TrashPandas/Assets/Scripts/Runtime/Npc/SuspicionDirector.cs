@@ -173,10 +173,13 @@ namespace TrashPandas.Runtime.Npc
         }
 
         /// <summary>Field of view plus a line of sight that ignores the looker and the target themselves.</summary>
-        bool Sees(NpcPawn pawn, Vector3 target, Transform targetRoot)
+        bool Sees(NpcPawn pawn, Vector3 target, Transform targetRoot) => CanSee(pawn, target, targetRoot, VisionRange, VisionFov);
+
+        /// <summary>Field of view + line of sight (tables, hedges and people block it).</summary>
+        public bool CanSee(NpcPawn pawn, Vector3 target, Transform targetRoot, float range, float fov)
         {
             Vector3 eye = pawn.Eye;
-            if (!VisionCone.CanSee(eye, pawn.transform.forward, target, VisionRange, VisionFov, false)) return false;
+            if (!VisionCone.CanSee(eye, pawn.transform.forward, target, range, fov, false)) return false;
             Vector3 to = target - eye;
             float dist = to.magnitude;
             int n = Physics.RaycastNonAlloc(eye, to / dist, _hits, dist, ~0, QueryTriggerInteraction.Ignore);

@@ -57,6 +57,9 @@ namespace TrashPandas.Core.Panic
             return Drop(player);
         }
 
+        /// <summary>Freed from the cage: not settled any more (a later escape pays).</summary>
+        public void Rescued(int player) => _paid.Remove(player);
+
         public int Of(int player) => _paid.TryGetValue(player, out var v) ? v : 0;
         public bool ObjectiveEscaped(ObjectiveId id) => _objectives.Contains(id);
 

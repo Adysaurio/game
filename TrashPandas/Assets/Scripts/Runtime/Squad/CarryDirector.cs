@@ -221,6 +221,10 @@ namespace TrashPandas.Runtime.Squad
         {
             if (!SimulationAuthority.IsSimulating || Time.timeSinceLevelLoad < 2f || Time.time < _quietUntil) return;
             if (c.relativeVelocity.magnitude < 3f) return;
+            // A plate to the face: a panicked human is dazed for a moment (the co-op answer to a chase).
+            var pawn = c.collider.GetComponentInParent<Npc.NpcPawn>();
+            if (pawn && Panic.PanicDirector.Instance && Panic.PanicDirector.Instance.Phase == Panic.RoundPhase.Panic)
+                Panic.PanicDirector.Instance.StunChaser(pawn);
             _quietUntil = Time.time + 0.5f;
             NoiseBus.Emit(NoiseKind.Crash, transform.position);
         }

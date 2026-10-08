@@ -31,6 +31,23 @@ namespace TrashPandas.Core.Panic
         public bool MarkEscaped(int player) => Resolve(player, PlayerOutcome.Escaped);
         public bool MarkCaught(int player) => Resolve(player, PlayerOutcome.Caught);
 
+        /// <summary>Someone new enters the run (debug: you switched to another raccoon mid-panic).</summary>
+        public bool Join(int player)
+        {
+            if (IsOver || _status.ContainsKey(player)) return false;
+            _status[player] = PlayerOutcome.Running;
+            return true;
+        }
+
+        /// <summary>A friend opened the cage: back in the run (only while the round goes on).</summary>
+        public bool Rescue(int player)
+        {
+            if (IsOver || StatusOf(player) != PlayerOutcome.Caught) return false;
+            _status[player] = PlayerOutcome.Running;
+            Caught--;
+            return true;
+        }
+
         public void Tick(float now)
         {
             if (IsOver || now < _endsAt) return;

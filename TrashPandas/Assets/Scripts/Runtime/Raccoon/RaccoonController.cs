@@ -91,6 +91,18 @@ namespace TrashPandas.Runtime.Raccoon
             return true;
         }
 
+        /// <summary>Move instantly (into the cage), off any tower.</summary>
+        public void TeleportTo(Vector3 position)
+        {
+            if (!ReferenceEquals(Mount, null)) Dismount(Vector3.zero);
+            bool was = _cc.enabled;
+            _cc.enabled = false;
+            transform.position = position;
+            _cc.enabled = was;
+            _planar = Vector3.zero;
+            _verticalVelocity = 0f;
+        }
+
         /// <summary>Non-owner copy online: mirror who this raccoon stands on (for counting riders), no physics.</summary>
         public void SetRemoteMount(RaccoonController mount) => Mount = mount;
 

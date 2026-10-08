@@ -60,11 +60,25 @@ namespace TrashPandas.Runtime.Panic
                 else if (myOutcome == PlayerOutcome.Caught)
                 {
                     GUI.color = new Color(1f, 0.35f, 0.3f);
-                    GUI.Label(new Rect(0, H * 0.4f, W, 60), "YOU GOT CAUGHT!", _mid);
+                    GUI.Label(new Rect(0, H * 0.4f, W, 60), "CAUGHT! In the pet carrier…", _mid);
                     GUI.color = Color.white;
-                    GUI.Label(new Rect(0, H * 0.4f + 40, W, 24), "Watching the others…", _small);
+                    GUI.Label(new Rect(0, H * 0.4f + 40, W, 24), "A free friend standing next to the cage lets you out", _small);
                 }
 
+                // The cage: where your caught friends wait. Stand next to it to free them.
+                bool anyCaught = false;
+                for (int p = 0; p < snap.Count; p++) anyCaught |= snap.OutcomeOf(p) == PlayerOutcome.Caught;
+                if (cam && anyCaught)
+                {
+                    Vector3 cp = cam.WorldToScreenPoint(d.CagePosition + Vector3.up * 1.8f);
+                    if (cp.z > 0f)
+                    {
+                        Vector2 p2 = UiScale.FromScreen(cp);
+                        GUI.color = new Color(0.5f, 0.85f, 1f);
+                        GUI.Label(new Rect(p2.x - 110, p2.y - 28, 220, 56), $"▼ CAGE — free your friends!\n{Mathf.RoundToInt(d.RescueProgress01 * 100f)}%", _exit);
+                        GUI.color = Color.white;
+                    }
+                }
                 if (cam)
                     for (int i = 0; i < d.Exits.Length; i++)
                     {

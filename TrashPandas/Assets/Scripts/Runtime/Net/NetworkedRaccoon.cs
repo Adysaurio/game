@@ -109,7 +109,11 @@ namespace TrashPandas.Runtime.Net
 
         /// <summary>Host → owner: caught, no more control.</summary>
         [Rpc(SendTo.Owner)]
-        public void FreezeRpc() => Controller.Frozen = true;
+        public void FreezeRpc(Vector3 jail) { Controller.Frozen = true; Controller.TeleportTo(jail); }
+
+        /// <summary>Host → owner: a friend opened the cage.</summary>
+        [Rpc(SendTo.Owner)]
+        public void UnfreezeRpc() => Controller.Frozen = false;
 
         public override void OnNetworkDespawn()
         {
