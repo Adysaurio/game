@@ -137,6 +137,24 @@ namespace TrashPandas.Runtime.Trenchcoat
         UnityEngine.AI.NavMeshPath _botPath;
         float _botStuck;
 
+        /// <summary>Dev automation: direction along the navmesh toward a point.</summary>
+        Vector3 BotSteer(Vector3 target)
+        {
+            Vector3 direct = target - Body.transform.position;
+            direct.y = 0f;
+            if (!UnityEngine.AI.NavMesh.SamplePosition(target, out var goal, 2f, UnityEngine.AI.NavMesh.AllAreas)
+                || !UnityEngine.AI.NavMesh.SamplePosition(Body.transform.position, out var me, 1.5f, UnityEngine.AI.NavMesh.AllAreas)) return direct;
+            _botPath ??= new UnityEngine.AI.NavMeshPath();
+            if (!UnityEngine.AI.NavMesh.CalculatePath(me.position, goal.position, UnityEngine.AI.NavMesh.AllAreas, _botPath) || _botPath.corners.Length < 2) return direct;
+            for (int i = 1; i < _botPath.corners.Length; i++)
+            {
+                Vector3 d = _botPath.corners[i] - Body.transform.position;
+                d.y = 0f;
+                if (d.magnitude > 0.4f || i == _botPath.corners.Length - 1) return d;
+            }
+            return direct;
+        }
+
         void BotStash(ref SlotInput live)
         {
             var grabber = Body.GetComponent<TrashPandas.Runtime.Grabbing.HandGrabber>();
@@ -164,10 +182,9 @@ namespace TrashPandas.Runtime.Trenchcoat
                 // Walk out through the arch.
                 var pd = TrashPandas.Runtime.Panic.PanicDirector.Instance;
                 if (!pd) return;
-                Vector3 toArch = pd.ArchCenter - Body.transform.position;
-                toArch.y = 0f;
                 live.GrabOne = false;
-                live.Move = new Vector2(toArch.x, toArch.z).normalized;
+                var steer = BotSteer(pd.ArchCenter);
+                live.Move = new Vector2(steer.x, steer.z).normalized;
                 return;
             }
             if (!best) return;

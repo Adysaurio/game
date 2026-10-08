@@ -120,6 +120,18 @@ namespace TrashPandas.Runtime.Net
             int.TryParse(Value("-autostart"), out _autoStart);
             if (float.TryParse(Value("-quitafter"), System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out float q)) _quitAt = q;
             _telemetry = Args.Contains("-telemetry");
+            int td = Array.IndexOf(Args, "-topdown");
+            if (td >= 0)
+            {
+                // Dev: an orthographic bird's-eye camera over the whole estate (drawn on top of the game camera).
+                var cam = new GameObject("TopDownCamera").AddComponent<Camera>();
+                cam.orthographic = true;
+                cam.orthographicSize = td + 1 < Args.Length && float.TryParse(Args[td + 1], out var size) ? size : 31f;
+                cam.transform.SetPositionAndRotation(new Vector3(0f, 80f, 2f), Quaternion.Euler(90f, 0f, 0f));
+                cam.depth = 100;
+                cam.farClipPlane = 200f;
+                DontDestroyOnLoad(cam.gameObject);
+            }
             int s = Array.IndexOf(Args, "-shot");
             if (s >= 0 && s + 2 < Args.Length && float.TryParse(Args[s + 1], System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out float at))
             { _shotAt = at; _shotPath = Args[s + 2]; }

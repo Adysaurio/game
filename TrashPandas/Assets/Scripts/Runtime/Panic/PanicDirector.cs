@@ -140,7 +140,8 @@ namespace TrashPandas.Runtime.Panic
             {
                 Vector3 d = suspicion.Coat.transform.position - ArchCenter;
                 d.y = 0f;
-                if (CleanExit.Qualifies(true, d.magnitude < ArchRadius, (int)suspicion.LastFrame.MissingParts)) EndWithCleanExit(suspicion);
+                var pocket = TrashPandas.Runtime.Loot.LootDirector.Instance;
+                if (CleanExit.Qualifies(true, d.magnitude < ArchRadius, (int)suspicion.LastFrame.MissingParts, pocket ? pocket.Pocket.Total : 0)) EndWithCleanExit(suspicion);
             }
             if (Phase == RoundPhase.Panic) TickPanic();
         }

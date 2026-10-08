@@ -58,8 +58,8 @@ namespace TrashPandas.Core.Panic
 
     public static class CleanExit
     {
-        /// <summary>The coat walks out through the arch with nobody missing (spec §16.2).</summary>
-        public static bool Qualifies(bool infiltrating, bool coatInArch, int missingParts) =>
-            infiltrating && coatInArch && missingParts == 0;
+        /// <summary>The coat walks out through the arch with nobody missing and something in the pocket (spec §16.2).</summary>
+        public static bool Qualifies(bool infiltrating, bool coatInArch, int missingParts, int pocketTotal) =>
+            infiltrating && coatInArch && missingParts == 0 && pocketTotal > 0;
     }
 }

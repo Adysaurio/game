@@ -75,10 +75,16 @@ namespace TrashPandas.Tests
         [Test]
         public void Qualifies_OnlyWithEveryoneInside_DuringInfiltration()
         {
-            Assert.IsTrue(CleanExit.Qualifies(infiltrating: true, coatInArch: true, missingParts: 0));
-            Assert.IsFalse(CleanExit.Qualifies(true, true, missingParts: 1), "an empty seat isn't a clean exit");
-            Assert.IsFalse(CleanExit.Qualifies(true, coatInArch: false, missingParts: 0));
-            Assert.IsFalse(CleanExit.Qualifies(infiltrating: false, coatInArch: true, missingParts: 0));
+            Assert.IsTrue(CleanExit.Qualifies(infiltrating: true, coatInArch: true, missingParts: 0, pocketTotal: 40));
+            Assert.IsFalse(CleanExit.Qualifies(true, true, missingParts: 1, pocketTotal: 40), "an empty seat isn't a clean exit");
+            Assert.IsFalse(CleanExit.Qualifies(true, coatInArch: false, missingParts: 0, pocketTotal: 40));
+            Assert.IsFalse(CleanExit.Qualifies(infiltrating: false, coatInArch: true, missingParts: 0, pocketTotal: 40));
+        }
+
+        [Test]
+        public void EmptyPocket_CantLeave()
+        {
+            Assert.IsFalse(CleanExit.Qualifies(true, true, 0, pocketTotal: 0), "walking straight back out isn't a heist");
         }
     }
 }
