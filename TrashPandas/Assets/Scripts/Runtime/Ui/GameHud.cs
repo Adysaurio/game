@@ -52,7 +52,7 @@ namespace TrashPandas.Runtime.Ui
             if (sinceStart > 9f) Tip("tools", "TOOLS: 2 pebble · 3 smoke · 4 banana — HOLD Q to aim (look up = farther), let go to throw");
             if (pd && pd.Phase == RoundPhase.Panic) Tip("run", "Bonk them with a pebble, drop a banana in their path — or hide (E) till they calm down");
             if (nd && nd.Pawn && pd && pd.Phase == RoundPhase.Infiltration && Vector3.Distance(nd.Pawn.transform.position, me.transform.position) < 12f)
-                Tip("lure", "Psst — throw a pebble FAR away (hold Q, look up): the noise sends her to look");
+                Tip("lure", $"Psst — throw a pebble FAR away (hold Q, look up): the noise sends {(nd.Kind == Core.Panic.NemesisKind.PestControl ? "him" : "her")} to look");
             var carry = CarryDirector.Instance;
             if (carry && carry.IsCarrying(me.PlayerId)) Tip("carry", "Click: drop it · HOLD click to aim a throw, let go to throw it (bonks people too)");
             if (gd)
