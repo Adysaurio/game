@@ -116,8 +116,14 @@ namespace TrashPandas.Runtime.Squad
             GUI.color = new Color(0f, 0f, 0f, 0.5f);
             GUI.DrawTexture(new Rect(8, H - 52, W - 16, 44), Texture2D.whiteTexture);
             GUI.color = Color.white;
+            if (Active && Active.Mount)
+            {
+                GUI.color = new Color(1f, 0.85f, 0.3f);
+                GUI.Label(new Rect(0, H - 84, W, 28), "RIDING — Space: hop off", new GUIStyle(_help) { fontSize = 20, fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleCenter });
+                GUI.color = Color.white;
+            }
             GUI.Label(new Rect(16, H - 50, W - 32, 42),
-                $"RACCOON {ActivePlayerId + 1}/{_raccoons.Count}   WASD move · Shift run (noisy) · C sneak · Space jump · Click grab/drop · Hold click + release: throw · Jump onto a raccoon: ride · E use\n" +
+                $"RACCOON {ActivePlayerId + 1}/{_raccoons.Count}   WASD move · Shift run (noisy) · C sneak · Space jump · Click grab/drop · Hold click + release: throw · Jump onto a raccoon: ride (Space: hop off) · E use\n" +
                 "[DEBUG] Tab: switch raccoon (the others wait where you left them)", _help);
         }
     }
