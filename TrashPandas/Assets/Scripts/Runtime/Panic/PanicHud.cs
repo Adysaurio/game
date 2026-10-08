@@ -16,6 +16,39 @@ namespace TrashPandas.Runtime.Panic
 
         void OnDisable() => TrashPandas.Runtime.Cameras.PlayerCameraRig.UiWantsCursor = false;
 
+        float _unlockedAt = -1f;
+
+        /// <summary>v2: the objectives are in — "GETAWAY!" and the exits light up (no RUN needed).</summary>
+        void DrawGetaway(PanicDirector d, Camera cam)
+        {
+            if (!d.ExitsUnlocked) { _unlockedAt = -1f; return; }
+            UiScale.Apply();
+            _big ??= new GUIStyle(GUI.skin.label) { fontSize = 64, fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleCenter };
+            _mid ??= new GUIStyle(GUI.skin.label) { fontSize = 26, fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleCenter };
+            _exit ??= new GUIStyle(GUI.skin.label) { fontSize = 18, fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleCenter };
+            float W = UiScale.Width, H = UiScale.Height;
+            if (_unlockedAt < 0f) { _unlockedAt = Time.time; Sfx.Play2D(Sound.Deliver); }
+            if (Time.time - _unlockedAt < 3.5f)
+            {
+                GUI.color = new Color(0.45f, 1f, 0.55f);
+                GUI.Label(new Rect(0, H * 0.22f, W, 90), "GETAWAY!", _big);
+                GUI.color = Color.white;
+                GUI.Label(new Rect(0, H * 0.22f + 80, W, 30), "All objectives in — the exits are open. Get out!", _mid);
+            }
+            if (!cam) return;
+            for (int i = 0; i < d.Exits.Length; i++)
+            {
+                if (!d.ExitOpen(i)) continue;
+                Vector3 sp = cam.WorldToScreenPoint(d.Exits[i] + Vector3.up * 1.2f);
+                if (sp.z <= 0f) continue;
+                Vector2 p = UiScale.FromScreen(sp);
+                GUI.color = new Color(0.5f, 1f, 0.55f);
+                string name = i < d.ExitNames.Length ? d.ExitNames[i] : "EXIT";
+                GUI.Label(new Rect(p.x - 80, p.y - 24, 160, 48), $"▼ EXIT\n{name}", _exit);
+                GUI.color = Color.white;
+            }
+        }
+
         void OnGUI()
         {
             var d = PanicDirector.Instance;
@@ -37,6 +70,7 @@ namespace TrashPandas.Runtime.Panic
                 if (d.Phase == RoundPhase.Panic && caught < _lastCaught) Sfx.Play2D(Sound.Rescue);
                 _lastCaught = caught;
             }
+            if (d && d.Phase == RoundPhase.Infiltration && TrashPandas.Runtime.Squad.GameMode.Raccoons) DrawGetaway(d, cam);
             if (!d || d.Phase == RoundPhase.Infiltration) { _panicStartedAt = -1f; return; }
             UiScale.Apply();
             if (_panicStartedAt < 0f) _panicStartedAt = Time.time;
@@ -57,10 +91,14 @@ namespace TrashPandas.Runtime.Panic
                     GUI.color = new Color(1f, 0.3f, 0.25f);
                     GUI.Label(new Rect(0, H * 0.22f, W, 90), "¡¡RUUUN!!", _big);
                     GUI.color = Color.white;
-                    GUI.Label(new Rect(0, H * 0.22f + 80, W, 30), "Get to an EXIT before they whack you!", _mid);
+                    string sub = !TrashPandas.Runtime.Squad.GameMode.Raccoons ? "Get to an EXIT before they whack you!"
+                        : d.PartyOver ? "The party's over — get to an EXIT!"
+                        : d.ExitsUnlocked ? "Get to an EXIT — or hide till they calm down!"
+                        : "HIDE! (bush, trash can, smoke) till they calm down";
+                    GUI.Label(new Rect(0, H * 0.22f + 80, W, 30), sub, _mid);
                 }
-
-                GUI.Label(new Rect(W - 170, 50, 160, 30), $"Time {Mathf.CeilToInt(snap.SecondsLeft)}s", _mid);
+                if (!TrashPandas.Runtime.Squad.GameMode.Raccoons)
+                    GUI.Label(new Rect(W - 170, 50, 160, 30), $"Time {Mathf.CeilToInt(snap.SecondsLeft)}s", _mid);
 
                 if (myOutcome == PlayerOutcome.Running && me.HasValue)
                 {

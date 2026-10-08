@@ -187,12 +187,10 @@ namespace TrashPandas.Runtime.Ui
                         GUI.Label(new Rect(p.x - 8, p.y - 9, 16, 18), "$", _small);
                     }
             }
-            if (panic)
-            {
+            if (pd)
                 for (int i = 0; i < pd.Exits.Length; i++)
                     if (pd.ExitOpen(i)) { var p = ToMap(pd.Exits[i], r); Dot(p, 13f, new Color(0.3f, 1f, 0.4f)); GUI.color = Color.black; GUI.Label(new Rect(p.x - 10, p.y - 9, 20, 18), "X", _small); }
-                if (pd.CageRadius > 0f) Dot(ToMap(pd.CagePosition, r), 11f, new Color(0.45f, 0.75f, 1f));
-            }
+            if (panic && pd.CageRadius > 0f) Dot(ToMap(pd.CagePosition, r), 11f, new Color(0.45f, 0.75f, 1f));
             // Humans who've noticed something.
             var sd = SuspicionDirector.Instance;
             if (sd)

@@ -151,7 +151,28 @@ namespace TrashPandas.Runtime.Panic
         public RoundPhase Phase => SimulationAuthority.IsOnline ? (RoundPhase)_phase.Value : _offlinePhase;
         public PanicSnapshot Snapshot => SimulationAuthority.IsOnline ? _snapshot.Value : _offlineSnapshot;
         byte OpenMask => SimulationAuthority.IsOnline ? _openExits.Value : _offlineOpenExits;
-        public bool ExitOpen(int i) => (OpenMask & (1 << i)) != 0;
+        public bool ExitOpen(int i) => (OpenMask & (1 << i)) != 0 && (!Squad.GameMode.Raccoons || ExitsUnlocked);
+
+        /// <summary>v2: the exits open once every objective is at the den (or when the party's over).</summary>
+        public bool ExitsUnlocked
+        {
+            get
+            {
+                if (Net.DevAutomation.UnlockExits) return true;
+                var l = TrashPandas.Runtime.Loot.LootDirector.Instance;
+                return l && Core.Round.Getaway.ExitsOpen(l.Snapshot.ObjectivesPicked, l.Snapshot.ObjectivesDone, l.Snapshot.SecondsLeft);
+            }
+        }
+
+        /// <summary>The clock ran out: a last RUN you can't hide from.</summary>
+        public bool PartyOver
+        {
+            get
+            {
+                var l = TrashPandas.Runtime.Loot.LootDirector.Instance;
+                return Squad.GameMode.Raccoons && l && Core.Round.Getaway.PartyOver(l.Snapshot.SecondsLeft);
+            }
+        }
 
         /// <summary>Positions of this round's open exits.</summary>
         public IReadOnlyList<Vector3> OpenExitPositions
@@ -209,7 +230,7 @@ namespace TrashPandas.Runtime.Panic
             for (int i = 0; i < ExitMarkers.Length; i++)
             {
                 var m = ExitMarkers[i];
-                bool show = panicking && ExitOpen(i);
+                bool show = Squad.GameMode.Raccoons ? ExitOpen(i) && Phase != RoundPhase.Results : panicking && ExitOpen(i);
                 if (m && m.activeSelf != show) m.SetActive(show);
             }
             if (!SimulationAuthority.IsSimulating) return;
@@ -223,6 +244,11 @@ namespace TrashPandas.Runtime.Panic
                 d.y = 0f;
                 var pocket = TrashPandas.Runtime.Loot.LootDirector.Instance;
                 if (CleanExit.Qualifies(true, d.magnitude < ArchRadius, (int)suspicion.LastFrame.MissingParts, pocket ? pocket.Pocket.Total : 0)) EndWithCleanExit(suspicion);
+            }
+            if (Phase == RoundPhase.Infiltration && Squad.GameMode.Raccoons)
+            {
+                if (PartyOver && suspicion && !suspicion.Caught) suspicion.Alarm(); // time's up: everybody out!
+                else if (ExitsUnlocked) TickGetaway();
             }
             if (Phase == RoundPhase.Panic) TickPanic();
             else if (Phase == RoundPhase.Infiltration && CagedCount() > 0) TickCagedAfterCalm();
@@ -239,23 +265,9 @@ namespace TrashPandas.Runtime.Panic
             _hits.Reset();
             _grace.Begin(Time.time);
             _missingSince.Clear();
-            _outcome.Begin(_players, Time.time, TimeLimit);
             _calm.Reset();
             _runStartedAt = Time.time;
-            // Still in the pet carrier from an earlier RUN: they stay caught.
-            foreach (var r in FindObjectsByType<RaccoonController>(FindObjectsSortMode.None))
-                if (r && r.Frozen && _players.Contains(r.PlayerId)) _outcome.MarkCaught(r.PlayerId);
-            // The coat's pocket is shared out now; each raccoon only keeps its share if it escapes.
-            var loot = TrashPandas.Runtime.Loot.LootDirector.Instance;
-            if (loot && Squad.GameMode.Raccoons)
-            {
-                // v2: what reached the den is yours whatever happens now.
-                Payout.SharesAreSafe = true;
-                var delivered = new Dictionary<int, int>();
-                foreach (int p in _players) delivered[p] = loot.Ledger.Of(p);
-                Payout.SetShares(delivered);
-            }
-            else if (loot) Payout.SetShares(loot.Pocket.Split(_players));
+            if (!_outcomeBegun) BeginOutcome();
 
             _chasers.Clear();
             _witnesses.Clear();
@@ -295,6 +307,57 @@ namespace TrashPandas.Runtime.Panic
             var assignment = WeaponAssigner.Assign(humans.ConvertAll(c => c.Brain.Pawn.transform.position), weapons.ConvertAll(w => w.transform.position));
             for (int i = 0; i < humans.Count; i++) if (assignment[i] >= 0) humans[i].Weapon = weapons[assignment[i]];
             Publish();
+        }
+
+        bool _outcomeBegun;
+
+        /// <summary>Who's playing this round and what they've banked (once per round: a second RUN or the getaway keeps it).</summary>
+        void BeginOutcome()
+        {
+            _outcomeBegun = true;
+            _outcome.Begin(_players, Time.time, Squad.GameMode.Raccoons ? 1e6f : TimeLimit); // v2: no RUN timer
+            // Still in the pet carrier from an earlier RUN: they stay caught.
+            foreach (var r in FindObjectsByType<RaccoonController>(FindObjectsSortMode.None))
+                if (r && r.Frozen && _players.Contains(r.PlayerId)) _outcome.MarkCaught(r.PlayerId);
+            // The coat's pocket is shared out now; each raccoon only keeps its share if it escapes.
+            var loot = TrashPandas.Runtime.Loot.LootDirector.Instance;
+            if (loot && Squad.GameMode.Raccoons)
+            {
+                // v2: what reached the den is yours whatever happens now.
+                Payout.SharesAreSafe = true;
+                var delivered = new Dictionary<int, int>();
+                foreach (int p in _players) delivered[p] = loot.Ledger.Of(p);
+                Payout.SetShares(delivered);
+            }
+            else if (loot) Payout.SetShares(loot.Pocket.Split(_players));
+        }
+
+        /// <summary>The exits are open and nobody's chasing: walk out whenever you like.</summary>
+        void TickGetaway()
+        {
+            float now = Time.time;
+            if (!_outcomeBegun) { GatherPlayers(burst: false); BeginOutcome(); Ui.DebugChecklist.Mark("getaway"); }
+            _raccoonOf.Clear();
+            foreach (var r in FindObjectsByType<RaccoonController>(FindObjectsSortMode.None))
+                if (r && r.PlayerId >= 0) _raccoonOf[r.PlayerId] = r;
+            JoinSwitchedRaccoon();
+            foreach (int p in _players.ToArray())
+                if (_outcome.StatusOf(p) == PlayerOutcome.Running && _raccoonOf.TryGetValue(p, out var r) && !r.Frozen) TryEscape(p, r);
+            if (_outcome.IsOver) SetPhase(RoundPhase.Results);
+            Publish();
+        }
+
+        /// <summary>Standing in an open exit (not riding someone): this raccoon is out.</summary>
+        bool TryEscape(int p, RaccoonController r)
+        {
+            if (!TowerRules.CountsForExit(riding: r.Mount) || ExitZones.Contains(OpenExitPositions, r.transform.position, ExitRadius) < 0) return false;
+            r.CollapseTower(); // riders fall off here and keep playing
+            _outcome.MarkEscaped(p);
+            Ui.DebugChecklist.Mark("escape");
+            TrashPandas.Runtime.Loot.LootDirector.Instance?.OnEscaped(p, Payout);
+            Payout.Escaped(p);
+            Remove(r);
+            return true;
         }
 
         void GatherPlayers(bool burst)
@@ -390,16 +453,7 @@ namespace TrashPandas.Runtime.Panic
                     continue;
                 }
                 _missingSince.Remove(p);
-                if (TowerRules.CountsForExit(riding: r.Mount) && ExitZones.Contains(OpenExitPositions, r.transform.position, ExitRadius) >= 0)
-                {
-                    r.CollapseTower(); // riders fall off here and keep playing
-                    _outcome.MarkEscaped(p);
-                    Ui.DebugChecklist.Mark("escape");
-                    TrashPandas.Runtime.Loot.LootDirector.Instance?.OnEscaped(p, Payout);
-                    Payout.Escaped(p);
-                    Remove(r);
-                    continue;
-                }
+                if (TryEscape(p, r)) continue;
                 _targets.Add(new ChaseTarget { Id = p, Position = r.transform.position });
             }
 
@@ -435,7 +489,7 @@ namespace TrashPandas.Runtime.Panic
             bool anySeen = false, allHidden = _targets.Count > 0;
             foreach (var a in _assignInput) if (a.Sees != null && a.Sees.Count > 0) anySeen = true;
             foreach (var t in _targets) if (!_raccoonOf.TryGetValue(t.Id, out var hr) || !Squad.HidingSpot.Hides(hr)) allHidden = false;
-            if (!shocked && _calm.Update(dt, now - _runStartedAt, anySeen, allHidden)) { CalmDown(suspicion); return; }
+            if (!shocked && !PartyOver && _calm.Update(dt, now - _runStartedAt, anySeen, allHidden)) { CalmDown(suspicion); return; }
             if (!shockedForWitnesses(now)) TickWitnesses(suspicion, now);
             // The nemesis remembers hideouts you've used before: occupied and nearby → she goes to check.
             var nem = NemesisDirector.Instance;

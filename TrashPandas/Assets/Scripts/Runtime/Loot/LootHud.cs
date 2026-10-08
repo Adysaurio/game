@@ -10,7 +10,7 @@ namespace TrashPandas.Runtime.Loot
     /// <summary>The coat's pocket ($), this round's objectives, the infiltration clock, "+$40" pop-ups, and what's in your mouth.</summary>
     public sealed class LootHud : MonoBehaviour
     {
-        GUIStyle _title, _line, _clock, _pop;
+        GUIStyle _title, _line, _clock, _pop, _clockBig, _goal;
         byte _lastSerial;
         float _popAt = -10f;
         int _popValue;
@@ -70,10 +70,22 @@ namespace TrashPandas.Runtime.Loot
                 }
                 GUI.color = Color.white;
 
-                // Clock (top right), red in the last minute.
+                // The clock (top center, under the bar): the goal and the time to do it. Red in the last minute.
                 int secs = Mathf.CeilToInt(s.SecondsLeft);
-                GUI.color = secs <= 60 ? new Color(1f, 0.35f, 0.3f) : Color.white;
-                GUI.Label(new Rect(W - 182, 50, 170, 30), $"{secs / 60}:{secs % 60:00}", _clock);
+                var pdc = TrashPandas.Runtime.Panic.PanicDirector.Instance;
+                bool open = pdc && Squad.GameMode.Raccoons && pdc.ExitsUnlocked;
+                int left = 0, total = 0;
+                foreach (var info in LootCatalog.Objectives) if (s.IsPicked(info.Id)) { total++; if (!s.IsDone(info.Id)) left++; }
+                string goal = !Squad.GameMode.Raccoons ? "" : secs <= 0 ? "THE PARTY'S OVER — GET OUT!" : open ? "GETAWAY! the exits are open" : $"bring {left} more objective{(left == 1 ? "" : "s")} to the den to open the exits";
+                float cw = 420f, cx = (W - cw) / 2f;
+                GUI.color = new Color(0f, 0f, 0f, 0.55f);
+                GUI.DrawTexture(new Rect(cx, 44, cw, 46), Texture2D.whiteTexture);
+                GUI.color = secs <= 60 ? new Color(1f, 0.35f, 0.3f, 0.75f + 0.25f * Mathf.PingPong(Time.time * 2f, 1f)) : Color.white;
+                _clockBig ??= new GUIStyle(GUI.skin.label) { fontSize = 24, fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleCenter };
+                _goal ??= new GUIStyle(GUI.skin.label) { fontSize = 13, alignment = TextAnchor.MiddleCenter };
+                GUI.Label(new Rect(cx, 44, cw, 28), $"⏱ {secs / 60}:{secs % 60:00}", _clockBig);
+                GUI.color = open ? new Color(0.5f, 1f, 0.55f) : new Color(1f, 0.9f, 0.6f);
+                GUI.Label(new Rect(cx, 70, cw, 18), goal, _goal);
                 GUI.color = Color.white;
             }
 

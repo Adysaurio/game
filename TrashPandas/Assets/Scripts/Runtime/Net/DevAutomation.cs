@@ -27,7 +27,8 @@ namespace TrashPandas.Runtime.Net
         {
             if (Bot != "hopflee" && Bot != "flee" && Bot != "hopgap" && Bot != "mouthflee" && Bot != "stashflee" && Bot != "sneakflee" && Bot != "lureflee") return null;
             var pd = TrashPandas.Runtime.Panic.PanicDirector.Instance;
-            if (!pd || pd.Phase != TrashPandas.Runtime.Panic.RoundPhase.Panic) return null;
+            if (!pd || pd.Phase == TrashPandas.Runtime.Panic.RoundPhase.Results) return null;
+            if (pd.Phase == TrashPandas.Runtime.Panic.RoundPhase.Infiltration && !pd.ExitsUnlocked) return null;
             var open = pd.OpenExitPositions;
             if (open.Count == 0) return null;
             Vector3 exit = open[0];
@@ -126,6 +127,8 @@ namespace TrashPandas.Runtime.Net
             if (Bot == "heavyonline") return TrashPandas.Runtime.Squad.SquadBots.OnlineHeavyMove(r);
             return null;
         }
+        /// <summary>Dev: exits open from the start (escape tests without delivering the objectives).</summary>
+        public static bool UnlockExits => Debug.isDebugBuild && Array.IndexOf(Args, "-unlockexits") >= 0;
         public static bool TowerHop => Array.IndexOf(Args, "-hopoff") >= 0;
         public static bool SquadCrouch => Bot == "sneak";
         static float s_nextGadget;
