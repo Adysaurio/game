@@ -23,6 +23,7 @@ namespace TrashPandas.Runtime.Npc
 
         void OnGUI()
         {
+            if (TrashPandas.Runtime.Squad.RoundIntro.Playing) return; // the intro has the screen
             UiScale.Apply();
             var d = SuspicionDirector.Instance;
             var cam = Camera.main;

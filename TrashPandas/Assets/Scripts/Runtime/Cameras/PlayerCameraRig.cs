@@ -31,6 +31,8 @@ namespace TrashPandas.Runtime.Cameras
         public bool CursorFreed { get; private set; }
         /// <summary>Set by full-screen UI (results screen) that needs a clickable cursor.</summary>
         public static bool UiWantsCursor;
+        /// <summary>A shared cinematic (the round intro) owns the camera: no mouse orbit.</summary>
+        public static bool CinematicLock;
 
         // --- Conversation framing (social events) --------------------------------------------------
         Transform _focus, _convA, _convB;
@@ -142,7 +144,7 @@ namespace TrashPandas.Runtime.Cameras
             }
 
             if (InConversation) { UpdateConversationFocus(); return; } // the shot is composed, not steered
-            if (UiWantsCursor) return;
+            if (UiWantsCursor || CinematicLock) return;
             if (!_locked || mouse == null) return;
             Vector2 delta = _filter.Filter(mouse.delta.ReadValue());
             Orbit.HorizontalAxis.Value = Mathf.Repeat(Orbit.HorizontalAxis.Value + delta.x * Sensitivity + 180f, 360f) - 180f;

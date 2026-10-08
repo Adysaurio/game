@@ -29,6 +29,7 @@ namespace TrashPandas.Runtime.Loot
 
         void OnGUI()
         {
+            if (TrashPandas.Runtime.Squad.RoundIntro.Playing) return; // the intro has the screen
             var d = LootDirector.Instance;
             if (!d) return;
             UiScale.Apply();

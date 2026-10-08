@@ -126,7 +126,7 @@ namespace TrashPandas.EditorTools
             // --- Parking (E): asphalt, cars, the catering van (exit at its side door).
             Box("Parking_Floor", new Vector3(23f, 0.005f, 1f), new Vector3(16f, 0.01f, 26f), asphalt).GetComponent<Collider>().enabled = false;
             Box("CateringVan", new Vector3(26f, 1.1f, 2f), new Vector3(2.4f, 2.2f, 4.6f), van);
-            foreach (var (name, pos) in new[] { ("Car_0", new Vector3(21f, 0.7f, -6f)), ("Car_1", new Vector3(21f, 0.7f, 9f)), ("Car_2", new Vector3(27f, 0.7f, -8f)) })
+            foreach (var (name, pos) in new[] { ("Car_0", new Vector3(21f, 0.7f, -6f)), ("Car_1", new Vector3(21f, 0.7f, 9f)), ("Car_2", new Vector3(28.5f, 0.7f, 9f)) })
             {
                 Box(name, pos, new Vector3(1.8f, 1.4f, 4f), carMat);
                 Spot(pos + new Vector3(0f, 0.73f, 1.2f));

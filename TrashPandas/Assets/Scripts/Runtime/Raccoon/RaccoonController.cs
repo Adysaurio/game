@@ -136,6 +136,7 @@ namespace TrashPandas.Runtime.Raccoon
 
         public void SetInput(Vector2 worldMove, bool jumpPressed, bool jumpHeld, bool crouchHeld, bool runHeld = false)
         {
+            if (Squad.RoundIntro.Playing) { _move = Vector2.zero; _runHeld = false; return; }
             _runHeld = runHeld;
             if (Frozen || IsStunned) { _move = Vector2.zero; _jumpHeld = false; return; }
             _move = worldMove;
@@ -154,6 +155,7 @@ namespace TrashPandas.Runtime.Raccoon
         void Update()
         {
             float dt = Time.deltaTime;
+            if (Squad.RoundIntro.Playing) return; // the intro animates us
             if (Mount)
             {
                 // Riding: stand on the head below; jump to hop off.

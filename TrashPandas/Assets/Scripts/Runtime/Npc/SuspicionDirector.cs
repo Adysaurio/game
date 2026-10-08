@@ -85,7 +85,7 @@ namespace TrashPandas.Runtime.Npc
         void Update()
         {
             bool coatInPlay = Coat && !Squad.GameMode.Raccoons;
-            if (!SimulationAuthority.IsSimulating || Suspended || (!coatInPlay && !Squad.GameMode.Raccoons)) return;
+            if (!SimulationAuthority.IsSimulating || Suspended || Squad.RoundIntro.Playing || (!coatInPlay && !Squad.GameMode.Raccoons)) return;
             float dt = Time.deltaTime, now = Time.time;
 
             if (now >= _nextRaccoonScan)

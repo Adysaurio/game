@@ -70,6 +70,7 @@ namespace TrashPandas.Runtime.Raccoon
 
         void OnGUI()
         {
+            if (TrashPandas.Runtime.Squad.RoundIntro.Playing) return; // the intro has the screen
             if (!Current) return;
             var cam = Camera.main;
             if (!cam) return;

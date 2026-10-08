@@ -70,6 +70,7 @@ namespace TrashPandas.Runtime.Net
                 else if (raccoon) _coat.RequestReturnRpc();
             }
 
+            if (Squad.RoundIntro.Playing) { _cameraOnRaccoon = null; return; } // everyone watches the same intro
             if (raccoon && !slot.HasValue)
             {
                 if (CameraRig.InConversation) { CameraRig.EndConversation(restore: false); _eventCamera = false; _cameraOnRaccoon = null; }

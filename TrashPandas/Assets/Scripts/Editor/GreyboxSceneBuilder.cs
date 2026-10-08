@@ -164,6 +164,9 @@ namespace TrashPandas.EditorTools
             squad.CameraRig = rig;
             squad.Coat = body;
             new GameObject("GrabHighlight").AddComponent<TrashPandas.Runtime.Raccoon.GrabHighlight>();
+            var intro = new GameObject("RoundIntro");
+            intro.AddComponent<NetworkObject>();
+            intro.AddComponent<TrashPandas.Runtime.Squad.RoundIntro>().CameraRig = rig;
             var carry = new GameObject("CarryDirector");
             carry.AddComponent<NetworkObject>();
             carry.AddComponent<TrashPandas.Runtime.Squad.CarryDirector>();
@@ -232,8 +235,8 @@ namespace TrashPandas.EditorTools
             Person("Guest_House_0", NpcKind.Guest, new Vector3(-7.5f, 0f, 21.5f), 90f, outfits[n++ % outfits.Length], skin, false);
             Person("Guest_House_1", NpcKind.Guest, new Vector3(-6.3f, 0f, 22.5f), -120f, outfits[n++ % outfits.Length], skin, false);
             Person("Chauffeur", NpcKind.Guest, new Vector3(19.5f, 0f, 11f), -90f, new Color(0.15f, 0.15f, 0.2f), skin, false);
-            Person("Guest_Orchard_0", NpcKind.Guest, new Vector3(18f, 0f, -12f), 90f, outfits[n++ % outfits.Length], skin, false);
-            Person("Guest_Orchard_1", NpcKind.Guest, new Vector3(19.2f, 0f, -12f), -90f, outfits[n++ % outfits.Length], skin, false);
+            Person("Guest_Orchard_0", NpcKind.Guest, new Vector3(14f, 0f, -16f), 90f, outfits[n++ % outfits.Length], skin, false);
+            Person("Guest_Orchard_1", NpcKind.Guest, new Vector3(15.2f, 0f, -16f), -90f, outfits[n++ % outfits.Length], skin, false);
 
             var waiter = Person("Waiter", NpcKind.Waiter, new Vector3(-17f, 0f, 9.5f), 0f, new Color(0.12f, 0.12f, 0.14f), skin, false);
             waiter.SpeakerId = "Waiter";

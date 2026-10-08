@@ -89,6 +89,7 @@ namespace TrashPandas.Runtime.Net
                 roster.Slots?.Leave(p);
                 SpawnRaccoon(p, client.Value, Squad.GameMode.SpawnPoint(n++), Quaternion.Euler(0f, 180f, 0f));
             }
+            if (Squad.RoundIntro.Instance) Squad.RoundIntro.Instance.Begin(n);
         }
 
         public override void OnNetworkDespawn()

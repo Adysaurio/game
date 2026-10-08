@@ -61,6 +61,8 @@ namespace TrashPandas.Runtime.Net
             return null;
         }
         public static bool SquadRun => Bot == "noisy";
+        /// <summary>Dev: -nointro, and the bots that test specific mechanics skip the intro.</summary>
+        public static bool SkipIntro => Array.IndexOf(Args, "-nointro") >= 0 || Bot == "heavy" || Bot == "tower";
         /// <summary>Bots built around the garden start (heavy, tower) keep spawning there.</summary>
         public static bool SquadNearOrigin => Bot == "heavy" || Bot == "tower" || Bot == "noisy";
         public static bool SquadTap(TrashPandas.Runtime.Raccoon.RaccoonController r) => Bot == "fetch" && TrashPandas.Runtime.Squad.SquadBots.FetchTap(r);

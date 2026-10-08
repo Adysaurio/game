@@ -44,7 +44,7 @@ namespace TrashPandas.Runtime.Squad
             Time.fixedDeltaTime = 1f / 60f;
         }
 
-        void OnDestroy() { if (Instance == this) Instance = null; }
+        void OnDestroy() { if (Instance == this) Instance = null; RoundIntro.Finished -= OnIntroFinished; }
 
         void Start()
         {
@@ -63,7 +63,11 @@ namespace TrashPandas.Runtime.Squad
                 _raccoons.Add(r);
             }
             Activate(0);
+            if (RoundIntro.Instance) RoundIntro.Instance.Begin(_raccoons.Count);
+            RoundIntro.Finished += OnIntroFinished;
         }
+
+        void OnIntroFinished() => Activate(_active);
 
         void Activate(int index)
         {
@@ -73,7 +77,7 @@ namespace TrashPandas.Runtime.Squad
 
         void Update()
         {
-            if (_raccoons.Count == 0) return;
+            if (_raccoons.Count == 0 || RoundIntro.Playing) return;
             if (_reader.CyclePressed)
             {
                 // Next raccoon still in play.
@@ -105,6 +109,7 @@ namespace TrashPandas.Runtime.Squad
 
         void OnGUI()
         {
+            if (TrashPandas.Runtime.Squad.RoundIntro.Playing) return; // the intro has the screen
             UiScale.Apply();
             _help ??= new GUIStyle(GUI.skin.label) { fontSize = 14, wordWrap = true };
             float W = UiScale.Width, H = UiScale.Height;
