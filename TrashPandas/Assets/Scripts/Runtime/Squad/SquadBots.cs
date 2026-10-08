@@ -94,6 +94,7 @@ namespace TrashPandas.Runtime.Squad
                 cc.enabled = false;
                 rider.transform.position = bottom.HeadTop + Vector3.up * 0.4f;
                 cc.enabled = true;
+                rider.DroppedFromAbove = true;
             }
             for (int i = 2; i < squad.Count; i++) if (squad[i]) squad[i].SetInput(Vector2.zero, false, false, false);
             rider.SetInput(Vector2.zero, false, false, false);
@@ -104,6 +105,81 @@ namespace TrashPandas.Runtime.Squad
                 Debug.Log($"[TOWER] t={t:F1} bottom={bottom.transform.position:F2} rider={rider.transform.position:F2} mounted={(rider.Mount == bottom)} riders={bottom.RidersAbove}");
         }
         static bool s_dropped;
+
+        // --- Online bots (one per machine) ----------------------------------------------------------
+        static bool s_towerDropped;
+
+        /// <summary>"towerclient" drops onto the other raccoon's head; "towerhost" waits, walks (with a rider), then runs.</summary>
+        public static Vector2? OnlineTowerMove(RaccoonController me, bool client)
+        {
+            float t = Time.timeSinceLevelLoad;
+            if (client)
+            {
+                if (!s_towerDropped && t > 12f)
+                {
+                    RaccoonController other = null;
+                    foreach (var r in Object.FindObjectsByType<RaccoonController>(FindObjectsSortMode.None)) if (r != me && r.PlayerId >= 0) other = r;
+                    if (other)
+                    {
+                        s_towerDropped = true;
+                        var cc = me.GetComponent<CharacterController>();
+                        cc.enabled = false;
+                        me.transform.position = other.HeadTop + Vector3.up * 0.4f;
+                        cc.enabled = true;
+                        me.DroppedFromAbove = true;
+                    }
+                }
+                return Vector2.zero;
+            }
+            return t > 16f ? new Vector2(0f, 1f) : Vector2.zero;
+        }
+
+        public static int GiftIndex
+        {
+            get
+            {
+                var carry = CarryDirector.Instance;
+                if (carry) for (int i = 0; i < carry.Items.Count; i++) if (carry.Items[i] && carry.Items[i].name == "Loot_GiantGift") return i;
+                return -1;
+            }
+        }
+
+        static Vector3? s_giftSide;
+        static Vector3 GiftSide(RaccoonController me)
+        {
+            var carry = CarryDirector.Instance;
+            int i = GiftIndex;
+            if (!carry || i < 0) return me.transform.position;
+            s_giftSide ??= carry.Items[i].transform.position + (me.PlayerId == 0 ? Vector3.right : Vector3.forward) * 0.75f;
+            return s_giftSide.Value;
+        }
+
+        /// <summary>"heavyonline": each machine's raccoon goes to its side of the giant gift, grabs it, and walks south with it.</summary>
+        public static Vector2? OnlineHeavyMove(RaccoonController me)
+        {
+            var carry = CarryDirector.Instance;
+            if (!carry) return Vector2.zero;
+            if (carry.IsCarrying(me.PlayerId))
+            {
+                if (!carry.Snapshot.Lifted(me.PlayerId)) return Vector2.zero;
+                return Time.timeSinceLevelLoad < 40f ? new Vector2(0f, -1f) : Vector2.zero;
+            }
+            Vector3 flat = GiftSide(me) - me.transform.position;
+            flat.y = 0f;
+            return flat.magnitude > 0.25f ? Steer(me.transform.position, GiftSide(me)) : Vector2.zero;
+        }
+
+        static float s_nextHeavyTap;
+        public static bool OnlineHeavyTap(RaccoonController me)
+        {
+            var carry = CarryDirector.Instance;
+            if (!carry || carry.IsCarrying(me.PlayerId) || Time.time < s_nextHeavyTap) return false;
+            Vector3 flat = GiftSide(me) - me.transform.position;
+            flat.y = 0f;
+            if (flat.magnitude > 0.35f) return false;
+            s_nextHeavyTap = Time.time + 0.5f;
+            return true;
+        }
 
         static float s_nextTap;
         public static bool FetchTap(RaccoonController r)

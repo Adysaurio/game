@@ -38,6 +38,12 @@ namespace TrashPandas.Runtime.Net
             if (Controller.Mount != mount) Controller.SetRemoteMount(mount);
         }
 
+        /// <summary>Other players' riders: stand exactly on the head as this machine sees it (no double lag).</summary>
+        void LateUpdate()
+        {
+            if (IsSpawned && !IsOwner && Controller.Mount) transform.position = Controller.Mount.HeadTop;
+        }
+
         /// <summary>Owner of the bottom raccoon → everyone: the tower falls; each owner knocks its own riders off.</summary>
         [Rpc(SendTo.NotOwner)]
         void CollapseRpc()

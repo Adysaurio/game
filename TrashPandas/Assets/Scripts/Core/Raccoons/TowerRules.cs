@@ -10,7 +10,10 @@ namespace TrashPandas.Core.Raccoons
 
         public static bool Collapses(bool bottomRunning, bool bottomHit) => bottomRunning || bottomHit;
 
-        public static bool CanMount(bool targetCarryingHeavy, bool targetFrozen, int towerSize) =>
-            !targetCarryingHeavy && !targetFrozen && towerSize < MaxHeight;
+        public static bool CanMount(bool targetCarryingHeavy, bool targetFrozen, int towerSize, bool targetCaught = false) =>
+            !targetCarryingHeavy && !targetFrozen && !targetCaught && towerSize < MaxHeight;
+
+        /// <summary>Only the raccoon on the ground reaches an exit; riders fall off and keep playing.</summary>
+        public static bool CountsForExit(bool riding) => !riding;
     }
 }

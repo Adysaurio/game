@@ -113,7 +113,7 @@ namespace TrashPandas.Runtime.Loot
                 if (push > 0f && SuspicionDirector.Instance) SuspicionDirector.Instance.AdjustSuspicion(push);
                 if (!Squad.GameMode.Raccoons) WatchStashing();
             }
-            if (Squad.GameMode.Raccoons) CheckDen();
+            if (Squad.GameMode.Raccoons && (!panic || panic.Phase != RoundPhase.Results)) CheckDen();
             Publish();
         }
 
@@ -160,12 +160,19 @@ namespace TrashPandas.Runtime.Loot
                 if (d.magnitude > DenRadius) continue;
                 var item = g.GetComponent<LootItem>();
                 if (!item) { carry.Drop(pair.Key, Vector3.zero); continue; } // a glass isn't loot
+                if (!HeavyCarry.CanDeliver(g.RequiresBothHands, carry.Snapshot.Lifted(pair.Key))) continue; // drag it alone? no
                 int index = carry.IndexOf(g);
                 var carriers = carry.CarriersOfItem(index).ToList();
                 carry.Consume(pair.Key);
                 int id = _items.IndexOf(item), share = item.Value / carriers.Count, extra = item.Value % carriers.Count;
+                var panicNow = PanicDirector.Instance;
+                bool running = panicNow && panicNow.Phase == RoundPhase.Panic;
                 for (int k = 0; k < carriers.Count; k++)
-                    Ledger.Deliver(carriers[k], id * 8 + k, share + (k < extra ? 1 : 0), k == 0 && item.IsObjective ? item.Objective : (ObjectiveId?)null);
+                {
+                    int value = share + (k < extra ? 1 : 0);
+                    Ledger.Deliver(carriers[k], id * 8 + k, value, k == 0 && item.IsObjective ? item.Objective : (ObjectiveId?)null);
+                    if (running) panicNow.Payout.AddShare(carriers[k], value); // banked during the RUN: still safe
+                }
                 item.SetState(LootState.Stashed);
                 _offline.Total = Ledger.Total;
                 if (item.IsObjective) _offline.ObjectivesDone |= (byte)(1 << (int)item.Objective);
@@ -195,6 +202,8 @@ namespace TrashPandas.Runtime.Loot
         public void OnEscaped(int player, Core.Panic.RoundPayout payout)
         {
             var carry = Squad.CarryDirector.Instance;
+            var held = carry ? carry.ItemOf(player) : null;
+            if (held && !HeavyCarry.CanDeliver(held.RequiresBothHands, carry.Snapshot.Lifted(player))) { carry.Drop(player, Vector3.zero); return; }
             var g = carry ? carry.Consume(player) : null;
             var item = g ? g.GetComponent<LootItem>() : null;
             if (!item) { if (g) { g.Body.isKinematic = false; foreach (var c in g.Colliders) c.enabled = true; } return; }

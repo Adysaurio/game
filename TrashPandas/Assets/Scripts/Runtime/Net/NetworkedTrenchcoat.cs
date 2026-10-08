@@ -52,7 +52,7 @@ namespace TrashPandas.Runtime.Net
                 if (IsServer)
                 {
                     // Wait until every client has loaded the scene, or their raccoons never reach them.
-                    _spawnSquadAt = Time.realtimeSinceStartup + 6f;
+                    _spawnSquadAt = Time.realtimeSinceStartup + 60f; // fallback only; the load event is the real trigger
                     NetworkManager.SceneManager.OnLoadEventCompleted += OnAllLoaded;
                 }
             }

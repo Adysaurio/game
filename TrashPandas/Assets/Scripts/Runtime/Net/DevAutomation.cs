@@ -71,15 +71,22 @@ namespace TrashPandas.Runtime.Net
                 return new Vector2(Mathf.Sin(Time.time * 3f), Mathf.Cos(Time.time * 3f)) * 0.8f;
             }
             if (Bot == "fetch") return TrashPandas.Runtime.Squad.SquadBots.FetchMove(r);
+            if (Bot == "towerhost" || Bot == "towerclient") return TrashPandas.Runtime.Squad.SquadBots.OnlineTowerMove(r, Bot == "towerclient");
+            if (Bot == "heavyonline") return TrashPandas.Runtime.Squad.SquadBots.OnlineHeavyMove(r);
             return null;
         }
-        public static bool SquadRun => Bot == "noisy" && Time.timeSinceLevelLoad > 4f;
+        public static bool SquadRun => (Bot == "noisy" && Time.timeSinceLevelLoad > 4f) || (Bot == "towerhost" && Time.timeSinceLevelLoad > 24f);
         static bool s_noisyPlaced;
         /// <summary>Dev: -nointro, and the bots that test specific mechanics skip the intro.</summary>
         public static bool SkipIntro => Array.IndexOf(Args, "-nointro") >= 0 || Bot == "heavy" || Bot == "tower";
         /// <summary>Bots built around the garden start (heavy, tower) keep spawning there.</summary>
         public static bool SquadNearOrigin => Bot == "heavy" || Bot == "tower";
-        public static bool SquadTap(TrashPandas.Runtime.Raccoon.RaccoonController r) => Bot == "fetch" && TrashPandas.Runtime.Squad.SquadBots.FetchTap(r);
+        public static bool SquadTap(TrashPandas.Runtime.Raccoon.RaccoonController r) =>
+            (Bot == "fetch" && TrashPandas.Runtime.Squad.SquadBots.FetchTap(r)) || (Bot == "heavyonline" && TrashPandas.Runtime.Squad.SquadBots.OnlineHeavyTap(r));
+        /// <summary>Bots that grab something specific (not what the highlight picked).</summary>
+        public static int? SquadTapIndex => Bot == "heavyonline" ? TrashPandas.Runtime.Squad.SquadBots.GiftIndex : (int?)null;
+
+        static int GiftIndexForTelemetry(TrashPandas.Runtime.Squad.CarryDirector c) => TrashPandas.Runtime.Squad.SquadBots.GiftIndex;
 
         static Vector3? NearestLoot(Vector3 from)
         {
@@ -231,7 +238,16 @@ namespace TrashPandas.Runtime.Net
                 }
             }
             var cdx = TrashPandas.Runtime.Squad.CarryDirector.Instance;
+            if (cdx) panic += $" carry1={cdx.Snapshot.ItemOf(1)}";
             if (cdx) foreach (var g in cdx.Items) if (g && g.name == "Loot_GiantGift") panic += $" gift={g.transform.position:F1} lifted0={cdx.Snapshot.Lifted(0)} lifted1={cdx.Snapshot.Lifted(1)}";
+            var mineR = NetworkedRaccoon.LocalOwned;
+            if (mineR) panic += $" myPid={mineR.Controller.PlayerId} myMount={(mineR.Controller.Mount ? mineR.Controller.Mount.PlayerId : -1)} ridersOnMe={mineR.Controller.RidersAbove} myPos={mineR.transform.position:F1}";
+            if (cdx && GiftIndexForTelemetry(cdx) is int gi && gi >= 0)
+            {
+                var gift = cdx.Items[gi];
+                var gcol = gift.GetComponent<Collider>();
+                panic += $" giftCollider={(gcol && gcol.enabled)}";
+            }
             if (ld) { var ls = ld.Snapshot; panic += $" carry0={(TrashPandas.Runtime.Squad.CarryDirector.Instance ? TrashPandas.Runtime.Squad.CarryDirector.Instance.Snapshot.ItemOf(0) : -1)} pocket=${ls.Total} objectives={ls.ObjectivesPicked:X2}/{ls.ObjectivesDone:X2} clock={ls.SecondsLeft:F0}"; }
             int hearing = 0;
             foreach (var b in d.Brains) if (b.HeardNoise.HasValue && Time.time < b.HeardUntil) hearing++;

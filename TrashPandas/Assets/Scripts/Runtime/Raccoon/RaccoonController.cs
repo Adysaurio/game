@@ -63,8 +63,12 @@ namespace TrashPandas.Runtime.Raccoon
         bool IsAbove(RaccoonController other) { var m = Mount; while (m) { if (m == other) return true; m = m.Mount; } return false; }
 
         static readonly System.Collections.Generic.List<RaccoonController> All = new System.Collections.Generic.List<RaccoonController>();
-        void OnEnable() { All.RemoveAll(r => !r); if (!All.Contains(this)) All.Add(this); }
-        void OnDisable() { All.Remove(this); if (Mount) Dismount(Vector3.zero); }
+        // Registered for their whole life: other players' raccoons are disabled copies but still count (towers).
+        void OnDestroy()
+        {
+            All.Remove(this);
+            if (RidersAbove > 0) CollapseTower(); // whoever stood on me falls (escaped, despawned, disconnected)
+        }
 
         /// <summary>Stand on <paramref name="target"/>'s head (if the tower rules allow it).</summary>
         public bool TryMount(RaccoonController target)
@@ -77,8 +81,9 @@ namespace TrashPandas.Runtime.Raccoon
                 found = false;
                 foreach (var r in All) if (r && r != this && r.Mount == top) { top = r; found = true; break; }
             }
-            if (!Core.Raccoons.TowerRules.CanMount(top.Bottom.CarryingHeavy, top.Frozen || top.Bottom.Frozen, top.TowerSize)) return false;
+            if (!Core.Raccoons.TowerRules.CanMount(top.Bottom.CarryingHeavy, top.Frozen || top.Bottom.Frozen, top.TowerSize, IsCaught(top) || IsCaught(top.Bottom))) return false;
             Mount = top;
+            DroppedFromAbove = false;
             _cc.enabled = false;
             _planar = Vector3.zero;
             _verticalVelocity = 0f;
@@ -88,10 +93,18 @@ namespace TrashPandas.Runtime.Raccoon
         /// <summary>Non-owner copy online: mirror who this raccoon stands on (for counting riders), no physics.</summary>
         public void SetRemoteMount(RaccoonController mount) => Mount = mount;
 
+        /// <summary>Caught according to the replicated round state (Frozen is only set on the owner and the host).</summary>
+        static bool IsCaught(RaccoonController r)
+        {
+            var pd = Panic.PanicDirector.Instance;
+            return pd && r.PlayerId >= 0 && pd.Snapshot.OutcomeOf(r.PlayerId) == Core.Panic.PlayerOutcome.Caught;
+        }
+
         public void Dismount(Vector3 push)
         {
-            if (!Mount) return;
+            if (ReferenceEquals(Mount, null)) return;
             Mount = null;
+            _noMountUntil = Time.time + 1f; // tumbling off isn't climbing back on
             if (!enabled) return;
             _cc.enabled = true;
             _planar = new Vector3(push.x, 0f, push.z);
@@ -148,18 +161,22 @@ namespace TrashPandas.Runtime.Raccoon
         void Awake()
         {
             _cc = GetComponent<CharacterController>();
+            All.RemoveAll(r => !r);
+            if (!All.Contains(this)) All.Add(this);
             // The default (1 mm) swallows small per-frame steps at high frame rates (sneaking on a fast PC).
             _cc.minMoveDistance = 0f;
+            // Low steps: walking into another raccoon mustn't carry you up onto its head (only a jump does).
+            _cc.stepOffset = Mathf.Min(_cc.stepOffset, 0.12f);
         }
 
         void Update()
         {
             float dt = Time.deltaTime;
             if (Squad.RoundIntro.Playing) return; // the intro animates us
-            if (Mount)
+            if (!ReferenceEquals(Mount, null))
             {
-                // Riding: stand on the head below; jump to hop off.
-                if (!Mount || !Mount.isActiveAndEnabled) { Dismount(Vector3.zero); return; }
+                // Riding: stand on the head below; jump to hop off. (A destroyed mount compares equal to null.)
+                if (!Mount || !Mount.gameObject.activeInHierarchy) { Dismount(Vector3.zero); return; }
                 transform.position = Mount.HeadTop;
                 if (_move.sqrMagnitude > 0.01f) transform.rotation = Quaternion.RotateTowards(transform.rotation, Quaternion.LookRotation(new Vector3(_move.x, 0f, _move.y)), TurnSpeed * dt);
                 if (_jump.TryConsume(Time.time)) { Dismount(transform.forward * 1.5f + Vector3.up * JumpVelocity); }
@@ -193,6 +210,7 @@ namespace TrashPandas.Runtime.Raccoon
             else if (_jump.TryConsume(Time.time))
             {
                 _verticalVelocity = JumpVelocity;
+                _jumpedSinceGrounded = true;
             }
             else if (grounded && _verticalVelocity < 0f)
             {
@@ -207,14 +225,22 @@ namespace TrashPandas.Runtime.Raccoon
             }
 
             _cc.Move((_planar + Vector3.up * _verticalVelocity) * dt);
-            if (!grounded && _verticalVelocity < 0f && AutoMount) TryLandOnHead();
+            if (_cc.isGrounded && _verticalVelocity <= 0f) _jumpedSinceGrounded = false;
+            // Only a deliberate jump lands you on someone's head (bumping into them from behind doesn't).
+            if (!grounded && _verticalVelocity < 0f && AutoMount && (_jumpedSinceGrounded || DroppedFromAbove)) TryLandOnHead();
         }
 
         /// <summary>Off for raccoons this machine doesn't own (their owner decides).</summary>
         [System.NonSerialized] public bool AutoMount = true;
 
+        float _noMountUntil;
+        bool _jumpedSinceGrounded;
+        /// <summary>Dev bots that place a raccoon above another one.</summary>
+        [System.NonSerialized] public bool DroppedFromAbove;
+
         void TryLandOnHead()
         {
+            if (Time.time < _noMountUntil) return;
             foreach (var r in All)
             {
                 if (!r || r == this || r.IsAbove(this)) continue;

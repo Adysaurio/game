@@ -11,6 +11,9 @@ namespace TrashPandas.Core.Raccoons
 
         public static bool Lifted(int carriers, int needed = Needed) => carriers >= needed;
 
+        /// <summary>A heavy thing only counts (den, exit) while it's actually off the ground.</summary>
+        public static bool CanDeliver(bool heavy, bool lifted) => !heavy || lifted;
+
         public static Vector3 Anchor(IReadOnlyList<Vector3> mouths)
         {
             if (mouths.Count == 0) return Vector3.zero;

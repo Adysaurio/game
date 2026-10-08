@@ -25,6 +25,13 @@ namespace TrashPandas.Core.Panic
             foreach (var pair in shares) _shares[pair.Key] = pair.Value;
         }
 
+        /// <summary>Loot delivered after the shares were set (during the RUN): safe like the rest.</summary>
+        public void AddShare(int player, int value)
+        {
+            _shares[player] = (_shares.TryGetValue(player, out var s) ? s : 0) + value;
+            if (_paid.ContainsKey(player)) _paid[player] += value;
+        }
+
         public void Carry(int player, int value, ObjectiveId? objective) => _mouth[player] = new Carried { Value = value, Objective = objective };
 
         /// <returns>True if the player was carrying something.</returns>

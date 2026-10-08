@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using TrashPandas.Core.Panic;
+using TrashPandas.Core.Raccoons;
 using TrashPandas.Runtime.Net;
 using TrashPandas.Runtime.Npc;
 using TrashPandas.Runtime.Raccoon;
@@ -248,8 +249,9 @@ namespace TrashPandas.Runtime.Panic
                     continue;
                 }
                 _missingSince.Remove(p);
-                if (ExitZones.Contains(OpenExitPositions, r.transform.position, ExitRadius) >= 0)
+                if (TowerRules.CountsForExit(riding: r.Mount) && ExitZones.Contains(OpenExitPositions, r.transform.position, ExitRadius) >= 0)
                 {
+                    r.CollapseTower(); // riders fall off here and keep playing
                     _outcome.MarkEscaped(p);
                     TrashPandas.Runtime.Loot.LootDirector.Instance?.OnEscaped(p, Payout);
                     Payout.Escaped(p);

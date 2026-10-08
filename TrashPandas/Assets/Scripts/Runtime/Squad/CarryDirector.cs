@@ -33,6 +33,7 @@ namespace TrashPandas.Runtime.Squad
         readonly Dictionary<int, RaccoonController> _raccoons = new Dictionary<int, RaccoonController>();
         readonly HashSet<Grabbable> _gluedHere = new HashSet<Grabbable>();
         readonly HashSet<Grabbable> _gluedNow = new HashSet<Grabbable>();
+        readonly List<Vector3> _mouths = new List<Vector3>();
 
         void Awake() => Instance = this;
         public override void OnDestroy() { if (Instance == this) Instance = null; base.OnDestroy(); }
@@ -133,7 +134,7 @@ namespace TrashPandas.Runtime.Squad
                     continue;
                 }
                 bool lifted = HeavyCarry.Lifted(mouths.Count);
-                g.Body.isKinematic = lifted;
+                g.Body.isKinematic = true; // lifted: placed at the mouths; one alone: it stays put
                 foreach (var c in g.Colliders) c.enabled = !lifted;
                 if (lifted) g.transform.position = HeavyCarry.Anchor(mouths) + Vector3.up * 0.25f;
                 else
@@ -142,6 +143,14 @@ namespace TrashPandas.Runtime.Squad
                     var only = CarriersOfItem(index).First();
                     if (Vector3.Distance(GrabHighlight.MouthOf(_raccoons[only].transform), g.transform.position) > GrabPick.Reach + 0.4f) Drop(only, Vector3.zero);
                 }
+            }
+
+            // Heavy things at rest don't budge (a raccoon walking into the cake must not shove it along).
+            for (int i = 0; i < _items.Count; i++)
+            {
+                var g = _items[i];
+                if (!g || !g.RequiresBothHands || CarriersOf(i) > 0 || g.Body.isKinematic) continue;
+                if (g.Body.linearVelocity.sqrMagnitude < 0.01f && Time.timeSinceLevelLoad > 1f) g.Body.isKinematic = true;
             }
 
             var snap = new CarrySnapshot();
@@ -179,6 +188,20 @@ namespace TrashPandas.Runtime.Squad
                 var g = ItemOf(r.PlayerId);
                 if (!g || g.RequiresBothHands) continue;
                 g.transform.SetPositionAndRotation(GrabHighlight.MouthOf(r.transform), r.transform.rotation);
+                foreach (var c in g.Colliders) if (c) c.enabled = false;
+                _gluedNow.Add(g);
+            }
+            // Heavy loads in the air: at the carriers' mouths as this machine sees them, no collisions.
+            for (int index = 0; index < _items.Count; index++)
+            {
+                var g = _items[index];
+                if (!g || !g.RequiresBothHands) continue;
+                _mouths.Clear();
+                bool lifted = false;
+                foreach (var r in FindObjectsByType<RaccoonController>(FindObjectsSortMode.None))
+                    if (r && r.PlayerId >= 0 && s.ItemOf(r.PlayerId) == index) { _mouths.Add(GrabHighlight.MouthOf(r.transform)); lifted |= s.Lifted(r.PlayerId); }
+                if (!lifted || _mouths.Count == 0) continue;
+                g.transform.position = HeavyCarry.Anchor(_mouths) + Vector3.up * 0.25f;
                 foreach (var c in g.Colliders) if (c) c.enabled = false;
                 _gluedNow.Add(g);
             }

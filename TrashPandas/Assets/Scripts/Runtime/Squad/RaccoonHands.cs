@@ -26,7 +26,7 @@ namespace TrashPandas.Runtime.Squad
             if (reader.ClickReleased(rig) || botTap)
             {
                 var outcome = botTap ? new ClickOutcome { Kind = ClickResult.Tap } : _click.Release(now);
-                if (outcome.Kind == ClickResult.Tap) tap(carry.IndexOf(highlight), raccoon.transform.position);
+                if (outcome.Kind == ClickResult.Tap) tap(botTap && Net.DevAutomation.SquadTapIndex.HasValue ? Net.DevAutomation.SquadTapIndex.Value : carry.IndexOf(highlight), raccoon.transform.position);
                 else if (outcome.Kind == ClickResult.Throw && carrying) throwIt(rig.OutputCamera.transform.forward, outcome.Strength);
             }
         }
