@@ -15,12 +15,34 @@ namespace TrashPandas.EditorTools
         [MenuItem("TrashPandas/Build Windows (dev)")]
         public static void BuildWindows() => Build(BuildTarget.StandaloneWindows64, "../Builds/windows/TrashPandas.exe");
 
+        const string IconPath = "Assets/Art/Icon/AppIcon.png";
+
+        /// <summary>The app icon (the raccoon with the red bandana) for every platform.</summary>
+        static void ApplyIcon()
+        {
+            AssetDatabase.ImportAsset(IconPath, ImportAssetOptions.ForceSynchronousImport);
+            if (AssetImporter.GetAtPath(IconPath) is TextureImporter ti)
+            {
+                ti.textureType = TextureImporterType.Default;
+                ti.alphaIsTransparency = true;
+                ti.mipmapEnabled = false;
+                ti.npotScale = TextureImporterNPOTScale.None;
+                ti.textureCompression = TextureImporterCompression.Uncompressed;
+                ti.maxTextureSize = 1024;
+                ti.SaveAndReimport();
+            }
+            var icon = AssetDatabase.LoadAssetAtPath<Texture2D>(IconPath);
+            if (!icon) { Debug.LogWarning($"[BuildScripts] no icon at {IconPath}"); return; }
+            PlayerSettings.SetIcons(UnityEditor.Build.NamedBuildTarget.Unknown, new[] { icon }, IconKind.Any);
+        }
+
         static void Build(BuildTarget target, string path)
         {
             PlayerSettings.runInBackground = true; // several local instances must keep simulating unfocused
             PlayerSettings.fullScreenMode = FullScreenMode.Windowed;
             PlayerSettings.defaultScreenWidth = 1280;
             PlayerSettings.defaultScreenHeight = 720;
+            ApplyIcon();
             var report = BuildPipeline.BuildPlayer(new BuildPlayerOptions
             {
                 scenes = Scenes,
