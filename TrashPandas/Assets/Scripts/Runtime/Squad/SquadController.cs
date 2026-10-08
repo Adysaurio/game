@@ -119,6 +119,9 @@ namespace TrashPandas.Runtime.Squad
                     else if (Hideout.Near(r.transform.position) is Hideout can) r.EnterCan(can);
                     else RaccoonPipe.Near(r.transform.position)?.Crawl(r);
                 }
+                var kb = UnityEngine.InputSystem.Keyboard.current;
+                if (kb != null && kb.gKey.wasPressedThisFrame) r.ToggleEmote(1);
+                if (kb != null && kb.hKey.wasPressedThisFrame) r.ToggleEmote(2);
                 bool botJump = Net.DevAutomation.SquadJump(r);
                 r.SetInput(move, _reader.JumpPressed || botJump, _reader.JumpHeld || botJump, _reader.CrouchHeld || Net.DevAutomation.SquadCrouch, run);
                 if (r.IsRunning && Time.time >= _nextRunNoise) { _nextRunNoise = Time.time + 0.5f; NoiseBus.Emit(NoiseKind.Running, r.transform.position); }

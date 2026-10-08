@@ -91,6 +91,9 @@ namespace TrashPandas.Runtime.Net
                     ?? (DevAutomation.Bot == "hopflee" || DevAutomation.Bot == "mouthflee" ? new Vector2(0f, 1f) : _reader.CameraRelativeMove(CameraRig)); // dev bots
                 raccoon.Controller.SetInput(move, _reader.JumpPressed, _reader.JumpHeld, _reader.CrouchHeld || DevAutomation.FleeCrouchAt(raccoon.transform.position), _reader.RunHeld || DevAutomation.SquadRun);
                 var r = raccoon.Controller;
+                var kb = UnityEngine.InputSystem.Keyboard.current;
+                if (kb != null && kb.gKey.wasPressedThisFrame) r.ToggleEmote(1);
+                if (kb != null && kb.hKey.wasPressedThisFrame) r.ToggleEmote(2);
                 if (_reader.UsePressed || DevAutomation.SquadUse(r))
                 {
                     if (r.InCan) r.ExitCan();

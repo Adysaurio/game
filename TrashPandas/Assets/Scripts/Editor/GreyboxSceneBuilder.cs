@@ -1,3 +1,4 @@
+using System.Linq;
 using System.IO;
 using TrashPandas.Runtime.Cameras;
 using TrashPandas.Runtime.Grabbing;
@@ -748,6 +749,7 @@ namespace TrashPandas.EditorTools
             look.Pupils = pupils;
             look.Lids = lids;
             look.Bandana = bandana.GetComponent<Renderer>();
+            AttachRaccoonModel(visual, head, tail, paws, bandana, look);
             root.AddComponent<RaccoonController>();
             root.AddComponent<NetworkObject>();
             var nt = root.AddComponent<NetworkTransform>();
@@ -765,6 +767,90 @@ namespace TrashPandas.EditorTools
             EditorUtility.SetDirty(prefab);
             PrefabUtility.SavePrefabAsset(prefab);
             return prefab.GetComponent<RaccoonController>();
+        }
+
+        const string RaccoonArt = "Assets/Art/Raccoon";
+        public const float RaccoonModelScale = 0.72f;
+
+        /// <summary>
+        /// The real raccoon (Meshy model, rigged, 11 clips) in place of the greybox shapes. The greybox transforms stay
+        /// (head, tail, paws drive nothing now but keep old code happy); only the player-colored bandana stays visible.
+        /// Without the model asset the greybox raccoon is kept.
+        /// </summary>
+        static void AttachRaccoonModel(Transform visual, Transform head, Transform tail, Transform[] paws, Transform bandana, RaccoonLook look)
+        {
+            AssetDatabase.ImportAsset(TrashPandas.EditorTools.RaccoonModelImport.ModelPath, ImportAssetOptions.ForceSynchronousImport);
+            var model = AssetDatabase.LoadAssetAtPath<GameObject>(TrashPandas.EditorTools.RaccoonModelImport.ModelPath);
+            if (!model) { Debug.LogWarning("[GreyboxSceneBuilder] no raccoon model — keeping the greybox raccoon"); return; }
+
+            // URP material with the baked texture.
+            string texPath = RaccoonArt + "/RaccoonSkin.png";
+            AssetDatabase.ImportAsset(texPath, ImportAssetOptions.ForceSynchronousImport);
+            var tex = AssetDatabase.LoadAssetAtPath<Texture2D>(texPath);
+            string matPath = RaccoonArt + "/RaccoonSkin.mat";
+            var mat = AssetDatabase.LoadAssetAtPath<Material>(matPath);
+            if (!mat) { mat = new Material(Shader.Find("Universal Render Pipeline/Lit")); AssetDatabase.CreateAsset(mat, matPath); }
+            mat.SetTexture("_BaseMap", tex);
+            mat.SetColor("_BaseColor", Color.white);
+            mat.SetFloat("_Smoothness", 0.12f);
+            EditorUtility.SetDirty(mat);
+
+            // One state per clip; RaccoonLook cross-fades by name.
+            string ctrlPath = RaccoonArt + "/Raccoon.controller";
+            AssetDatabase.DeleteAsset(ctrlPath);
+            var ctrl = UnityEditor.Animations.AnimatorController.CreateAnimatorControllerAtPath(ctrlPath);
+            var sm = ctrl.layers[0].stateMachine;
+            var clips = AssetDatabase.LoadAllAssetsAtPath(TrashPandas.EditorTools.RaccoonModelImport.ModelPath).OfType<AnimationClip>().Where(c => !c.name.StartsWith("__preview__")).ToList();
+            foreach (var clip in clips)
+            {
+                var st = sm.AddState(clip.name);
+                st.motion = clip;
+                if (clip.name == "Idle") sm.defaultState = st;
+            }
+            Debug.Log($"[GreyboxSceneBuilder] raccoon clips: {string.Join(", ", clips.Select(c => c.name))} | takes: {string.Join(", ", ((ModelImporter)AssetImporter.GetAtPath(TrashPandas.EditorTools.RaccoonModelImport.ModelPath)).defaultClipAnimations.Select(c => c.takeName))}");
+
+            var inst = (GameObject)Object.Instantiate(model, visual);
+            inst.name = "Model";
+            inst.transform.localPosition = Vector3.zero;
+            inst.transform.localRotation = Quaternion.Euler(0f, 180f, 0f); // the model faces -Z
+            inst.transform.localScale = Vector3.one * RaccoonModelScale;
+            foreach (var smr in inst.GetComponentsInChildren<SkinnedMeshRenderer>())
+            {
+                smr.sharedMaterial = mat;
+                smr.updateWhenOffscreen = true;
+                smr.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.On;
+            }
+            var anim = inst.GetComponent<Animator>();
+            if (!anim) anim = inst.AddComponent<Animator>();
+            anim.runtimeAnimatorController = ctrl;
+            anim.applyRootMotion = false;
+            anim.cullingMode = AnimatorCullingMode.AlwaysAnimate;
+            look.Model = anim;
+
+            // Hide the greybox shapes (keep the transforms) — but keep the bandana in the player's color, fitted to the neck.
+            foreach (Transform child in visual)
+                if (child != inst.transform && child != bandana && child != head && child != tail) child.gameObject.SetActive(false);
+            foreach (Transform child in head) child.gameObject.SetActive(false);
+            foreach (Transform child in tail) child.gameObject.SetActive(false);
+            foreach (var p in paws) p.gameObject.SetActive(false);
+            // The player's color is the model's own bandana, recolored per player (tools: RaccoonSkin_P1..P4.png).
+            bandana.gameObject.SetActive(false);
+            var skins = new Material[5];
+            skins[0] = mat;
+            for (int p = 1; p < 5; p++)
+            {
+                string tp = $"{RaccoonArt}/RaccoonSkin_P{p}.png";
+                AssetDatabase.ImportAsset(tp, ImportAssetOptions.ForceSynchronousImport);
+                var t = AssetDatabase.LoadAssetAtPath<Texture2D>(tp);
+                string mp = $"{RaccoonArt}/RaccoonSkin_P{p}.mat";
+                var m = AssetDatabase.LoadAssetAtPath<Material>(mp);
+                if (!m) { m = new Material(mat); AssetDatabase.CreateAsset(m, mp); }
+                m.CopyPropertiesFromMaterial(mat);
+                if (t) m.SetTexture("_BaseMap", t);
+                EditorUtility.SetDirty(m);
+                skins[p] = m;
+            }
+            look.Skins = skins;
         }
 
         static GameObject Prop(string name, PrimitiveType type, Vector3 position, Vector3 scale, Material mat, float mass, bool bothHands)

@@ -200,7 +200,8 @@ namespace TrashPandas.Runtime.Ui
             _cardTitle ??= new GUIStyle(GUI.skin.label) { fontSize = 40, fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleCenter };
             _cardRule ??= new GUIStyle(GUI.skin.label) { fontSize = 18, alignment = TextAnchor.MiddleCenter, wordWrap = true };
             float t = Time.time - _cardFrom;
-            if (t < 6f)
+            var pdCard = PanicDirector.Instance;
+            if (t < 6f && (!pdCard || pdCard.Phase == RoundPhase.Infiltration))
             {
                 float a = Mathf.Clamp01(t * 3f) * Mathf.Clamp01((6f - t) * 2f);
                 GUI.color = new Color(0f, 0f, 0f, 0.6f * a);

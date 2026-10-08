@@ -18,6 +18,15 @@ namespace TrashPandas.Runtime.Raccoon
         public Transform[] Pupils = new Transform[0];
         public Transform[] Lids = new Transform[0];
         public Renderer Bandana;
+        /// <summary>The 3D raccoon (Meshy, rigged): when set, its clips replace the greybox poses.</summary>
+        public Animator Model;
+        /// <summary>The model's material per player (its bandana recolored).</summary>
+        public Material[] Skins = new Material[0];
+        string _clip;
+        public string CurrentClip => _clip;
+        public float Lean => _leanK;
+        float _leanK;
+        float _clipSince;
 
         public static readonly Color[] PlayerColors =
         {
@@ -156,6 +165,22 @@ namespace TrashPandas.Runtime.Raccoon
             float pitch = Mathf.Lerp(Mathf.Lerp(Mathf.Lerp(Mathf.Lerp(Mathf.Clamp(planar * 2.2f, 0f, 12f), 22f, _sneakK), 68f, _runK), 28f, _pushK), -8f, _hangK);
             sy *= 1f + 0.12f * _hangK; // stretched up, hanging by the paws
             float sway = moving ? Mathf.Sin(_phase) * Mathf.Lerp(Mathf.Lerp(4f, 9f, _sneakK), 2f, _runK) : 0f;
+            if (Model)
+            {
+                // The model animates itself; keep the squash & stretch (juice) and a little sway.
+                if (Visual)
+                {
+                    Visual.localScale = new Vector3(sxz, sy, sxz);
+                    // Running: a low forward lean, paws reaching for the ground (the gallop).
+                    float lean = 42f * _runK * (moving ? 1f : 0f);
+                    _leanK = Mathf.MoveTowards(_leanK, lean, dt * 160f);
+                    Visual.localPosition = new Vector3(0f, 0f, -0.05f * _leanK / 42f);
+                    Visual.localRotation = Quaternion.Euler(_leanK + (moving ? Mathf.Sin(_phase * 2f) * 5f * _runK : 0f), 0f, sway * 0.4f);
+                }
+                PlayModelClip(planar, moving, riding);
+                UpdateBandana();
+                return;
+            }
             if (Visual)
             {
                 Visual.localScale = new Vector3(sxz, sy, sxz);
@@ -266,8 +291,44 @@ namespace TrashPandas.Runtime.Raccoon
             GUI.color = Color.white;
         }
 
+        /// <summary>Which clip fits what the raccoon is doing (owner: from its state; others: from how it moves).</summary>
+        void PlayModelClip(float planar, bool moving, bool riding)
+        {
+            var r = _raccoon;
+            bool local = r && r.enabled;
+            bool carrying = r && Squad.CarryDirector.Instance && Squad.CarryDirector.Instance.IsCarrying(r.PlayerId);
+            bool airborne = r && !riding && !r.Hanging && !r.Crawling && !r.InCan && (local ? !r.IsGroundedForPeel : Mathf.Abs(_vy) > 1.2f);
+            string clip; float speed = 1f;
+            if (r && r.Hanging) clip = "Hang";
+            else if (r && r.Crawling) { clip = "Crawl"; speed = 1.6f; }
+            else if (riding) clip = "Idle";
+            else if (airborne) { clip = "Jump"; speed = 1.4f; }
+            else if (r && r.Pushing) clip = "Push";
+            else if (_runK > 0.5f && moving) { clip = "Run"; speed = Mathf.Clamp(planar * 0.32f, 1.1f, 2.2f); } // leaning gallop
+            else if (carrying && moving) { clip = "Carry"; speed = Mathf.Clamp(planar * 0.7f, 0.8f, 2.2f); }
+            else if (_sneakK > 0.5f && moving) { clip = "Sneak"; speed = Mathf.Clamp(planar * 0.9f, 0.7f, 2f); }
+            else if (moving) { clip = "Walk"; speed = Mathf.Clamp(planar * 0.75f, 0.8f, 2.6f); }
+            else if (r && r.Emote == 1) clip = "Dance";
+            else if (r && r.Emote == 2) clip = "Cheer";
+            else clip = "Idle";
+            if (clip != _clip)
+            {
+                _clip = clip;
+                _clipSince = Time.time;
+                Model.CrossFadeInFixedTime(clip, clip == "Jump" ? 0.08f : 0.18f);
+            }
+            Model.speed = speed;
+        }
+
         void UpdateBandana()
         {
+            if (Model && Skins.Length > 0 && _raccoon && _raccoon.PlayerId != _colorFor)
+            {
+                _colorFor = _raccoon.PlayerId;
+                var skin = Skins[Mathf.Abs(_colorFor) % Skins.Length];
+                foreach (var smr in Model.GetComponentsInChildren<SkinnedMeshRenderer>()) smr.sharedMaterial = skin;
+                return;
+            }
             if (!Bandana || !_raccoon || _raccoon.PlayerId == _colorFor) return;
             _colorFor = _raccoon.PlayerId;
             Bandana.GetPropertyBlock(_block);

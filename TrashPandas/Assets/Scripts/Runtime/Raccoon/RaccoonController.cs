@@ -36,6 +36,9 @@ namespace TrashPandas.Runtime.Raccoon
         /// <summary>Caught in the panic: no more control.</summary>
         public bool Frozen;
         public bool IsStunned => Time.time < _stunnedUntil;
+        /// <summary>0 none, 1 dance, 2 cheer (G / H). Moving cancels it. Synced to the others online.</summary>
+        public byte Emote { get; set; }
+        public void ToggleEmote(byte e) { Emote = Emote == e ? (byte)0 : e; if (Emote != 0) Ui.DebugChecklist.Mark("emote"); }
         public bool IsRunning => _runHeld && !_crouchHeld && _planar.sqrMagnitude > 1f;
         public bool IsSneaking => _crouchHeld;
         public float PlanarSpeed => _planar.magnitude;
@@ -365,6 +368,7 @@ namespace TrashPandas.Runtime.Raccoon
         {
             float dt = Time.deltaTime;
             if (Squad.RoundIntro.Playing) return; // the intro animates us
+            if (_move.sqrMagnitude > 0.05f) Emote = 0;
             if (Crawling) { TickCrawl(dt); return; }
             if (Hanging) { TickHang(); return; }
             if (InCan) return; // tucked in a trash can

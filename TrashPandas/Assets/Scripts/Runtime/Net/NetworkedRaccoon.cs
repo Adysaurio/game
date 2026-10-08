@@ -26,6 +26,7 @@ namespace TrashPandas.Runtime.Net
         /// <summary>Which hideout (can, bush, hot dog) the owner is in, 0 = none — so everyone sees the lid flip and the host can kick it.</summary>
         readonly NetworkVariable<int> _hideout = new NetworkVariable<int>(0, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Owner);
         Squad.Hideout _remoteHideout;
+        readonly NetworkVariable<byte> _emote = new NetworkVariable<byte>(0, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Owner);
 
         void Awake() => Controller = GetComponent<RaccoonController>();
 
@@ -42,10 +43,12 @@ namespace TrashPandas.Runtime.Net
                 if (_mountedOn.Value != m) _mountedOn.Value = m;
                 bool inside = Controller.Crawling || Controller.InCan;
                 if (_crawling.Value != inside) _crawling.Value = inside;
+                if (_emote.Value != Controller.Emote) _emote.Value = Controller.Emote;
                 int hid = Controller.InCan ? Controller.InCan.Id : 0;
                 if (_hideout.Value != hid) _hideout.Value = hid;
                 return;
             }
+            Controller.Emote = _emote.Value;
             var want = _hideout.Value != 0 ? Squad.Hideout.ById(_hideout.Value) : null;
             if (want != _remoteHideout)
             {

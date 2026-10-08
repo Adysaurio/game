@@ -29,6 +29,7 @@ namespace TrashPandas.Runtime.Ui
             ("trashcan", "Hide in a trash can or a bush (E), look around, hop out"),
             ("push", "Push something (walk into a crate / the gift)"),
             ("getaway", "Deliver all 3 objectives: GETAWAY! (exits open)"),
+            ("emote", "Dance (G) or cheer (H)"),
             ("calm", "During the RUN, everyone hide until the alert drains (PHEW)"),
             ("nemesis", "Get spotted by tonight's nemesis (planner / pest guy / granny)"),
             ("pebble", "Throw a pebble (2, HOLD Q to aim, let go)"),

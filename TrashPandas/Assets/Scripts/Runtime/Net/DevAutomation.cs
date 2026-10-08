@@ -151,6 +151,31 @@ namespace TrashPandas.Runtime.Net
                 gd.HostUse(0, TrashPandas.Core.Raccoons.Gadget.Pebble, from, new Vector3(-0.95f, -0.3f, 0f));
             }
         }
+        static bool s_galleryDone;
+        /// <summary>Dev "-gallery": one copy of the raccoon model per clip, side by side in front of the camera.</summary>
+        public static void Gallery()
+        {
+            if (s_galleryDone || !Debug.isDebugBuild || Array.IndexOf(Args, "-gallery") < 0 || Time.timeSinceLevelLoad < 1.5f) return;
+            var sq = TrashPandas.Runtime.Squad.SquadController.Instance;
+            var look = sq && sq.Active ? sq.Active.GetComponent<TrashPandas.Runtime.Raccoon.RaccoonLook>() : null;
+            var cam = Camera.main;
+            if (!look || !look.Model || !cam) return;
+            s_galleryDone = true;
+            string[] clips = { "Idle", "Walk", "Sneak", "Run", "Jump", "Push", "Hang", "Carry", "Crawl", "Cheer", "Dance" };
+            Vector3 f = cam.transform.forward; f.y = 0f; f.Normalize();
+            Vector3 right = Vector3.Cross(Vector3.up, f);
+            Vector3 c = cam.transform.position + f * 3.2f; c.y = sq.Active.transform.position.y;
+            for (int i = 0; i < clips.Length; i++)
+            {
+                var g = UnityEngine.Object.Instantiate(look.Model.gameObject);
+                g.transform.position = c + right * ((i - clips.Length / 2f) * 0.5f) + f * (i % 2) * 0.5f;
+                g.transform.rotation = Quaternion.LookRotation(right) * Quaternion.Euler(0f, 180f, 0f);
+                g.transform.localScale = look.Model.transform.lossyScale;
+                var a = g.GetComponent<Animator>();
+                a.Play(clips[i], 0, 0.3f);
+                a.speed = 1f;
+            }
+        }
         public static bool TowerHop => Array.IndexOf(Args, "-hopoff") >= 0;
         public static bool SquadCrouch => Bot == "sneak";
         static float s_nextGadget;
@@ -368,6 +393,9 @@ namespace TrashPandas.Runtime.Net
             var nmx = TrashPandas.Runtime.Panic.NemesisDirector.Instance;
             if (nmx && nmx.Pawn) panic += $" nemesis={nmx.Kind}/{nmx.Pawn.Mood}@{nmx.Pawn.transform.position:F1} nemnet={nmx.IsSpawned}/{nmx.DebugNet}";
             if (pdx) panic += $" alert={pdx.Alert01:F2}";
+            var sqg = TrashPandas.Runtime.Squad.SquadController.Instance;
+            var lookx = sqg && sqg.Active ? sqg.Active.GetComponent<TrashPandas.Runtime.Raccoon.RaccoonLook>() : null;
+            if (lookx) panic += $" clip={lookx.CurrentClip} lean={lookx.Lean:F0} running={sqg.Active.IsRunning}";
             int occupied = 0;
             var who = ""; foreach (var h in TrashPandas.Runtime.Squad.Hideout.All) if (h && h.Occupant) { occupied++; who += h.Occupant.PlayerId; }
             panic += $" occupied={occupied}:{who}";

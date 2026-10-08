@@ -94,6 +94,7 @@ namespace TrashPandas.Runtime.Squad
 
             if (!SimulationAuthority.IsSimulating || (SimulationAuthority.IsOnline && !IsSpawned)) return;
             Net.DevAutomation.GadgetTests();
+            Net.DevAutomation.Gallery();
             float now = Time.time;
             if (now >= _nextPawnScan) { _nextPawnScan = now + 1f; _pawns = FindObjectsByType<NpcPawn>(FindObjectsSortMode.None); }
 
