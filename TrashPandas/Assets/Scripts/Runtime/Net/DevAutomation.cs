@@ -103,9 +103,10 @@ namespace TrashPandas.Runtime.Net
                 // On RUN: dive into the nearest bush and stay there.
                 var pdh = TrashPandas.Runtime.Panic.PanicDirector.Instance;
                 if (!pdh || pdh.Phase != TrashPandas.Runtime.Panic.RoundPhase.Panic) return Vector2.zero;
+                if (r.InCan) return Vector2.zero;
                 Vector3? best = null;
-                foreach (var h in TrashPandas.Runtime.Squad.HidingSpot.All)
-                    if (h && h.Kind == TrashPandas.Runtime.Squad.HidingKind.Bush && (!best.HasValue || Vector3.Distance(h.transform.position, r.transform.position) < Vector3.Distance(best.Value, r.transform.position)))
+                foreach (var h in TrashPandas.Runtime.Squad.Hideout.All)
+                    if (h && !h.Occupant && (!best.HasValue || Vector3.Distance(h.transform.position, r.transform.position) < Vector3.Distance(best.Value, r.transform.position)))
                         best = h.transform.position;
                 if (!best.HasValue) return Vector2.zero;
                 Vector3 d = best.Value - r.transform.position; d.y = 0f;
@@ -153,6 +154,7 @@ namespace TrashPandas.Runtime.Net
         public static bool SquadUse(TrashPandas.Runtime.Raccoon.RaccoonController r)
         {
             if (Bot == "tunnel" && !s_tunnelDone && !r.Crawling && TrashPandas.Runtime.Squad.RaccoonPipe.Near(r.transform.position)) { s_tunnelDone = true; return true; }
+            if (Bot == "hideflee" && !r.InCan && TrashPandas.Runtime.Panic.PanicDirector.Instance && TrashPandas.Runtime.Panic.PanicDirector.Instance.Phase == TrashPandas.Runtime.Panic.RoundPhase.Panic && TrashPandas.Runtime.Squad.Hideout.Near(r.transform.position)) return true;
             if (Bot == "canhide" && !s_canDone && !r.InCan && TrashPandas.Runtime.Squad.Hideout.Near(r.transform.position)) { s_canDone = true; return true; }
             return false;
         }
@@ -310,6 +312,7 @@ namespace TrashPandas.Runtime.Net
             if (pdx) panic += $" chasers[{pdx.ChaserStates}]";
             var nmx = TrashPandas.Runtime.Panic.NemesisDirector.Instance;
             if (nmx && nmx.Pawn) panic += $" nemesis={nmx.Kind}/{nmx.Pawn.Mood}@{nmx.Pawn.transform.position:F1} nemnet={nmx.IsSpawned}/{nmx.DebugNet}";
+            if (pdx) panic += $" alert={pdx.Alert01:F2}";
             var sqx = TrashPandas.Runtime.Squad.SquadController.Instance;
             var cg = GameObject.Find("Crate_Garden");
             if (sqx && sqx.Active) panic += $" crate={(cg ? cg.transform.position.ToString("F2") : "-")} hanging={sqx.Active.Hanging} pushing={sqx.Active.Pushing}";

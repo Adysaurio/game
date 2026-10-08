@@ -43,7 +43,17 @@ namespace TrashPandas.Runtime.Npc
         public Vector3 Eye => Head ? Head.position : transform.position + Vector3.up * EyeHeight;
         public Vector3 Forward => Head ? Head.forward : transform.forward;
 
-        void Awake() => _agent = GetComponent<NavMeshAgent>();
+        float _baseSpeed;
+        void Awake() { _agent = GetComponent<NavMeshAgent>(); _baseSpeed = _agent ? _agent.speed : 1f; }
+
+        /// <summary>The RUN cooled down: back to a stroll.</summary>
+        public void CalmDown()
+        {
+            if (_agent) { _agent.speed = _baseSpeed; _agent.acceleration = 8f; }
+            Stop();
+            LookAt(null);
+            SetMood(MoodCalmAgain);
+        }
 
         public override void OnNetworkSpawn()
         {

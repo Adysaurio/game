@@ -93,6 +93,7 @@ namespace TrashPandas.Runtime.Panic
             if (RoundIntro.Playing) return;
             var sd = SuspicionDirector.Instance;
             if (!sd || sd.Suspended) return;
+            Pawn.SetSpeed(BaseSpeed * Profile.Speed); // (after a RUN calms down)
             if (!_portrait) TickInfiltration(sd);
         }
         bool _portrait;

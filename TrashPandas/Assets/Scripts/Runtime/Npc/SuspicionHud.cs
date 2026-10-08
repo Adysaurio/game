@@ -89,12 +89,27 @@ namespace TrashPandas.Runtime.Npc
             // Bar
             float w = Mathf.Min(360f, UiScale.Width - 40f), x = (UiScale.Width - w) / 2f, y = 14f;
             float k = d.Suspicion / 100f;
+            string barLabel = $"SUSPICION {Mathf.RoundToInt(d.Suspicion)}";
+            var pd = TrashPandas.Runtime.Panic.PanicDirector.Instance;
+            if (pd && pd.Phase == TrashPandas.Runtime.Panic.RoundPhase.Panic)
+            {
+                // The RUN: the bar is the alert. Everyone hides → it drains → back to normal.
+                k = pd.Alert01;
+                barLabel = k >= 0.999f ? "ALERT!  everyone hide to calm them down" : "CALMING DOWN…  stay hidden";
+            }
             GUI.color = new Color(0f, 0f, 0f, 0.55f);
             GUI.DrawTexture(new Rect(x - 4, y - 4, w + 8, 26), Texture2D.whiteTexture);
             GUI.color = Color.Lerp(new Color(1f, 0.8f, 0.2f), new Color(1f, 0.25f, 0.2f), k);
             GUI.DrawTexture(new Rect(x, y, w * k, 18), Texture2D.whiteTexture);
             GUI.color = Color.white;
-            GUI.Label(new Rect(x, y, w, 18), $"SUSPICION {Mathf.RoundToInt(d.Suspicion)}", _label);
+            GUI.Label(new Rect(x, y, w, 18), barLabel, _label);
+            if (pd && Time.time - pd.CalmedAt < 3.5f)
+            {
+                GUI.color = new Color(0.55f, 1f, 0.6f, Mathf.Clamp01((3.5f - (Time.time - pd.CalmedAt)) * 2f));
+                GUI.Label(new Rect(0, UiScale.Height * 0.3f, UiScale.Width, 120), "PHEW…", _banner);
+                GUI.Label(new Rect(0, UiScale.Height * 0.3f + 100, UiScale.Width, 24), "they gave up — back to normal", _label);
+                GUI.color = Color.white;
+            }
 
             // Icons over humans
             if (Event.current.type == EventType.Repaint || Event.current.type == EventType.Layout) _drawnBubbles.Clear();

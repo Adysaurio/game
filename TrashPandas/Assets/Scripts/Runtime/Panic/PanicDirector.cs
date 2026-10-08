@@ -48,6 +48,10 @@ namespace TrashPandas.Runtime.Panic
         bool _exitsPicked;
         readonly List<Vector3> _openExitPositions = new List<Vector3>();
         public readonly RoundPayout Payout = new RoundPayout();
+        readonly RunCalm _calm = new RunCalm();
+        float _runStartedAt;
+        /// <summary>0..1: how hot the RUN still is (drains while everyone hides).</summary>
+        public float Alert01 => Snapshot.AlertPercent / 100f;
         bool _cleanExit;
         readonly NetworkVariable<PanicSnapshot> _snapshot = new NetworkVariable<PanicSnapshot>();
         RoundPhase _offlinePhase;
@@ -221,6 +225,7 @@ namespace TrashPandas.Runtime.Panic
                 if (CleanExit.Qualifies(true, d.magnitude < ArchRadius, (int)suspicion.LastFrame.MissingParts, pocket ? pocket.Pocket.Total : 0)) EndWithCleanExit(suspicion);
             }
             if (Phase == RoundPhase.Panic) TickPanic();
+            else if (Phase == RoundPhase.Infiltration && CagedCount() > 0) TickCagedAfterCalm();
         }
 
         void BeginPanic(SuspicionDirector suspicion)
@@ -235,6 +240,11 @@ namespace TrashPandas.Runtime.Panic
             _grace.Begin(Time.time);
             _missingSince.Clear();
             _outcome.Begin(_players, Time.time, TimeLimit);
+            _calm.Reset();
+            _runStartedAt = Time.time;
+            // Still in the pet carrier from an earlier RUN: they stay caught.
+            foreach (var r in FindObjectsByType<RaccoonController>(FindObjectsSortMode.None))
+                if (r && r.Frozen && _players.Contains(r.PlayerId)) _outcome.MarkCaught(r.PlayerId);
             // The coat's pocket is shared out now; each raccoon only keeps its share if it escapes.
             var loot = TrashPandas.Runtime.Loot.LootDirector.Instance;
             if (loot && Squad.GameMode.Raccoons)
@@ -324,7 +334,41 @@ namespace TrashPandas.Runtime.Panic
             Publish();
         }
 
+        /// <summary>Everyone hid long enough: the humans give up and the wedding goes back to normal.</summary>
+        void CalmDown(SuspicionDirector suspicion)
+        {
+            foreach (var c in _chasers) if (c.Brain.Pawn) c.Brain.Pawn.CalmDown();
+            foreach (var w in _witnesses) if (w.Pawn) w.Pawn.CalmDown();
+            _chasers.Clear();
+            _witnesses.Clear();
+            if (suspicion) { suspicion.ResetSuspicion(); suspicion.Suspended = false; }
+            SetPhase(RoundPhase.Infiltration);
+            CalmedAt = Time.time;
+            Ui.DebugChecklist.Mark("calm");
+            Debug.Log("[Panic] calmed down");
+            Publish();
+            CalmRpcIfOnline();
+        }
+
+        /// <summary>When the last RUN cooled down (for the "phew" banner; host/offline only — clients use the RPC).</summary>
+        public float CalmedAt { get; private set; } = -100f;
+
+        void CalmRpcIfOnline() { if (IsSpawned && IsServer) CalmedRpc(); }
+
+        [Rpc(SendTo.NotServer)]
+        void CalmedRpc() => CalmedAt = Time.time;
+
         bool shockedForWitnesses(float now) => !_grace.ChasersMayMove(now);
+
+        /// <summary>After a calm-down the cage stays shut: a friend can still sneak over and open it.</summary>
+        void TickCagedAfterCalm()
+        {
+            _raccoonOf.Clear();
+            foreach (var r in FindObjectsByType<RaccoonController>(FindObjectsSortMode.None))
+                if (r && r.PlayerId >= 0) _raccoonOf[r.PlayerId] = r;
+            TickRescue(Time.deltaTime);
+            Publish();
+        }
 
         void TickPanic()
         {
@@ -387,6 +431,11 @@ namespace TrashPandas.Runtime.Panic
                 _assignInput.Add(new PursuitAssigner.Chaser { Position = pawn ? pawn.transform.position : Vector3.zero, Sees = sees });
             }
             var assigned = PursuitAssigner.Assign(_assignInput, MaxChasersPerRaccoon);
+            // Everyone free is hidden and nobody sees anyone: the alert drains; empty = the RUN is over.
+            bool anySeen = false, allHidden = _targets.Count > 0;
+            foreach (var a in _assignInput) if (a.Sees != null && a.Sees.Count > 0) anySeen = true;
+            foreach (var t in _targets) if (!_raccoonOf.TryGetValue(t.Id, out var hr) || !Squad.HidingSpot.Hides(hr)) allHidden = false;
+            if (!shocked && _calm.Update(dt, now - _runStartedAt, anySeen, allHidden)) { CalmDown(suspicion); return; }
             if (!shockedForWitnesses(now)) TickWitnesses(suspicion, now);
             // The nemesis remembers hideouts you've used before: occupied and nearby → she goes to check.
             var nem = NemesisDirector.Instance;
@@ -497,7 +546,7 @@ namespace TrashPandas.Runtime.Panic
 
         void Publish()
         {
-            var snap = new PanicSnapshot { SecondsLeft = _outcome.SecondsLeft(Time.time), CleanExit = _cleanExit, RescuePercent = (byte)Mathf.RoundToInt(RescueProgress01Host * 100f) };
+            var snap = new PanicSnapshot { SecondsLeft = _outcome.SecondsLeft(Time.time), CleanExit = _cleanExit, RescuePercent = (byte)Mathf.RoundToInt(RescueProgress01Host * 100f), AlertPercent = (byte)Mathf.RoundToInt(_calm.Alert01 * 100f) };
             var roster = SimulationAuthority.IsOnline && SessionHost.Instance ? SessionHost.Instance.Roster : null;
             foreach (int p in _players)
             {

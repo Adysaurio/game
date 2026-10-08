@@ -15,6 +15,8 @@ namespace TrashPandas.Runtime.Panic
         public float SecondsLeft;
         public bool CleanExit;
         public byte RescuePercent;
+        /// <summary>The RUN's alert (100 = hunting; drains while everyone hides; 0 = calmed down).</summary>
+        public byte AlertPercent;
         int _l0, _l1, _l2, _l3, _l4;        // money taken home
         byte _t0, _t1, _t2, _t3, _t4;       // total hits taken (rescues don't reset this)
         byte _r0, _r1, _r2, _r3, _r4;       // friends freed
@@ -75,6 +77,7 @@ namespace TrashPandas.Runtime.Panic
             s.SerializeValue(ref SecondsLeft);
             s.SerializeValue(ref CleanExit);
             s.SerializeValue(ref RescuePercent);
+            s.SerializeValue(ref AlertPercent);
             s.SerializeValue(ref _l0); s.SerializeValue(ref _l1); s.SerializeValue(ref _l2); s.SerializeValue(ref _l3); s.SerializeValue(ref _l4);
             s.SerializeValue(ref _t0); s.SerializeValue(ref _t1); s.SerializeValue(ref _t2); s.SerializeValue(ref _t3); s.SerializeValue(ref _t4);
             s.SerializeValue(ref _r0); s.SerializeValue(ref _r1); s.SerializeValue(ref _r2); s.SerializeValue(ref _r3); s.SerializeValue(ref _r4);
@@ -85,7 +88,7 @@ namespace TrashPandas.Runtime.Panic
             _count == o._count && _c0 == o._c0 && _c1 == o._c1 && _c2 == o._c2 && _c3 == o._c3 && _c4 == o._c4 &&
             _o0 == o._o0 && _o1 == o._o1 && _o2 == o._o2 && _o3 == o._o3 && _o4 == o._o4 &&
             _h0 == o._h0 && _h1 == o._h1 && _h2 == o._h2 && _h3 == o._h3 && _h4 == o._h4 &&
-            (int)SecondsLeft == (int)o.SecondsLeft && CleanExit == o.CleanExit && RescuePercent == o.RescuePercent &&
+            (int)SecondsLeft == (int)o.SecondsLeft && CleanExit == o.CleanExit && RescuePercent == o.RescuePercent && AlertPercent == o.AlertPercent &&
             _l0 == o._l0 && _l1 == o._l1 && _l2 == o._l2 && _l3 == o._l3 && _l4 == o._l4 &&
             _t0 == o._t0 && _t1 == o._t1 && _t2 == o._t2 && _t3 == o._t3 && _t4 == o._t4 &&
             _r0 == o._r0 && _r1 == o._r1 && _r2 == o._r2 && _r3 == o._r3 && _r4 == o._r4 &&
