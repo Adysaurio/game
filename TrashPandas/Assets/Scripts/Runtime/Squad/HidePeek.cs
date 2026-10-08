@@ -14,7 +14,7 @@ namespace TrashPandas.Runtime.Squad
         enum Mode { None, Raised, Can, Tunnel }
         static Mode s_mode;
         static RaccoonController s_who;
-        static float s_stillFor;
+        static float s_stillFor, s_lastYaw, s_nextWiggle;
 
         public static bool Active => s_mode != Mode.None;
 
@@ -53,6 +53,13 @@ namespace TrashPandas.Runtime.Squad
                         PlayerCameraRig.CinematicLock = true;
                         break;
                 }
+            }
+            if (s_mode == Mode.Can && r.InCan)
+            {
+                float yaw = rig.Orbit.HorizontalAxis.Value;
+                float swing = Mathf.Abs(Mathf.DeltaAngle(yaw, s_lastYaw)) / Mathf.Max(Time.deltaTime, 1e-4f);
+                s_lastYaw = yaw;
+                if (swing > 90f && Time.time >= s_nextWiggle) { s_nextWiggle = Time.time + 0.9f; r.InCan.Wiggle(); }
             }
             if (s_mode == Mode.Tunnel)
             {

@@ -190,9 +190,7 @@ namespace TrashPandas.EditorTools
             root.position = at;
             Visual(PrimitiveType.Sphere, "Leaves", root, new Vector3(0f, r * 0.55f, 0f), new Vector3(r * 2f, r * 1.3f, r * 2f), s_bush);
             Visual(PrimitiveType.Sphere, "Leaves2", root, new Vector3(r * 0.45f, r * 0.45f, r * 0.3f), new Vector3(r * 1.3f, r, r * 1.3f), s_bush);
-            var spot = root.gameObject.AddComponent<TrashPandas.Runtime.Squad.HidingSpot>();
-            spot.Kind = TrashPandas.Runtime.Squad.HidingKind.Bush;
-            spot.Size = new Vector3(r * 1.8f, r * 1.2f, r * 1.8f);
+            root.gameObject.AddComponent<TrashPandas.Runtime.Squad.BushHideout>().Radius = r;
         }
 
         static void TrashCan(Vector3 at)
@@ -257,6 +255,20 @@ namespace TrashPandas.EditorTools
             pb.Path = new[] { path[3], path[2], path[1], path[0] };
         }
 
+        static Material s_crate;
+
+        /// <summary>Something the raccoons can shove (networked: the host moves it, clients see it slide).</summary>
+        static void Pushable(string name, Vector3 center, Vector3 size, bool wood = false)
+        {
+            s_crate ??= Mat("Crate", new Color(0.72f, 0.55f, 0.35f));
+            var go = Box(name, center, size, wood ? Mat("Wardrobe", new Color(0.45f, 0.3f, 0.2f)) : s_crate);
+            go.AddComponent<TrashPandas.Runtime.Squad.Pushable>().Speed = wood ? 0.9f : 1.3f;
+            go.AddComponent<NetworkObject>();
+            var nt = go.AddComponent<Unity.Netcode.Components.NetworkTransform>();
+            nt.SyncScaleX = nt.SyncScaleY = nt.SyncScaleZ = false;
+            IgnoreForNavigation(go);
+        }
+
         /// <summary>Playtest: "faltan bushes o lugares donde esconderte, pasadizos". Cover, hiding spots and raccoon shortcuts.</summary>
         static void BuildCover(Material hedge)
         {
@@ -274,10 +286,18 @@ namespace TrashPandas.EditorTools
             Box("LowHedge_S", new Vector3(0f, 0.35f, -1.2f), new Vector3(3.5f, 0.7f, 0.6f), hedge);
             // Trash cans.
             foreach (var p in new[] { new Vector3(-23f, 0f, 3.2f), new Vector3(-15.2f, 0f, 1.2f), new Vector3(20.5f, 0f, -9.5f), new Vector3(28.5f, 0f, 5.5f), new Vector3(10.8f, 0f, 19f) }) TrashCan(p);
-            // Raccoon pipes: parking ↔ garden, kitchen ↔ living room, orchard ↔ entrance.
-            Pipe(new Vector3(25.5f, 0f, -10.5f), 180f, new Vector3(-11.5f, 0f, 5f), 90f);
-            Pipe(new Vector3(-23.3f, 0f, 12f), 90f, new Vector3(-9.4f, 0f, 26.5f), 90f);
-            Pipe(new Vector3(14f, 0f, -22.5f), 0f, new Vector3(-6f, 0f, -21f), 0f);
+            // Raccoon pipes (short hops between cover): parking ↔ garden east, kitchen ↔ living room (behind
+            // the wardrobe: a secret!), orchard ↔ south lawn.
+            Pipe(new Vector3(22.5f, 0f, -8.5f), 180f, new Vector3(12.5f, 0f, -3f), 270f);
+            Pipe(new Vector3(-15f, 0f, 14.8f), 0f, new Vector3(-9.45f, 0f, 20.2f), 90f);
+            Pipe(new Vector3(15f, 0f, -19f), 0f, new Vector3(5f, 0f, -12f), 180f);
+            // The wardrobe in the living room hides the kitchen pipe: push it aside (from the south) to find it.
+            Pushable("Wardrobe", new Vector3(-9.05f, 0.9f, 20.3f), new Vector3(0.7f, 1.8f, 1.3f), wood: true);
+            // Crates: push them around, jump at them and climb up (ledge grab) to see over the hedges.
+            Pushable("Crate_Parking", new Vector3(19.5f, 0.45f, -2.5f), new Vector3(0.9f, 0.9f, 0.9f));
+            Pushable("Crate_Garden", new Vector3(-6.5f, 0.45f, -2.2f), new Vector3(0.9f, 0.9f, 0.9f));
+            Pushable("Crate_Kitchen", new Vector3(-16.5f, 0.45f, 11.8f), new Vector3(0.9f, 0.9f, 0.9f));
+            Pushable("Crate_Orchard", new Vector3(18f, 0.45f, -15.5f), new Vector3(0.9f, 0.9f, 0.9f));
         }
 
         /// <summary>The 27 loose loot items plus the 6 objectives (only 3 are used each round).</summary>
@@ -314,6 +334,7 @@ namespace TrashPandas.EditorTools
             var gift = Mat("GiantGift", new Color(0.85f, 0.25f, 0.45f));
             var giant = Prop("Loot_GiantGift", PrimitiveType.Cube, new Vector3(24f, 0.4f, -17.5f), new Vector3(0.8f, 0.8f, 0.8f), gift, 8f, true).AddComponent<LootItem>();
             giant.Kind = LootKind.GiantGift;
+            giant.gameObject.AddComponent<TrashPandas.Runtime.Squad.Pushable>().Speed = 1.1f; // one raccoon can shove it; lifting takes two
             Objective(ObjectiveId.Ring, PrimitiveType.Sphere, new Vector3(0.09f, 0.09f, 0.09f));
             Objective(ObjectiveId.CakeTopper, PrimitiveType.Cylinder, new Vector3(0.1f, 0.12f, 0.1f)); // a cylinder doesn't roll off
             Objective(ObjectiveId.Envelope, PrimitiveType.Cube, new Vector3(0.26f, 0.03f, 0.16f));

@@ -71,6 +71,17 @@ namespace TrashPandas.Runtime.Net
                 return new Vector2(Mathf.Sin(Time.time * 3f), Mathf.Cos(Time.time * 3f)) * 0.8f;
             }
             if (Bot == "fetch") return TrashPandas.Runtime.Squad.SquadBots.FetchMove(r);
+            if (Bot == "push" || Bot == "climb")
+            {
+                // Line up south of the garden crate, then walk north into it (push) or jump at it (climb).
+                var crate = GameObject.Find("Crate_Garden");
+                if (!crate) return Vector2.zero;
+                Vector3 lineUp = crate.transform.position + new Vector3(0f, 0f, -1.3f);
+                Vector3 gd = lineUp - r.transform.position; gd.y = 0f;
+                if (!s_linedUp && gd.magnitude > 0.2f) return TrashPandas.Runtime.Squad.SquadBots.Steer(r.transform.position, lineUp);
+                s_linedUp = true;
+                return r.Hanging ? Vector2.zero : new Vector2(0f, 1f);
+            }
             if (Bot == "tunnel" || Bot == "canhide")
             {
                 if (r.Crawling) { var td = r.TunnelDirection; return new Vector2(td.x, td.z); } // keep crawling forward
@@ -80,7 +91,7 @@ namespace TrashPandas.Runtime.Net
                     foreach (var pipe in UnityEngine.Object.FindObjectsByType<TrashPandas.Runtime.Squad.RaccoonPipe>(FindObjectsSortMode.None))
                         if (!goal.HasValue || Vector3.Distance(pipe.transform.position, r.transform.position) < Vector3.Distance(goal.Value, r.transform.position)) goal = pipe.transform.position + pipe.transform.forward * 0.5f;
                 if (Bot == "canhide" && !s_canDone)
-                    foreach (var can in TrashPandas.Runtime.Squad.TrashCanHideout.All)
+                    foreach (var can in TrashPandas.Runtime.Squad.Hideout.All)
                         if (can && (!goal.HasValue || Vector3.Distance(can.transform.position, r.transform.position) < Vector3.Distance(goal.Value, r.transform.position))) goal = can.transform.position + can.transform.forward * 0.8f;
                 if (!goal.HasValue) return Vector2.zero;
                 Vector3 gd = goal.Value - r.transform.position; gd.y = 0f;
@@ -113,20 +124,30 @@ namespace TrashPandas.Runtime.Net
         }
         public static bool TowerHop => Array.IndexOf(Args, "-hopoff") >= 0;
         public static bool SquadCrouch => Bot == "sneak";
-        static bool s_tunnelDone, s_canDone;
+        static bool s_tunnelDone, s_canDone, s_linedUp;
+        static float s_climbJumpAt = -1f;
+        /// <summary>"climb": jump once lined up at the crate; Space again while hanging.</summary>
+        public static bool SquadJump(TrashPandas.Runtime.Raccoon.RaccoonController r)
+        {
+            if (Bot != "climb" || !s_linedUp) return false;
+            if (r.Hanging && Time.time > s_climbJumpAt + 0.6f) { s_climbJumpAt = Time.time; return true; }
+            var crate = GameObject.Find("Crate_Garden");
+            if (s_climbJumpAt < 0f && crate && crate.transform.position.z - r.transform.position.z < 0.95f) { s_climbJumpAt = Time.time; return true; }
+            return false;
+        }
         /// <summary>Dev bots press E when they reach a pipe mouth / a trash can.</summary>
         public static bool SquadUse(TrashPandas.Runtime.Raccoon.RaccoonController r)
         {
             if (Bot == "tunnel" && !s_tunnelDone && !r.Crawling && TrashPandas.Runtime.Squad.RaccoonPipe.Near(r.transform.position)) { s_tunnelDone = true; return true; }
-            if (Bot == "canhide" && !s_canDone && !r.InCan && TrashPandas.Runtime.Squad.TrashCanHideout.Near(r.transform.position)) { s_canDone = true; return true; }
+            if (Bot == "canhide" && !s_canDone && !r.InCan && TrashPandas.Runtime.Squad.Hideout.Near(r.transform.position)) { s_canDone = true; return true; }
             return false;
         }
         public static bool SquadRun => Bot == "sprint" || (Bot == "noisy" && Time.timeSinceLevelLoad > 4f) || (Bot == "towerhost" && Time.timeSinceLevelLoad > 24f);
         static bool s_noisyPlaced;
         /// <summary>Dev: -nointro, and the bots that test specific mechanics skip the intro.</summary>
-        public static bool SkipIntro => Array.IndexOf(Args, "-nointro") >= 0 || Bot == "heavy" || Bot == "tower" || Bot == "flee" || Bot == "sneakflee" || Bot == "rescue" || Bot == "hideflee";
+        public static bool SkipIntro => Array.IndexOf(Args, "-nointro") >= 0 || Bot == "heavy" || Bot == "tower" || Bot == "flee" || Bot == "sneakflee" || Bot == "rescue" || Bot == "hideflee" || Bot == "push" || Bot == "climb";
         /// <summary>Bots built around the garden start (heavy, tower) keep spawning there.</summary>
-        public static bool SquadNearOrigin => Bot == "heavy" || Bot == "tower" || Bot == "flee" || Bot == "sneakflee" || Bot == "rescue" || Bot == "hideflee";
+        public static bool SquadNearOrigin => Bot == "heavy" || Bot == "tower" || Bot == "flee" || Bot == "sneakflee" || Bot == "rescue" || Bot == "hideflee" || Bot == "push" || Bot == "climb";
         public static bool SquadTap(TrashPandas.Runtime.Raccoon.RaccoonController r) =>
             (Bot == "fetch" && TrashPandas.Runtime.Squad.SquadBots.FetchTap(r)) || (Bot == "heavyonline" && TrashPandas.Runtime.Squad.SquadBots.OnlineHeavyTap(r));
         /// <summary>Bots that grab something specific (not what the highlight picked).</summary>
@@ -274,6 +295,8 @@ namespace TrashPandas.Runtime.Net
             var pdx = TrashPandas.Runtime.Panic.PanicDirector.Instance;
             if (pdx) panic += $" chasers[{pdx.ChaserStates}]";
             var sqx = TrashPandas.Runtime.Squad.SquadController.Instance;
+            var cg = GameObject.Find("Crate_Garden");
+            if (sqx && sqx.Active) panic += $" crate={(cg ? cg.transform.position.ToString("F2") : "-")} hanging={sqx.Active.Hanging} pushing={sqx.Active.Pushing}";
             if (sqx && sqx.Active) panic += $" crawling={sqx.Active.Crawling} inCan={(bool)sqx.Active.InCan} pos={sqx.Active.transform.position:F1}";
             if (sqx && sqx.Active) panic += $" hidden={TrashPandas.Runtime.Squad.HidingSpot.Hides(sqx.Active)} spot={TrashPandas.Runtime.Squad.HidingSpot.SpotOf(sqx.Active)}";
             if (pdx) panic += $" P0loot=${pdx.Snapshot.LootOf(0)} clean={pdx.Snapshot.CleanExit} openExits={string.Join(",", pdx.OpenExitPositions)}";

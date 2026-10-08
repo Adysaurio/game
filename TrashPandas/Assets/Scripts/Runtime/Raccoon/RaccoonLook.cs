@@ -34,7 +34,7 @@ namespace TrashPandas.Runtime.Raccoon
         MaterialPropertyBlock _block;
         Vector3[] _pupilRest, _pawRest;
         Vector3 _headRest;
-        float _runK, _sneakK;
+        float _runK, _sneakK, _pushK, _hangK;
 
         void Awake()
         {
@@ -151,7 +151,10 @@ namespace TrashPandas.Runtime.Raccoon
             float bob = Mathf.Lerp(Mathf.Lerp(walkBob, walkBob * 0.4f, _sneakK), gallop, _runK);
             float sy = (1f - _squash + _stretch + bob) * Mathf.Lerp(1f, 0.72f, _sneakK);
             float sxz = (1f + _squash * 0.6f - _stretch * 0.35f) * Mathf.Lerp(1f, 1.08f, _sneakK);
-            float pitch = Mathf.Lerp(Mathf.Lerp(Mathf.Clamp(planar * 2.2f, 0f, 12f), 22f, _sneakK), 68f, _runK);
+            _pushK = Mathf.MoveTowards(_pushK, _raccoon && _raccoon.Pushing ? 1f : 0f, dt * 8f);
+            _hangK = Mathf.MoveTowards(_hangK, _raccoon && _raccoon.Hanging ? 1f : 0f, dt * 10f);
+            float pitch = Mathf.Lerp(Mathf.Lerp(Mathf.Lerp(Mathf.Lerp(Mathf.Clamp(planar * 2.2f, 0f, 12f), 22f, _sneakK), 68f, _runK), 28f, _pushK), -8f, _hangK);
+            sy *= 1f + 0.12f * _hangK; // stretched up, hanging by the paws
             float sway = moving ? Mathf.Sin(_phase) * Mathf.Lerp(Mathf.Lerp(4f, 9f, _sneakK), 2f, _runK) : 0f;
             if (Visual)
             {
@@ -195,7 +198,10 @@ namespace TrashPandas.Runtime.Raccoon
                 Vector3 rest = _pawRest[i];
                 // Running: front paws reach forward under the chest, back paws push from behind.
                 rest += new Vector3(0f, 0f, (front ? 0.12f : -0.08f) * _runK);
-                paw.localPosition = rest + new Vector3(0f, lift, reach);
+                // Pushing: front paws up on the thing. Hanging: front paws on the ledge, back paws dangling.
+                if (front) rest += new Vector3(0f, 0.32f, 0.16f) * _pushK + new Vector3(0f, 0.62f, 0.12f) * _hangK;
+                else rest += new Vector3(0f, -0.02f, -0.04f) * _hangK;
+                paw.localPosition = rest + new Vector3(0f, lift * (1f - _hangK), reach * (1f - _pushK * 0.6f));
             }
         }
 
@@ -245,8 +251,8 @@ namespace TrashPandas.Runtime.Raccoon
             string text = null;
             Color color = Color.white;
             var spot = Squad.HidingSpot.SpotOf(_raccoon);
-            if (_raccoon.InCan) { text = "IN THE CAN — E: hop out"; color = new Color(0.5f, 1f, 0.6f); Ui.DebugChecklist.Mark("hide"); }
-            else if (Squad.TrashCanHideout.Near(transform.position)) { text = "E: hide in the can"; color = new Color(1f, 0.9f, 0.5f); }
+            if (_raccoon.InCan) { text = "HIDDEN — E: hop out"; color = new Color(0.5f, 1f, 0.6f); Ui.DebugChecklist.Mark("hide"); }
+            else if (Squad.Hideout.Near(transform.position) is Squad.Hideout near) { text = near.Prompt; color = new Color(1f, 0.9f, 0.5f); }
             else if (Squad.RaccoonPipe.Near(transform.position)) { text = "E: crawl in"; color = new Color(0.6f, 0.9f, 1f); }
             else if (spot.HasValue && Squad.HidingSpot.Hides(_raccoon)) { text = "HIDDEN"; color = new Color(0.5f, 1f, 0.6f); Ui.DebugChecklist.Mark("hide"); }
             if (text == null) return;

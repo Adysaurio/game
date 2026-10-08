@@ -138,6 +138,16 @@ namespace TrashPandas.Runtime.Net
             g.Body.AddForceAtPosition(Vector3.ClampMagnitude(impulse, 4f), at, ForceMode.Impulse);
         }
 
+        /// <summary>Owner → host: my raccoon shoves a pushable (the host moves it).</summary>
+        [Rpc(SendTo.Server)]
+        public void PushObjectRpc(int index, Vector3 direction, RpcParams rpc = default)
+        {
+            var list = Squad.Pushable.Sorted;
+            if (rpc.Receive.SenderClientId != OwnerClientId || index < 0 || index >= list.Count || !list[index]) return;
+            if (Vector3.Distance(list[index].transform.position, transform.position) > 3f) return;
+            list[index].Push(direction, Time.deltaTime * 3f); // RPCs arrive at tick rate, not frame rate
+        }
+
         /// <summary>Host → owner: a friend opened the cage.</summary>
         [Rpc(SendTo.Owner)]
         public void UnfreezeRpc() => Controller.Frozen = false;

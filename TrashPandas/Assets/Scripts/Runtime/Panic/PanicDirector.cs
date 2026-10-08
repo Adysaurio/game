@@ -372,7 +372,7 @@ namespace TrashPandas.Runtime.Panic
                 if (c.Last == PursuitState.Chase && o.State == PursuitState.Search) Ui.DebugChecklist.Mark("lost"); // it lost sight of you
                 // Searching right where you vanished into a trash can: they kick it and out you tumble.
                 if (o.State == PursuitState.Search && Vector3.Distance(pawn.transform.position, o.Destination) < 1.4f)
-                    foreach (var can in Squad.TrashCanHideout.All)
+                    foreach (var can in Squad.Hideout.All)
                         if (can && can.Occupant && Vector3.Distance(can.transform.position, o.Destination) < 1.3f)
                         {
                             var victim = can.Occupant;

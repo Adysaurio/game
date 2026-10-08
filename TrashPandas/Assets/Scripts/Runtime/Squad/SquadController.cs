@@ -116,10 +116,11 @@ namespace TrashPandas.Runtime.Squad
                 if (_reader.UsePressed || Net.DevAutomation.SquadUse(r))
                 {
                     if (r.InCan) r.ExitCan();
-                    else if (TrashCanHideout.Near(r.transform.position) is TrashCanHideout can) r.EnterCan(can);
+                    else if (Hideout.Near(r.transform.position) is Hideout can) r.EnterCan(can);
                     else RaccoonPipe.Near(r.transform.position)?.Crawl(r);
                 }
-                r.SetInput(move, _reader.JumpPressed, _reader.JumpHeld, _reader.CrouchHeld || Net.DevAutomation.SquadCrouch, run);
+                bool botJump = Net.DevAutomation.SquadJump(r);
+                r.SetInput(move, _reader.JumpPressed || botJump, _reader.JumpHeld || botJump, _reader.CrouchHeld || Net.DevAutomation.SquadCrouch, run);
                 if (r.IsRunning && Time.time >= _nextRunNoise) { _nextRunNoise = Time.time + 0.5f; NoiseBus.Emit(NoiseKind.Running, r.transform.position); }
             }
             var active = Active;

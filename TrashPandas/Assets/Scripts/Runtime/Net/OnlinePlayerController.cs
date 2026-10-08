@@ -94,7 +94,7 @@ namespace TrashPandas.Runtime.Net
                 if (_reader.UsePressed)
                 {
                     if (r.InCan) r.ExitCan();
-                    else if (Squad.TrashCanHideout.Near(r.transform.position) is Squad.TrashCanHideout can) r.EnterCan(can);
+                    else if (Squad.Hideout.Near(r.transform.position) is Squad.Hideout can) r.EnterCan(can);
                     else Squad.RaccoonPipe.Near(r.transform.position)?.Crawl(r);
                 }
                 Squad.HidePeek.Tick(CameraRig, raccoon.Controller, RaccoonCameraRadius, RaccoonLookHeight);

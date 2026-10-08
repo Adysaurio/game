@@ -47,7 +47,7 @@ namespace TrashPandas.Runtime.Raccoon
         float _tunnelS;
         Vector3 _tunnelFlatDir, _exitForwardEnd, _exitForwardStart;
         bool _remoteInside;
-        public const float CrawlSpeed = 2.4f;
+        public const float CrawlSpeed = 3f;
 
         /// <summary>Inside a drain pipe.</summary>
         public bool Crawling => _tunnel != null;
@@ -100,9 +100,9 @@ namespace TrashPandas.Runtime.Raccoon
         }
 
         // --- Trash cans: E to hop in (lid opens and closes), look around, E or Space to hop out ----------
-        public Squad.TrashCanHideout InCan { get; private set; }
+        public Squad.Hideout InCan { get; private set; }
 
-        public void EnterCan(Squad.TrashCanHideout can)
+        public void EnterCan(Squad.Hideout can)
         {
             if (!can || Crawling || InCan || Frozen || can.Occupant) return;
             if (!ReferenceEquals(Mount, null)) Dismount(Vector3.zero);
@@ -181,6 +181,80 @@ namespace TrashPandas.Runtime.Raccoon
             _planar = Vector3.zero;
             _verticalVelocity = 0f;
             return true;
+        }
+
+        // --- Ledges: jump at something just out of reach, grab the edge, Space again to climb up ----------
+        public bool Hanging { get; private set; }
+        public bool Climbing { get; private set; }
+        Vector3 _ledgeTop, _ledgeFacing;
+        bool _climbRequested;
+        float _noLedgeUntil;
+        public const float LedgeMin = 0.45f, LedgeMax = 1.25f;
+
+        void TryGrabLedge()
+        {
+            if (Time.time < _noLedgeUntil || Frozen || !ReferenceEquals(Mount, null)) return;
+            Vector3 wish = new Vector3(_move.x, 0f, _move.y);
+            if (wish.sqrMagnitude < 0.2f) return;
+            Vector3 fwd = transform.forward;
+            Vector3 chest = transform.position + Vector3.up * 0.35f;
+            if (!Physics.Raycast(chest, fwd, out var wall, _cc.radius + 0.35f, ~0, QueryTriggerInteraction.Ignore)) return;
+            if (Mathf.Abs(wall.normal.y) > 0.3f || wall.collider.GetComponentInParent<RaccoonController>() || wall.collider.GetComponentInParent<Npc.NpcPawn>() || wall.collider.GetComponentInParent<Grabbing.Grabbable>()) return;
+            // Is there a top we can reach from here?
+            Vector3 probe = wall.point - wall.normal * 0.25f + Vector3.up * (LedgeMax + 0.3f);
+            if (!Physics.Raycast(probe, Vector3.down, out var top, LedgeMax + 0.3f, ~0, QueryTriggerInteraction.Ignore)) return;
+            float rise = top.point.y - transform.position.y;
+            if (top.normal.y < 0.7f || rise < LedgeMin || rise > LedgeMax) return;
+            // Room to stand up there?
+            if (Physics.CheckCapsule(top.point + Vector3.up * 0.25f, top.point + Vector3.up * 0.5f, 0.15f, ~0, QueryTriggerInteraction.Ignore)) return;
+            Hanging = true;
+            _climbRequested = false;
+            _ledgeTop = top.point;
+            _ledgeFacing = -new Vector3(wall.normal.x, 0f, wall.normal.z).normalized;
+            _cc.enabled = false;
+            _planar = Vector3.zero;
+            _verticalVelocity = 0f;
+            transform.SetPositionAndRotation(new Vector3(wall.point.x, top.point.y - 0.55f, wall.point.z) + wall.normal * (_cc.radius + 0.05f), Quaternion.LookRotation(_ledgeFacing));
+            Ui.Sfx.Play(Ui.Sound.Grab, transform.position, 0.6f);
+            Ui.DebugChecklist.Mark("ledge");
+        }
+
+        void TickHang()
+        {
+            if (Climbing) return;
+            Vector3 wish = new Vector3(_move.x, 0f, _move.y);
+            if (wish.sqrMagnitude > 0.2f && Vector3.Dot(wish.normalized, _ledgeFacing) < -0.5f)
+            {
+                // Pull back: let go.
+                Hanging = false;
+                _cc.enabled = true;
+                _noLedgeUntil = Time.time + 0.5f;
+                return;
+            }
+            if (_climbRequested) StartCoroutine(ClimbUp());
+        }
+
+        System.Collections.IEnumerator ClimbUp()
+        {
+            Climbing = true;
+            _climbRequested = false;
+            Vector3 from = transform.position, to = _ledgeTop + _ledgeFacing * 0.35f + Vector3.up * 0.03f;
+            Ui.Sfx.Play(Ui.Sound.Jump, from, 0.5f);
+            // Up first (scramble), then over the edge.
+            for (float t = 0f; t < 0.4f; t += Time.deltaTime)
+            {
+                float k = t / 0.4f;
+                Vector3 p = Vector3.Lerp(from, to, Mathf.SmoothStep(0f, 1f, k));
+                p.y = Mathf.Lerp(from.y, to.y + 0.15f, Mathf.Clamp01(k * 1.8f));
+                transform.position = p;
+                yield return null;
+            }
+            transform.position = to;
+            Climbing = false;
+            Hanging = false;
+            _cc.enabled = true;
+            _noLedgeUntil = Time.time + 0.3f;
+            Ui.DebugChecklist.Mark("climb");
         }
 
         /// <summary>Move instantly (into the cage), off any tower.</summary>
@@ -264,6 +338,7 @@ namespace TrashPandas.Runtime.Raccoon
         {
             if (Squad.RoundIntro.Playing) { _move = Vector2.zero; _runHeld = false; return; }
             if (InCan && jumpPressed) { ExitCan(); return; }
+            if (Hanging && jumpPressed) { _climbRequested = true; return; }
             _runHeld = runHeld;
             if (Frozen || IsStunned) { _move = Vector2.zero; _jumpHeld = false; return; }
             _move = worldMove;
@@ -289,6 +364,7 @@ namespace TrashPandas.Runtime.Raccoon
             float dt = Time.deltaTime;
             if (Squad.RoundIntro.Playing) return; // the intro animates us
             if (Crawling) { TickCrawl(dt); return; }
+            if (Hanging) { TickHang(); return; }
             if (InCan) return; // tucked in a trash can
             if (!ReferenceEquals(Mount, null))
             {
@@ -309,7 +385,7 @@ namespace TrashPandas.Runtime.Raccoon
             if (Frozen) { _move = Vector2.zero; }
             int riders = RidersAbove;
             if (riders > 0 && Core.Raccoons.TowerRules.Collapses(bottomRunning: _runHeld && _move.sqrMagnitude > 0.1f, bottomHit: false)) { CollapseTower(); riders = 0; }
-            float speed = _crouchHeld ? SneakSpeed : _runHeld ? RunSpeed : WalkSpeed;
+            float speed = Pushing ? WalkSpeed * 0.45f : _crouchHeld ? SneakSpeed : _runHeld ? RunSpeed : WalkSpeed;
             Vector3 wish = new Vector3(_move.x, 0f, _move.y) * speed * SpeedMultiplier * CarryFactor * Core.Raccoons.TowerRules.SpeedFactor(riders);
             if (grounded && !_wasGrounded && _verticalVelocity < -HardLandingSpeed) Noise?.Invoke(Core.Raccoons.NoiseKind.HardLanding, transform.position);
             _wasGrounded = grounded;
@@ -345,6 +421,7 @@ namespace TrashPandas.Runtime.Raccoon
             if (_cc.isGrounded && _verticalVelocity <= 0f) _jumpedSinceGrounded = false;
             // Only a deliberate jump lands you on someone's head (bumping into them from behind doesn't).
             if (!grounded && _verticalVelocity < 0f && AutoMount && (_jumpedSinceGrounded || DroppedFromAbove)) TryLandOnHead();
+            if (!grounded && _verticalVelocity < 2f && !Hanging) TryGrabLedge();
             // Moving inside a bush shakes it and makes a little noise (humans nearby turn around).
             if (_planar.magnitude > 0.5f && Time.time >= _nextRustle)
             {
@@ -362,8 +439,28 @@ namespace TrashPandas.Runtime.Raccoon
         float _nextPush;
 
         /// <summary>Bumping into light things knocks them about (Astro Bot: every touch gets a reaction).</summary>
+        /// <summary>Paws on something and shoving it (for the pose).</summary>
+        public bool Pushing => Time.time < _pushingUntil;
+        float _pushingUntil;
+
         void OnControllerColliderHit(ControllerColliderHit hit)
         {
+            var pushable = hit.collider.GetComponentInParent<Squad.Pushable>();
+            if (pushable && _cc.isGrounded && Mathf.Abs(hit.normal.y) < 0.5f)
+            {
+                Vector3 into = -new Vector3(hit.normal.x, 0f, hit.normal.z).normalized;
+                Vector3 wish = new Vector3(_move.x, 0f, _move.y);
+                if (wish.sqrMagnitude > 0.1f && Vector3.Dot(wish.normalized, into) > 0.5f)
+                {
+                    _pushingUntil = Time.time + 0.2f;
+                    var pusherNet = GetComponent<Net.NetworkedRaccoon>();
+                    Ui.DebugChecklist.Mark("push");
+                    if (pushable.name.StartsWith("Wardrobe")) Ui.DebugChecklist.Mark("secret");
+                    if (pusherNet && pusherNet.IsSpawned && !pusherNet.IsServer) pusherNet.PushObjectRpc(pushable.Index, into);
+                    else pushable.Push(into, Time.deltaTime);
+                    return;
+                }
+            }
             var rb = hit.rigidbody;
             if (!rb || rb.mass > 2f || hit.moveDirection.y < -0.3f || Time.time < _nextPush) return;
             Vector3 impulse = new Vector3(hit.moveDirection.x, 0.15f, hit.moveDirection.z) * (1.2f + _planar.magnitude * 0.35f);
