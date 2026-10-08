@@ -331,6 +331,7 @@ namespace TrashPandas.EditorTools
             pd.ArchRadius = 1.8f;
             pd.Overview = overview;
             new GameObject("PanicHud").AddComponent<PanicHud>();
+            new GameObject("LootHud").AddComponent<TrashPandas.Runtime.Loot.LootHud>();
         }
 
         static PanicWeapon Weapon(string name, WeaponKind kind, Vector3 position)

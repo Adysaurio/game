@@ -403,7 +403,7 @@ namespace TrashPandas.Runtime.Trenchcoat
             if (_showHelp)
             {
                 if (_possession.ActiveIsOutside)
-                    lines.Add("RACCOON  Mouse camera · WASD run · Space jump (hold=higher) · Ctrl crouch · walk into red curtain to climb · E near coat");
+                    lines.Add("RACCOON  Mouse camera · WASD run · Space jump (hold=higher) · Ctrl crouch · Click: grab loot with your mouth · E near coat");
                 else
                     lines.Add((SoloMode ? "[SOLO — F2: roles]  " : "[ROLES — F2: solo]  ") + DebugInputReader.HintFor(SoloMode ? _slots.ControlledParts : _slots.PartsOf(_slots.SlotOf(_possession.ActivePlayerId).Value)));
                 lines.Add($"Tab/1-5 switch · E out/in · R record ghost · Backspace clear ghosts · [ ] camera speed ({CameraRig.Sensitivity:F2}) · ←→ orbit · Esc free mouse · F1 hide help");

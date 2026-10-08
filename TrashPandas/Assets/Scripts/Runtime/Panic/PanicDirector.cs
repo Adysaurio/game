@@ -124,7 +124,7 @@ namespace TrashPandas.Runtime.Panic
 
         void Update()
         {
-            bool panicking = Phase != RoundPhase.Infiltration;
+            bool panicking = Phase == RoundPhase.Panic || (Phase == RoundPhase.Results && !Snapshot.CleanExit);
             for (int i = 0; i < ExitMarkers.Length; i++)
             {
                 var m = ExitMarkers[i];

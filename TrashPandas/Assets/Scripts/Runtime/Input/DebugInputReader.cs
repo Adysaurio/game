@@ -153,7 +153,7 @@ namespace TrashPandas.Runtime.Input
             bool legs = (parts & BodyPart.Legs) != 0, arms = (parts & BodyPart.Arms) != 0, head = (parts & BodyPart.Head) != 0;
             var hint = "Mouse: camera   ";
             if (legs) hint += "WASD walk (camera-relative) · Space jump · Ctrl crouch   ";
-            if (arms) hint += "Aim with the crosshair · hold Left click: grab (closest hand) · Right click: both hands (big things) · release to throw   ";
+            if (arms) hint += "Aim with the crosshair · hold Left click: grab · Right click: both hands (big things) · release to throw · hold Q: put it in the pocket   ";
             if (head) hint += "Head looks where you look";
             return hint;
         }

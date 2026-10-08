@@ -156,7 +156,7 @@ namespace TrashPandas.Runtime.Net
             }
             int? mine = snapshot.SlotOfClient(nm.LocalClientId);
             string hint = mine.HasValue ? DebugInputReader.HintFor(snapshot.PartsOf(mine.Value)) + "   E: hop out"
-                        : NetworkedRaccoon.LocalOwned ? "RACCOON  Mouse camera · WASD run · Space jump · Ctrl crouch · E next to the coat: hop back in"
+                        : NetworkedRaccoon.LocalOwned ? "RACCOON  Mouse camera · WASD run · Space jump · Ctrl crouch · Click: grab loot with your mouth · E next to the coat: hop back in"
                         : "Waiting for a seat…";
             string room = SessionHost.Instance && !string.IsNullOrEmpty(SessionHost.Instance.RoomCode) ? $"Room {SessionHost.Instance.RoomCode} · " : "";
             var lines = new[] { $"{room}ONLINE · {(nm.IsHost ? "host" : "client")}   {seats}", hint + "   F10: leave" };

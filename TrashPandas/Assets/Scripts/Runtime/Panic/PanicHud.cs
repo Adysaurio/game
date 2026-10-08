@@ -81,7 +81,7 @@ namespace TrashPandas.Runtime.Panic
             }
 
             // Results
-            float w = 420f, h = 120f + snap.Count * 28f;
+            float w = 440f, h = 120f + snap.Count * 28f + 120f;
             var box = new Rect((W - w) / 2f, (H - h) / 2f, w, h);
             GUI.color = new Color(0f, 0f, 0f, 0.75f);
             GUI.DrawTexture(box, Texture2D.whiteTexture);
@@ -93,9 +93,31 @@ namespace TrashPandas.Runtime.Panic
                 if (o == PlayerOutcome.None) continue;
                 string who = me == p ? $"P{p} (you)" : $"P{p}";
                 GUI.color = o == PlayerOutcome.Escaped ? new Color(0.4f, 1f, 0.5f) : new Color(1f, 0.45f, 0.4f);
-                GUI.Label(new Rect(box.x, box.y + 52 + p * 28, w, 26), $"{who} — {(o == PlayerOutcome.Escaped ? "ESCAPED" : "CAUGHT")}", _small);
+                GUI.Label(new Rect(box.x, box.y + 52 + p * 28, w, 26), $"{who} — {(o == PlayerOutcome.Escaped ? "ESCAPED" : "CAUGHT")}   ${snap.LootOf(p)}", _small);
             }
             GUI.color = Color.white;
+            // Team summary: objectives, clean exit, total.
+            var loot = TrashPandas.Runtime.Loot.LootDirector.Instance;
+            if (loot)
+            {
+                var ls = loot.Snapshot;
+                float ty = box.y + 52 + snap.Count * 28 + 8;
+                int total = 0;
+                for (int p = 0; p < snap.Count; p++) total += snap.LootOf(p);
+                GUI.color = new Color(1f, 0.85f, 0.3f);
+                GUI.Label(new Rect(box.x, ty, w, 26), (snap.CleanExit ? "CLEAN EXIT ×1.5!   " : "") + $"Team total ${total}", _small);
+                GUI.color = Color.white;
+                ty += 26;
+                foreach (var info in TrashPandas.Core.Loot.LootCatalog.Objectives)
+                {
+                    if (!ls.IsPicked(info.Id)) continue;
+                    bool done = ls.IsDone(info.Id);
+                    GUI.color = done ? new Color(0.45f, 1f, 0.55f) : new Color(0.75f, 0.75f, 0.75f);
+                    GUI.Label(new Rect(box.x, ty, w, 22), $"{(done ? "GOT" : "missed")}: {info.Name}", _small);
+                    ty += 22;
+                }
+                GUI.color = Color.white;
+            }
             bool online = SimulationAuthority.IsOnline;
             bool isHost = online && SessionHost.Instance && SessionHost.Instance.IsHost;
             if (!online || (isHost && SessionHost.Instance.Roster.CanStart))
