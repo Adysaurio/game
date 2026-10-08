@@ -157,6 +157,7 @@ namespace TrashPandas.Runtime.Raccoon
             var shake = Cameras.CameraShake.Instance;
             var cam = Camera.main;
             if (shake && cam && Vector3.Distance(cam.transform.position, transform.position) < 6f) { shake.Kick(0.55f); shake.HitStop(0.07f); }
+            Ui.Sfx.Play(Ui.Sound.Hit, transform.position);
             if (Mount) Dismount(impulse);
             if (RidersAbove > 0 && Core.Raccoons.TowerRules.Collapses(false, bottomHit: true)) CollapseTower();
             _planar = new Vector3(impulse.x, 0f, impulse.z);

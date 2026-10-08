@@ -48,6 +48,7 @@ namespace TrashPandas.Runtime.Loot
                 _popAt = Time.unscaledTime;
                 _popValue = s.LastStashValue;
                 _popWorld = s.LastStashAt;
+                if (_popValue > 0) Sfx.Play(Sound.Deliver, _popWorld);
             }
 
             if (infiltrating)

@@ -177,9 +177,25 @@ namespace TrashPandas.Runtime.Squad
             }
         }
 
+        readonly int[] _lastCarried = { -1, -1, -1, -1, -1 };
+
+        void PlayCarrySounds()
+        {
+            var s = Snapshot;
+            for (int p = 0; p < CarrySnapshot.Max; p++)
+            {
+                int now = s.ItemOf(p);
+                if (now == _lastCarried[p]) continue;
+                var g = now >= 0 ? (now < _items.Count ? _items[now] : null) : (_lastCarried[p] >= 0 && _lastCarried[p] < _items.Count ? _items[_lastCarried[p]] : null);
+                if (g) Ui.Sfx.Play(now >= 0 ? Ui.Sound.Grab : Ui.Sound.Throw, g.transform.position, now >= 0 ? 0.8f : 0.5f);
+                _lastCarried[p] = now;
+            }
+        }
+
         /// <summary>Every machine: small things sit in the mouth as this machine sees the raccoon, no collisions.</summary>
         void LateUpdate()
         {
+            PlayCarrySounds();
             _gluedNow.Clear();
             var s = Snapshot;
             foreach (var r in FindObjectsByType<RaccoonController>(FindObjectsSortMode.None))
@@ -227,6 +243,7 @@ namespace TrashPandas.Runtime.Squad
                 Panic.PanicDirector.Instance.StunChaser(pawn);
             _quietUntil = Time.time + 0.5f;
             NoiseBus.Emit(NoiseKind.Crash, transform.position);
+            Ui.Sfx.Play(Ui.Sound.Land, transform.position, 0.7f);
         }
     }
 }

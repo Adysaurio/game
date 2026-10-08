@@ -12,6 +12,7 @@ namespace TrashPandas.Runtime.Panic
         GUIStyle _big, _mid, _small, _exit;
 
         RoundPhase _lastPhase;
+        int _lastCaught;
 
         void OnDisable() => TrashPandas.Runtime.Cameras.PlayerCameraRig.UiWantsCursor = false;
 
@@ -21,8 +22,21 @@ namespace TrashPandas.Runtime.Panic
             var cam = Camera.main;
             TrashPandas.Runtime.Cameras.PlayerCameraRig.UiWantsCursor = d && d.Phase == RoundPhase.Results;
             if (d && d.Phase == RoundPhase.Panic && _lastPhase != RoundPhase.Panic && TrashPandas.Runtime.Cameras.CameraShake.Instance)
+            {
                 TrashPandas.Runtime.Cameras.CameraShake.Instance.Kick(0.9f); // ¡¡RUUUN!!
+                Sfx.Play2D(Sound.Siren, 0.8f);
+            }
             if (d) _lastPhase = d.Phase;
+            if (d && Event.current.type == EventType.Repaint)
+            {
+                // Someone caught (sad trombone) or freed (fanfare).
+                var sn = d.Snapshot;
+                int caught = 0;
+                for (int p = 0; p < sn.Count; p++) if (sn.OutcomeOf(p) == PlayerOutcome.Caught) caught++;
+                if (d.Phase == RoundPhase.Panic && caught > _lastCaught) Sfx.Play2D(Sound.Caught);
+                if (d.Phase == RoundPhase.Panic && caught < _lastCaught) Sfx.Play2D(Sound.Rescue);
+                _lastCaught = caught;
+            }
             if (!d || d.Phase == RoundPhase.Infiltration) { _panicStartedAt = -1f; return; }
             UiScale.Apply();
             if (_panicStartedAt < 0f) _panicStartedAt = Time.time;

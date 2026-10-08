@@ -95,8 +95,8 @@ namespace TrashPandas.Runtime.Raccoon
             _dustCooldown -= dt;
 
             // Take-off: stretch. Landing: squash, harder the faster you fell, plus a puff of dust.
-            if (_vy > 2f && _lastVy <= 2f) { _stretch = 0.35f; Puff(6); }
-            if (_lastVy < -2.5f && _vy > -0.6f) { _squash = Mathf.Clamp01(-_lastVy / 9f) * 0.6f + 0.15f; Puff(10); }
+            if (_vy > 2f && _lastVy <= 2f) { _stretch = 0.35f; Puff(6); Ui.Sfx.Play(Ui.Sound.Jump, pos, 0.6f); }
+            if (_lastVy < -2.5f && _vy > -0.6f) { _squash = Mathf.Clamp01(-_lastVy / 9f) * 0.6f + 0.15f; Puff(10); Ui.Sfx.Play(Ui.Sound.Land, pos, Mathf.Clamp01(-_lastVy / 8f)); }
             if (planar > 4.2f && Random.value < dt * 8f) Puff(2); // running kicks up dust
             _squash = Mathf.MoveTowards(_squash, 0f, dt * 2.2f);
             _stretch = Mathf.MoveTowards(_stretch, 0f, dt * 1.8f);
