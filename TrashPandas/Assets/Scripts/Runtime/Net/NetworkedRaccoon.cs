@@ -26,6 +26,10 @@ namespace TrashPandas.Runtime.Net
         [Rpc(SendTo.Owner)]
         public void HitRpc(UnityEngine.Vector3 impulse, float stunSeconds) => Controller.ApplyHit(impulse, stunSeconds);
 
+        /// <summary>Owner → host: pick up / spit out loot with the mouth.</summary>
+        [Rpc(SendTo.Server)]
+        public void MouthRpc() { if (Loot.LootDirector.Instance) Loot.LootDirector.Instance.ToggleMouth(Controller); }
+
         /// <summary>Host → owner: caught, no more control.</summary>
         [Rpc(SendTo.Owner)]
         public void FreezeRpc() => Controller.Frozen = true;

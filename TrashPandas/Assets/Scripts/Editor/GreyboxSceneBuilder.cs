@@ -316,6 +316,10 @@ namespace TrashPandas.EditorTools
             pd.Exits = exits;
             pd.ExitNames = names;
             pd.ExitMarkers = markers;
+            pd.ExitZoneIds = new[] { 0, 1, 2, 3 };
+            pd.GardenCenter = new Vector3(0f, 0f, 6f);
+            pd.ArchCenter = new Vector3(0f, 0f, -8f); // temporary: the real arch comes with the big map
+            pd.ArchRadius = 1.6f;
             pd.Overview = overview;
             new GameObject("PanicHud").AddComponent<PanicHud>();
         }

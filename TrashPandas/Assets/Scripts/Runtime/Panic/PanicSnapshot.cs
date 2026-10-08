@@ -13,6 +13,11 @@ namespace TrashPandas.Runtime.Panic
         byte _o0, _o1, _o2, _o3, _o4;       // PlayerOutcome
         byte _h0, _h1, _h2, _h3, _h4;       // hits taken
         public float SecondsLeft;
+        public bool CleanExit;
+        int _l0, _l1, _l2, _l3, _l4;        // money taken home
+
+        public int LootOf(int p) => p switch { 0 => _l0, 1 => _l1, 2 => _l2, 3 => _l3, 4 => _l4, _ => 0 };
+        public void SetLoot(int p, int v) { switch (p) { case 0: _l0 = v; break; case 1: _l1 = v; break; case 2: _l2 = v; break; case 3: _l3 = v; break; case 4: _l4 = v; break; } }
 
         public int Count => _count;
 
@@ -48,12 +53,15 @@ namespace TrashPandas.Runtime.Panic
             s.SerializeValue(ref _o0); s.SerializeValue(ref _o1); s.SerializeValue(ref _o2); s.SerializeValue(ref _o3); s.SerializeValue(ref _o4);
             s.SerializeValue(ref _h0); s.SerializeValue(ref _h1); s.SerializeValue(ref _h2); s.SerializeValue(ref _h3); s.SerializeValue(ref _h4);
             s.SerializeValue(ref SecondsLeft);
+            s.SerializeValue(ref CleanExit);
+            s.SerializeValue(ref _l0); s.SerializeValue(ref _l1); s.SerializeValue(ref _l2); s.SerializeValue(ref _l3); s.SerializeValue(ref _l4);
         }
 
         public bool Equals(PanicSnapshot o) =>
             _count == o._count && _c0 == o._c0 && _c1 == o._c1 && _c2 == o._c2 && _c3 == o._c3 && _c4 == o._c4 &&
             _o0 == o._o0 && _o1 == o._o1 && _o2 == o._o2 && _o3 == o._o3 && _o4 == o._o4 &&
             _h0 == o._h0 && _h1 == o._h1 && _h2 == o._h2 && _h3 == o._h3 && _h4 == o._h4 &&
-            (int)SecondsLeft == (int)o.SecondsLeft;
+            (int)SecondsLeft == (int)o.SecondsLeft && CleanExit == o.CleanExit &&
+            _l0 == o._l0 && _l1 == o._l1 && _l2 == o._l2 && _l3 == o._l3 && _l4 == o._l4;
     }
 }

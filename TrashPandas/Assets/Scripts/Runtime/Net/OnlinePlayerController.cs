@@ -78,6 +78,7 @@ namespace TrashPandas.Runtime.Net
                 var move = DevAutomation.FleeMove(raccoon.transform.position)
                     ?? (DevAutomation.Bot == "hopflee" ? new Vector2(0f, 1f) : _reader.CameraRelativeMove(CameraRig)); // dev bots
                 raccoon.Controller.SetInput(move, _reader.JumpPressed, _reader.JumpHeld, _reader.CrouchHeld || DevAutomation.FleeCrouchAt(raccoon.transform.position));
+                if (_reader.MouthPressed(CameraRig) || DevAutomation.MouthBot(raccoon.transform.position)) raccoon.MouthRpc();
                 return;
             }
             if (_cameraOnRaccoon) { _cameraOnRaccoon = null; _armsCamera = null; }

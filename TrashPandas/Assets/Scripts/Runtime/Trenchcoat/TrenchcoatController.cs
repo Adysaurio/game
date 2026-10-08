@@ -159,15 +159,26 @@ namespace TrashPandas.Runtime.Trenchcoat
                 float d = Vector3.Distance(item.transform.position, Body.transform.position);
                 if (d < bestD) { bestD = d; best = item; }
             }
+            if (Net.DevAutomation.Bot == "stashout" && TrashPandas.Runtime.Loot.LootDirector.Instance && TrashPandas.Runtime.Loot.LootDirector.Instance.Snapshot.Total > 0)
+            {
+                // Walk out through the arch.
+                var pd = TrashPandas.Runtime.Panic.PanicDirector.Instance;
+                if (!pd) return;
+                Vector3 toArch = pd.ArchCenter - Body.transform.position;
+                toArch.y = 0f;
+                live.GrabOne = false;
+                live.Move = new Vector2(toArch.x, toArch.z).normalized;
+                return;
+            }
             if (!best) return;
             Vector3 to = best.transform.position - Body.transform.position;
             to.y = 0f;
             // Stuck against a table with the item out of reach: try another one.
-            if (Body.transform.position.sqrMagnitude > 0.01f && (Body.transform.position - _botLastPos).magnitude < 0.02f && to.magnitude > 1.2f)
+            var v = Body.GetComponent<Rigidbody>().linearVelocity;
+            if (Time.timeSinceLevelLoad > 2f && new Vector2(v.x, v.z).magnitude < 0.15f && to.magnitude > 1.2f)
             { if ((_botStuck += Time.deltaTime) > 1f) { _botSkip.Add(best); _botStuck = 0f; } }
             else _botStuck = 0f;
             _botLastPos = Body.transform.position;
-            if (Time.frameCount % 60 == 0) Debug.Log($"[BOT] target={best.name} at {best.transform.position} dist={to.magnitude:F2} skipped={_botSkip.Count} grab={to.magnitude < 1.4f}");
             // Walk the navmesh to a free spot beside the item, then reach for it.
             Vector3 dir = to;
             if (to.magnitude > 0.85f && UnityEngine.AI.NavMesh.SamplePosition(new Vector3(best.transform.position.x, 0f, best.transform.position.z) - to.normalized * 0.75f, out var near, 1.2f, UnityEngine.AI.NavMesh.AllAreas)
@@ -212,7 +223,7 @@ namespace TrashPandas.Runtime.Trenchcoat
             if (selected >= 0) _possession.TrySelect(selected);
             if (_reader.CyclePressed) _possession.CycleNext();
             if (_reader.TogglePressed) Toggle(now);
-            if ((Net.DevAutomation.Bot == "hop" || Net.DevAutomation.Bot == "hopflee" || Net.DevAutomation.Bot == "hopgap") && !_botHopped && Time.timeSinceLevelLoad > Net.DevAutomation.HopAt) { _botHopped = true; Toggle(now); } // dev automation
+            if ((Net.DevAutomation.Bot == "hop" || Net.DevAutomation.Bot == "hopflee" || Net.DevAutomation.Bot == "hopgap" || Net.DevAutomation.Bot == "mouthflee") && !_botHopped && Time.timeSinceLevelLoad > Net.DevAutomation.HopAt) { _botHopped = true; Toggle(now); } // dev automation
             if (_reader.RecordPressed) ToggleRecording(now);
             UpdateCoatCamera();
             if (UnityEngine.InputSystem.Keyboard.current?.f1Key.wasPressedThisFrame == true) _showHelp = !_showHelp;
@@ -232,16 +243,18 @@ namespace TrashPandas.Runtime.Trenchcoat
             if (_possession.ActiveIsOutside)
             {
                 if (!_raccoon) { Body.SetIntent(default); return; }
-                bool dashBot = Net.DevAutomation.Bot == "hop" || Net.DevAutomation.Bot == "hopflee";
+                bool dashBot = Net.DevAutomation.Bot == "hop" || Net.DevAutomation.Bot == "hopflee" || Net.DevAutomation.Bot == "mouthflee";
                 var raccoonMove = Net.DevAutomation.FleeMove(_raccoon.transform.position)
                     ?? (dashBot ? new Vector2(0f, 1f) : _reader.CameraRelativeMove(CameraRig)); // dev bots
                 _raccoon.SetInput(raccoonMove, _reader.JumpPressed, _reader.JumpHeld, _reader.CrouchHeld || Net.DevAutomation.FleeCrouchAt(_raccoon.transform.position));
+                if ((_reader.MouthPressed(CameraRig) || Net.DevAutomation.MouthBot(_raccoon.transform.position)) && TrashPandas.Runtime.Loot.LootDirector.Instance)
+                    TrashPandas.Runtime.Loot.LootDirector.Instance.ToggleMouth(_raccoon);
             }
             else
             {
                 var live = TrashPandas.Core.Events.ConversationInput.Filter(_reader.ReadSlotInput(CameraRig, Body, now), engaged);
                 if (Net.DevAutomation.Bot == "walk") live.Move = new Vector2(0f, 1f); // dev automation
-                if (Net.DevAutomation.Bot == "stash") BotStash(ref live);
+                if (Net.DevAutomation.Bot == "stash" || Net.DevAutomation.Bot == "stashout") BotStash(ref live);
                 if (Net.DevAutomation.Bot == "walkgrab") { live.Move = Body.transform.position.z < 2.6f ? new Vector2(0f, 1f) : Vector2.zero; live.GrabOne = true; }
                 if (Net.DevAutomation.Bot == "tocat") live.Move = TowardCat();
                 _inputs[_possession.ActivePlayerId] = live; // you always override your own ghost

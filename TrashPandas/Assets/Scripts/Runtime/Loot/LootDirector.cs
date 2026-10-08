@@ -6,6 +6,7 @@ using TrashPandas.Runtime.Grabbing;
 using TrashPandas.Runtime.Net;
 using TrashPandas.Runtime.Npc;
 using TrashPandas.Runtime.Panic;
+using TrashPandas.Runtime.Raccoon;
 using Unity.Netcode;
 using UnityEngine;
 
@@ -104,6 +105,7 @@ namespace TrashPandas.Runtime.Loot
                 if (push > 0f && SuspicionDirector.Instance) SuspicionDirector.Instance.AdjustSuspicion(push);
                 WatchStashing();
             }
+            UpdateMouths(infiltrating);
             Publish();
         }
 
@@ -145,8 +147,85 @@ namespace TrashPandas.Runtime.Loot
             return true;
         }
 
-        /// <summary>Host/offline: a raccoon escaped carrying an objective in its mouth.</summary>
-        public void MarkObjectiveDone(ObjectiveId id) => _offline.ObjectivesDone |= (byte)(1 << (int)id);
+        // --- The raccoon's mouth: one item at a time --------------------------------------------------
+        public const float MouthReach = 0.9f;
+        readonly Dictionary<int, LootItem> _mouth = new Dictionary<int, LootItem>();
+        readonly Dictionary<int, RaccoonController> _raccoons = new Dictionary<int, RaccoonController>();
+
+        public LootItem MouthOf(int player) => _mouth.TryGetValue(player, out var i) ? i : null;
+
+        /// <summary>Host/offline: click as a raccoon — pick up the nearest loot, or spit out what you carry.</summary>
+        public void ToggleMouth(RaccoonController raccoon)
+        {
+            if (!raccoon || raccoon.Frozen) return;
+            int p = raccoon.PlayerId;
+            if (_mouth.ContainsKey(p)) { DropMouth(p); return; }
+            LootItem best = null;
+            float bestD = MouthReach;
+            foreach (var item in _items)
+            {
+                if (item.State != LootState.Active || item.Grabbable.IsHeld) continue;
+                float d = Vector3.Distance(item.transform.position, raccoon.transform.position + Vector3.up * 0.3f);
+                if (d < bestD) { bestD = d; best = item; }
+            }
+            if (!best) return;
+            var g = best.Grabbable;
+            g.IsHeld = true;
+            g.Body.isKinematic = true;
+            foreach (var c in g.Colliders) c.enabled = false;
+            _mouth[p] = best;
+        }
+
+        /// <summary>Host/offline: spit it out where the raccoon stands (caught, or a second click).</summary>
+        public void DropMouth(int player)
+        {
+            if (!_mouth.TryGetValue(player, out var item)) return;
+            _mouth.Remove(player);
+            if (!item) return;
+            var g = item.Grabbable;
+            g.IsHeld = false;
+            foreach (var c in g.Colliders) c.enabled = true;
+            g.Body.isKinematic = false;
+        }
+
+        /// <summary>Host/offline: the raccoon got out through an exit with something in its mouth.</summary>
+        public void OnEscaped(int player, Core.Panic.RoundPayout payout)
+        {
+            if (!_mouth.TryGetValue(player, out var item)) return;
+            _mouth.Remove(player);
+            if (!item) return;
+            payout.Carry(player, item.Value, item.IsObjective ? item.Objective : (ObjectiveId?)null);
+            if (item.IsObjective) _offline.ObjectivesDone |= (byte)(1 << (int)item.Objective);
+            item.Grabbable.IsHeld = false;
+            item.SetState(LootState.Stashed); // it left with the raccoon
+        }
+
+        void UpdateMouths(bool infiltrating)
+        {
+            if (_mouth.Count == 0) { ClearMouthSnapshot(); return; }
+            _raccoons.Clear();
+            foreach (var r in FindObjectsByType<RaccoonController>(FindObjectsSortMode.None)) if (r && r.PlayerId >= 0) _raccoons[r.PlayerId] = r;
+            foreach (var p in _mouth.Keys.ToList())
+            {
+                var item = _mouth[p];
+                if (!item) { _mouth.Remove(p); continue; }
+                if (_raccoons.TryGetValue(p, out var r))
+                {
+                    var t = r.transform;
+                    item.transform.SetPositionAndRotation(t.position + t.forward * 0.28f + Vector3.up * 0.32f, t.rotation);
+                    continue;
+                }
+                // The raccoon is gone. During the infiltration that means it climbed back into the coat: pocket it.
+                _mouth.Remove(p);
+                item.Grabbable.IsHeld = false;
+                if (infiltrating) Stash(item, item.transform.position);
+                else item.SetState(LootState.Stashed);
+            }
+            ClearMouthSnapshot();
+            foreach (var pair in _mouth) _offline.SetMouth(pair.Key, _items.IndexOf(pair.Value));
+        }
+
+        void ClearMouthSnapshot() { for (int p = 0; p < 5; p++) _offline.SetMouth(p, -1); }
 
         void Publish()
         {

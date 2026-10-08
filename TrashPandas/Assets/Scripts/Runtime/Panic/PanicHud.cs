@@ -68,6 +68,7 @@ namespace TrashPandas.Runtime.Panic
                 if (cam)
                     for (int i = 0; i < d.Exits.Length; i++)
                     {
+                        if (!d.ExitOpen(i)) continue;
                         Vector3 sp = cam.WorldToScreenPoint(d.Exits[i] + Vector3.up * 1.2f);
                         if (sp.z <= 0f) continue;
                         Vector2 p = UiScale.FromScreen(sp);

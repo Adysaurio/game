@@ -23,6 +23,14 @@ namespace TrashPandas.Runtime.Panic
         /// <summary>Rings + floating arrows; only visible once RUN! starts.</summary>
         public GameObject[] ExitMarkers = new GameObject[0];
         public string[] ExitNames = new string[0];
+        [Tooltip("Zone of each exit: at most one open exit per zone.")]
+        public int[] ExitZoneIds = new int[0];
+        public int OpenExitCount = 3;
+        public Vector3 GardenCenter;
+        public float MinExitDistance = 12f;
+        [Tooltip("Walking the coat in here with nobody missing = clean exit.")]
+        public Vector3 ArchCenter;
+        public float ArchRadius = 0f; // 0 = no clean exit in this scene
         public float ExitRadius = 1.3f;
         public float TimeLimit = 90f;
         public float ChaserSpeed = 3.6f;
@@ -34,6 +42,12 @@ namespace TrashPandas.Runtime.Panic
         public static PanicDirector Instance { get; private set; }
 
         readonly NetworkVariable<byte> _phase = new NetworkVariable<byte>();
+        readonly NetworkVariable<byte> _openExits = new NetworkVariable<byte>(0xFF);
+        byte _offlineOpenExits = 0xFF;
+        bool _exitsPicked;
+        readonly List<Vector3> _openExitPositions = new List<Vector3>();
+        public readonly RoundPayout Payout = new RoundPayout();
+        bool _cleanExit;
         readonly NetworkVariable<PanicSnapshot> _snapshot = new NetworkVariable<PanicSnapshot>();
         RoundPhase _offlinePhase;
         PanicSnapshot _offlineSnapshot;
@@ -57,6 +71,32 @@ namespace TrashPandas.Runtime.Panic
 
         public RoundPhase Phase => SimulationAuthority.IsOnline ? (RoundPhase)_phase.Value : _offlinePhase;
         public PanicSnapshot Snapshot => SimulationAuthority.IsOnline ? _snapshot.Value : _offlineSnapshot;
+        byte OpenMask => SimulationAuthority.IsOnline ? _openExits.Value : _offlineOpenExits;
+        public bool ExitOpen(int i) => (OpenMask & (1 << i)) != 0;
+
+        /// <summary>Positions of this round's open exits.</summary>
+        public IReadOnlyList<Vector3> OpenExitPositions
+        {
+            get
+            {
+                _openExitPositions.Clear();
+                for (int i = 0; i < Exits.Length; i++) if (ExitOpen(i)) _openExitPositions.Add(Exits[i]);
+                return _openExitPositions;
+            }
+        }
+
+        void PickExits()
+        {
+            _exitsPicked = true;
+            var candidates = new TrashPandas.Core.Round.ExitCandidate[Exits.Length];
+            for (int i = 0; i < Exits.Length; i++)
+                candidates[i] = new TrashPandas.Core.Round.ExitCandidate { Position = Exits[i], Zone = i < ExitZoneIds.Length ? ExitZoneIds[i] : i };
+            var random = new System.Random((TrashPandas.Runtime.Loot.LootDirector.SeedOverride ?? System.Environment.TickCount) + 7);
+            byte mask = 0;
+            foreach (int i in TrashPandas.Core.Round.RoundSetup.PickExits(candidates, GardenCenter, OpenExitCount, MinExitDistance, random)) mask |= (byte)(1 << i);
+            _offlineOpenExits = mask;
+            if (IsSpawned && IsServer) _openExits.Value = mask;
+        }
 
         /// <summary>The player at this keyboard, or null if unknown.</summary>
         public int? LocalPlayer
@@ -84,11 +124,24 @@ namespace TrashPandas.Runtime.Panic
 
         void Update()
         {
-            bool showExits = Phase != RoundPhase.Infiltration;
-            foreach (var m in ExitMarkers) if (m && m.activeSelf != showExits) m.SetActive(showExits);
+            bool panicking = Phase != RoundPhase.Infiltration;
+            for (int i = 0; i < ExitMarkers.Length; i++)
+            {
+                var m = ExitMarkers[i];
+                bool show = panicking && ExitOpen(i);
+                if (m && m.activeSelf != show) m.SetActive(show);
+            }
             if (!SimulationAuthority.IsSimulating) return;
+            if (SimulationAuthority.IsOnline && !IsSpawned) return;
+            if (!_exitsPicked) PickExits();
             var suspicion = SuspicionDirector.Instance;
             if (Phase == RoundPhase.Infiltration && suspicion && suspicion.Caught) BeginPanic(suspicion);
+            else if (Phase == RoundPhase.Infiltration && suspicion && ArchRadius > 0f && suspicion.Coat)
+            {
+                Vector3 d = suspicion.Coat.transform.position - ArchCenter;
+                d.y = 0f;
+                if (CleanExit.Qualifies(true, d.magnitude < ArchRadius, (int)suspicion.LastFrame.MissingParts)) EndWithCleanExit(suspicion);
+            }
             if (Phase == RoundPhase.Panic) TickPanic();
         }
 
@@ -98,28 +151,18 @@ namespace TrashPandas.Runtime.Panic
             { ChaserSpeed = 1f; CatSpeed = 1f; } // dev automation: let an escape happen deterministically
             SetPhase(RoundPhase.Panic);
             suspicion.Suspended = true;
-
-            _players.Clear();
-            if (SimulationAuthority.IsOnline)
-            {
-                var roster = SessionHost.Instance ? SessionHost.Instance.Roster : null;
-                if (roster != null) for (int p = 0; p < roster.Clients.Count + 5; p++) if (roster.ClientOf(p).HasValue) _players.Add(p);
-                if (NetworkedTrenchcoat.Instance) NetworkedTrenchcoat.Instance.BurstAll();
-            }
-            else if (TrenchcoatController.Instance)
-            {
-                // Debug mode: the other seats are virtual players with no one at the keys — their raccoons
-                // pop out for the chaos, but only yours decides when the round ends.
-                _players.Add(TrenchcoatController.Instance.LocalPlayerId);
-                TrenchcoatController.Instance.BurstAll();
-            }
+            GatherPlayers(burst: true);
 
             _hits.Reset();
             _grace.Begin(Time.time);
             _missingSince.Clear();
             _outcome.Begin(_players, Time.time, TimeLimit);
+            // The coat's pocket is shared out now; each raccoon only keeps its share if it escapes.
+            var loot = TrashPandas.Runtime.Loot.LootDirector.Instance;
+            if (loot) Payout.SetShares(loot.Pocket.Split(_players));
 
             _chasers.Clear();
+            
             foreach (var brain in suspicion.Brains)
             {
                 if (!brain.Pawn) continue;
@@ -133,6 +176,38 @@ namespace TrashPandas.Runtime.Panic
             var humans = _chasers.FindAll(c => !c.IsCat);
             var assignment = WeaponAssigner.Assign(humans.ConvertAll(c => c.Brain.Pawn.transform.position), weapons.ConvertAll(w => w.transform.position));
             for (int i = 0; i < humans.Count; i++) if (assignment[i] >= 0) humans[i].Weapon = weapons[assignment[i]];
+            Publish();
+        }
+
+        void GatherPlayers(bool burst)
+        {
+            _players.Clear();
+            if (SimulationAuthority.IsOnline)
+            {
+                var roster = SessionHost.Instance ? SessionHost.Instance.Roster : null;
+                if (roster != null) for (int p = 0; p < roster.Clients.Count + 5; p++) if (roster.ClientOf(p).HasValue) _players.Add(p);
+                if (burst && NetworkedTrenchcoat.Instance) NetworkedTrenchcoat.Instance.BurstAll();
+            }
+            else if (TrenchcoatController.Instance)
+            {
+                // Debug mode: the other seats are virtual players with no one at the keys — their raccoons
+                // pop out for the chaos, but only yours decides when the round ends.
+                _players.Add(TrenchcoatController.Instance.LocalPlayerId);
+                if (burst) TrenchcoatController.Instance.BurstAll();
+            }
+        }
+
+        /// <summary>The coat strolled out through the arch with everyone inside: all escape, pocket ×1.5.</summary>
+        void EndWithCleanExit(SuspicionDirector suspicion)
+        {
+            suspicion.Suspended = true;
+            GatherPlayers(burst: false);
+            _outcome.Begin(_players, Time.time, TimeLimit);
+            var loot = TrashPandas.Runtime.Loot.LootDirector.Instance;
+            if (loot) Payout.SetShares(loot.Pocket.CleanExitPayout(_players));
+            foreach (int p in _players) { _outcome.MarkEscaped(p); Payout.Escaped(p); }
+            _cleanExit = true;
+            SetPhase(RoundPhase.Results);
             Publish();
         }
 
@@ -156,9 +231,11 @@ namespace TrashPandas.Runtime.Panic
                     continue;
                 }
                 _missingSince.Remove(p);
-                if (ExitZones.Contains(Exits, r.transform.position, ExitRadius) >= 0)
+                if (ExitZones.Contains(OpenExitPositions, r.transform.position, ExitRadius) >= 0)
                 {
                     _outcome.MarkEscaped(p);
+                    TrashPandas.Runtime.Loot.LootDirector.Instance?.OnEscaped(p, Payout);
+                    Payout.Escaped(p);
                     Remove(r);
                     continue;
                 }
@@ -197,19 +274,29 @@ namespace TrashPandas.Runtime.Panic
                 var result = _hits.TryHit(o.TargetId, now);
                 if (result == HitResult.Ignored) continue;
                 Push(target, dir * HitImpulse, _hits.StunSeconds);
-                if (result == HitResult.Caught && _outcome.MarkCaught(o.TargetId)) Freeze(target);
+                if (result == HitResult.Caught && _outcome.MarkCaught(o.TargetId))
+                {
+                    Freeze(target);
+                    Payout.Caught(o.TargetId);
+                    TrashPandas.Runtime.Loot.LootDirector.Instance?.DropMouth(o.TargetId);
+                }
             }
 
             _outcome.Tick(now);
-            if (_outcome.IsOver) SetPhase(RoundPhase.Results);
+            if (_outcome.IsOver)
+            {
+                foreach (int p in _players)
+                    if (_outcome.StatusOf(p) == PlayerOutcome.Caught) { Payout.Caught(p); TrashPandas.Runtime.Loot.LootDirector.Instance?.DropMouth(p); }
+                SetPhase(RoundPhase.Results);
+            }
             Publish();
         }
 
         void Publish()
         {
-            var snap = new PanicSnapshot { SecondsLeft = _outcome.SecondsLeft(Time.time) };
+            var snap = new PanicSnapshot { SecondsLeft = _outcome.SecondsLeft(Time.time), CleanExit = _cleanExit };
             var roster = SimulationAuthority.IsOnline && SessionHost.Instance ? SessionHost.Instance.Roster : null;
-            foreach (int p in _players) snap.Set(p, roster?.ClientOf(p), _outcome.StatusOf(p), _hits.Hits(p));
+            foreach (int p in _players) { snap.Set(p, roster?.ClientOf(p), _outcome.StatusOf(p), _hits.Hits(p)); snap.SetLoot(p, Payout.Of(p)); }
             _offlineSnapshot = snap;
             if (IsSpawned && IsServer && !snap.Equals(_snapshot.Value)) _snapshot.Value = snap;
         }
