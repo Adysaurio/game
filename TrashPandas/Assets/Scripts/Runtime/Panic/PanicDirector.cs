@@ -68,6 +68,7 @@ namespace TrashPandas.Runtime.Panic
             public PursuitMind Mind;
             public PanicWeapon Weapon;
             public bool Screams; // the mother-in-law: "THERE!" sends nearby humans to look
+            public bool IsNemesis;
             public bool IsCat => Brain.Pawn.Kind == NpcKind.Cat;
             public PursuitState Last;
         }
@@ -89,6 +90,44 @@ namespace TrashPandas.Runtime.Panic
         readonly List<PursuitAssigner.Chaser> _assignInput = new List<PursuitAssigner.Chaser>();
 
         /// <summary>Each human chases differently (Pac-Man ghosts): speed and personality.</summary>
+        /// <summary>The planner calls the waiter; granny's cat comes along; the pest control guy works alone.</summary>
+        static bool IsHelper(NemesisKind kind, NpcPawn pawn) =>
+            (kind == NemesisKind.WeddingPlanner && pawn.Kind == NpcKind.Waiter) || (kind == NemesisKind.Granny && pawn.Kind == NpcKind.Cat);
+
+        readonly List<NpcBrain> _witnesses = new List<NpcBrain>();
+        readonly Dictionary<NpcBrain, float> _nextPoint = new Dictionary<NpcBrain, float>();
+
+        /// <summary>The nemesis heard / figured out something during the RUN: they go and look.</summary>
+        public void NemesisHeard(Vector3 at)
+        {
+            if (Phase != RoundPhase.Panic) return;
+            foreach (var c in _chasers) if (c.IsNemesis) c.Mind.Hear(at);
+        }
+
+        /// <summary>Witnesses: they see a raccoon, point and shout; the nemesis comes (radio = from anywhere).</summary>
+        void TickWitnesses(SuspicionDirector suspicion, float now)
+        {
+            var nemesis = NemesisDirector.Instance;
+            if (!nemesis || !suspicion) return;
+            var profile = nemesis.Profile;
+            foreach (var w in _witnesses)
+            {
+                var pawn = w.Pawn;
+                if (!pawn) continue;
+                pawn.Stop();
+                RaccoonController seen = null;
+                foreach (var t in _targets)
+                    if (_raccoonOf.TryGetValue(t.Id, out var rr) && !rr.Frozen && !Squad.HidingSpot.Hides(rr)
+                        && suspicion.CanSee(pawn, rr.transform.position + Vector3.up * 0.3f, rr.transform, 11f, 160f)) { seen = rr; break; }
+                pawn.LookAt(seen ? seen.transform.position : (Vector3?)null);
+                pawn.SetMood(seen ? NpcPawn.MoodPointing : (byte)Core.Npc.GuestState.Alarmed);
+                if (!seen || (_nextPoint.TryGetValue(w, out float next) && now < next)) continue;
+                _nextPoint[w] = now + 1.2f;
+                if (profile.Radio || (nemesis.Pawn && Vector3.Distance(nemesis.Pawn.transform.position, pawn.transform.position) < profile.ReportRange))
+                    NemesisHeard(seen.transform.position);
+            }
+        }
+
         (float speed, PursuitPersonality p, bool screams) PersonalityOf(NpcPawn pawn)
         {
             if (pawn.Kind == NpcKind.Cat) return (CatSpeed, new PursuitPersonality { SwingRange = 0.9f, Windup = 0.2f, SearchSeconds = 2.5f, ChaseBeforeWinded = 6f, WindedSeconds = 1.5f }, false);
@@ -209,10 +248,29 @@ namespace TrashPandas.Runtime.Panic
             else if (loot) Payout.SetShares(loot.Pocket.Split(_players));
 
             _chasers.Clear();
-            
+            _witnesses.Clear();
+            var nemesis = NemesisDirector.Instance;
+            var profile = nemesis ? nemesis.Profile : null;
+
             foreach (var brain in suspicion.Brains)
             {
                 if (!brain.Pawn) continue;
+                // With a nemesis in the scene only they (and their helper) hunt; everybody else is a witness who
+                // points and shouts.
+                if (nemesis && nemesis.Pawn == brain.Pawn)
+                {
+                    brain.Pawn.Panic(ChaserSpeed * profile.Speed);
+                    var nm = new PursuitMind(brain.Pawn.transform.position, profile.Pursuit);
+                    if (CageRadius > 0f) nm.CageAt = CagePosition;
+                    _chasers.Add(new Chaser { Brain = brain, Mind = nm, IsNemesis = true });
+                    continue;
+                }
+                if (nemesis && !IsHelper(nemesis.Kind, brain.Pawn))
+                {
+                    brain.Pawn.SetMood((byte)Core.Npc.GuestState.Alarmed);
+                    _witnesses.Add(brain);
+                    continue;
+                }
                 var (speed, personality, screams) = PersonalityOf(brain.Pawn);
                 brain.Pawn.Panic(speed);
                 brain.Pawn.SetMood((byte)Core.Npc.GuestState.Alarmed);
@@ -223,7 +281,7 @@ namespace TrashPandas.Runtime.Panic
 
             // Everyone but the cat runs for the nearest free weapon.
             var weapons = new List<PanicWeapon>(FindObjectsByType<PanicWeapon>(FindObjectsSortMode.InstanceID));
-            var humans = _chasers.FindAll(c => !c.IsCat);
+            var humans = _chasers.FindAll(c => !c.IsCat && !c.IsNemesis); // the nemesis brought their own
             var assignment = WeaponAssigner.Assign(humans.ConvertAll(c => c.Brain.Pawn.transform.position), weapons.ConvertAll(w => w.transform.position));
             for (int i = 0; i < humans.Count; i++) if (assignment[i] >= 0) humans[i].Weapon = weapons[assignment[i]];
             Publish();
@@ -265,6 +323,8 @@ namespace TrashPandas.Runtime.Panic
             SetPhase(RoundPhase.Results);
             Publish();
         }
+
+        bool shockedForWitnesses(float now) => !_grace.ChasersMayMove(now);
 
         void TickPanic()
         {
@@ -311,6 +371,15 @@ namespace TrashPandas.Runtime.Panic
                 if (pawn && suspicion)
                     foreach (var t in _targets)
                     {
+                        if (c.IsNemesis && NemesisDirector.Instance)
+                        {
+                            if (_raccoonOf.TryGetValue(t.Id, out var nr) && !nr.Frozen && NemesisDirector.Instance.Sees(suspicion, nr))
+                            {
+                                sees.Add(t);
+                                if (nr.InCan && Vector3.Distance(nr.transform.position, pawn.transform.position) < 2.5f) NemesisDirector.KickOut(nr); // the flashlight found you
+                            }
+                            continue;
+                        }
                         if (!_raccoonOf.TryGetValue(t.Id, out var rr) || rr.Frozen || Squad.HidingSpot.Hides(rr)) continue;
                         float range = rr.IsSneaking ? PanicSightRange * 0.5f : PanicSightRange;
                         if (suspicion.CanSee(pawn, rr.transform.position + Vector3.up * 0.3f, rr.transform, range, PanicFov)) sees.Add(t);
@@ -318,6 +387,13 @@ namespace TrashPandas.Runtime.Panic
                 _assignInput.Add(new PursuitAssigner.Chaser { Position = pawn ? pawn.transform.position : Vector3.zero, Sees = sees });
             }
             var assigned = PursuitAssigner.Assign(_assignInput, MaxChasersPerRaccoon);
+            if (!shockedForWitnesses(now)) TickWitnesses(suspicion, now);
+            // The nemesis remembers hideouts you've used before: occupied and nearby → she goes to check.
+            var nem = NemesisDirector.Instance;
+            if (nem && nem.Pawn)
+                foreach (var h in Squad.Hideout.All)
+                    if (h && h.Occupant && nem.Memory.Suspects(h.Id) && Vector3.Distance(h.transform.position, nem.Pawn.transform.position) < 14f)
+                        NemesisHeard(h.transform.position);
 
             for (int i = 0; i < _chasers.Count; i++)
             {
@@ -335,7 +411,7 @@ namespace TrashPandas.Runtime.Panic
                 if (c.Weapon && c.Weapon.Holder && c.Weapon.Holder != pawn) c.Weapon = null; // someone else got it
                 Vector3? weaponPos = !c.IsCat && c.Weapon && !hasWeapon ? c.Weapon.transform.position : (Vector3?)null;
 
-                var o = c.Mind.Update(dt, new PursuitInput { Self = pawn.transform.position, HasWeapon = hasWeapon || c.IsCat, Weapon = weaponPos, Visible = assigned[i] });
+                var o = c.Mind.Update(dt, new PursuitInput { Self = pawn.transform.position, HasWeapon = hasWeapon || c.IsCat || c.IsNemesis, Weapon = weaponPos, Visible = assigned[i] });
                 // The mother-in-law screams the moment she spots one: everyone nearby comes to look.
                 if (c.Screams && o.State == PursuitState.Chase && (c.Last == PursuitState.Idle || c.Last == PursuitState.Return || c.Last == PursuitState.Search) && assigned[i].HasValue)
                     foreach (var other in _chasers)
@@ -389,6 +465,8 @@ namespace TrashPandas.Runtime.Panic
                 Vector3 dir = to.sqrMagnitude > 1e-4f ? to.normalized : pawn.transform.forward;
 
                 if (c.IsCat) { Push(target, dir * CatPushImpulse, 0.4f); continue; }
+                if (c.IsNemesis && NemesisDirector.Instance && NemesisDirector.Instance.Profile.Throws)
+                    NemesisDirector.Instance.ThrowSlipper(pawn.Eye, target.transform.position + Vector3.up * 0.3f);
                 var result = _hits.TryHit(o.TargetId, now);
                 if (result == HitResult.Ignored) continue;
                 Push(target, dir * HitImpulse, _hits.StunSeconds);
@@ -412,6 +490,7 @@ namespace TrashPandas.Runtime.Panic
                     if (_outcome.StatusOf(p) == PlayerOutcome.Caught) { Payout.Caught(p); TrashPandas.Runtime.Loot.LootDirector.Instance?.DropMouth(p); }
                 SetPhase(RoundPhase.Results);
                 foreach (var c in _chasers) if (c.Brain.Pawn) { c.Brain.Pawn.Stop(); c.Brain.Pawn.SetMood(NpcPawn.MoodCalmAgain); }
+                foreach (var w in _witnesses) if (w.Pawn) { w.Pawn.LookAt(null); w.Pawn.SetMood(NpcPawn.MoodCalmAgain); }
             }
             Publish();
         }

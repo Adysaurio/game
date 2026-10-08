@@ -28,13 +28,40 @@ namespace TrashPandas.Runtime.Npc
         static readonly string[] Winded = { "huff… huff…", "too old for this", "*wheeze*", "gimme a sec…" };
         static readonly string[] Stunned = { "@_@", "OW!", "my eye!", "who threw that?!" };
 
+        static readonly string[] Pointing = { "THERE!", "RACCOON!", "OVER HERE!", "IT'S BEHIND YOU!", "EEEK!" };
+        static readonly string[][] NemesisPatrol =
+        {
+            new[] { "*checks list*", "napkins… swans… cake…", "everything is PERFECT", "who moved the chairs?" },
+            new[] { "*sniff sniff*", "I smell raccoon…", "here, little critter…", "*whistles*" },
+            new[] { "*humming*", "back in my day…", "where are my glasses", "*tap… tap…*" },
+        };
+        static readonly string[][] NemesisCurious =
+        {
+            new[] { "Copy that, on my way!", "Code red?!", "What now?!" },
+            new[] { "Gotcha… maybe.", "Let's have a look.", "Hmm-hmm…" },
+            new[] { "What was that?!", "I heard that!", "Who's there?" },
+        };
+        static readonly string[][] NemesisChase =
+        {
+            new[] { "NOT ON MY WEDDING!", "SECURITY! ANYONE!", "YOU'RE RUINING EVERYTHING!" },
+            new[] { "GOTCHA NOW!", "NOWHERE TO HIDE!", "CRITTER SPOTTED!" },
+            new[] { "COME HERE, YOU!", "*SLIPPER INCOMING*", "FILTHY CRITTERS!" },
+        };
+
         /// <summary>A line that fits the mood, stable for a few seconds per person.</summary>
         static string PanicLine(NpcPawn pawn, byte mood)
         {
             int seed = pawn.name.GetHashCode() ^ (int)(Time.time / 3.5f);
             string Pick(string[] lines) => lines[(seed & 0x7fffffff) % lines.Length];
+            if (pawn.Kind == NpcKind.Nemesis && TrashPandas.Runtime.Panic.NemesisDirector.Instance)
+            {
+                int k = (int)TrashPandas.Runtime.Panic.NemesisDirector.Instance.Kind;
+                if (mood == NpcPawn.MoodChasing) return Pick(NemesisChase[k]);
+                if (mood < NpcPawn.MoodChasing) return mood == 0 ? Pick(NemesisPatrol[k]) : mood == 1 ? Pick(NemesisCurious[k]) : "!!";
+            }
             switch (mood)
             {
+                case NpcPawn.MoodPointing: return Pick(Pointing);
                 case NpcPawn.MoodWindup: return "!!";
                 case NpcPawn.MoodChasing:
                     if (pawn.Kind == NpcKind.Cat) return "HSSSS!";
@@ -76,7 +103,7 @@ namespace TrashPandas.Runtime.Npc
                 var pawn = brain.Pawn;
                 if (!pawn) continue;
                 string icon = null; Color color = Color.white;
-                if (pawn.Mood >= NpcPawn.MoodChasing)
+                if (pawn.Mood >= NpcPawn.MoodChasing || pawn.Kind == NpcKind.Nemesis)
                 {
                     // The RUN: little speech bubbles with personality (Goose-style reactions).
                     string line = PanicLine(pawn, pawn.Mood);

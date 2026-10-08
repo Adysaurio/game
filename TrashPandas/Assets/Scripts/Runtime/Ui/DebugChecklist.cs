@@ -28,6 +28,7 @@ namespace TrashPandas.Runtime.Ui
             ("pipe", "Crawl through a drain pipe (E)"),
             ("trashcan", "Hide in a trash can or a bush (E), look around, hop out"),
             ("push", "Push something (walk into a crate / the gift)"),
+            ("nemesis", "Get spotted by tonight's nemesis (planner / pest guy / granny)"),
             ("pebble", "Throw a pebble to lure humans away (2, then Q)"),
             ("smoke", "Pop a smoke bomb (3, then Q)"),
             ("secret", "Push the wardrobe to find a secret pipe"),

@@ -41,6 +41,16 @@ namespace TrashPandas.Runtime.Npc
         SuspicionModel _model;
         float _nextRaccoonScan;
 
+        /// <summary>A guest registered a raccoon here (the nemesis may come and look).</summary>
+        public static event System.Action<Vector3> Witnessed;
+
+        /// <summary>The nemesis saw one: straight to RUN.</summary>
+        public void Alarm()
+        {
+            _model.Adjust(10000f);
+            Publish();
+        }
+
         public float Suspicion => SimulationAuthority.IsOnline ? _suspicion.Value : (_model?.Value ?? 0f);
         public bool Caught => SimulationAuthority.IsOnline ? _caught.Value : (_model?.Caught ?? false);
         public IReadOnlyList<NpcBrain> Brains => _brains;
@@ -107,6 +117,7 @@ namespace TrashPandas.Runtime.Npc
             foreach (var brain in _brains)
             {
                 var pawn = brain.Pawn;
+                if (pawn.Kind == NpcKind.Nemesis) continue; // driven by the nemesis director
                 if (brain.Cat != null)
                 {
                     Vector3 quarry = catQuarry;
@@ -140,7 +151,7 @@ namespace TrashPandas.Runtime.Npc
                 var state = brain.Guest.Update(dt, seen, seenRaccoon, noticeScale);
                 pawn.SetAwareness(state == GuestState.Alarmed ? 0f : brain.Guest.Awareness);
                 // Only once the guest has actually registered the raccoon (not on a split-second glimpse).
-                if (seenRaccoon && state == GuestState.Alarmed) _model.ReportRaccoonSighting(brain.Id, now);
+                if (seenRaccoon && state == GuestState.Alarmed && _model.ReportRaccoonSighting(brain.Id, now)) Witnessed?.Invoke(seenRaccoon.transform.position);
                 if (seenRaccoon) brain.LastSeenRaccoon = seenRaccoon.transform.position;
                 if (seesCoat) { frame.CoatWitnessed = true; frame.SeenWeirdness = Mathf.Max(frame.SeenWeirdness, weirdness); }
 
@@ -153,7 +164,7 @@ namespace TrashPandas.Runtime.Npc
             // Someone hiding (and nobody spotting a raccoon): the wedding calms down faster.
             bool anyHidden = false, anySeen = false;
             foreach (var r in _raccoons) if (r && Squad.HidingSpot.SpotOf(r).HasValue && Squad.HidingSpot.Hides(r)) anyHidden = true;
-            foreach (var brain in _brains) if (brain.Guest != null && brain.Guest.State == GuestState.Alarmed) anySeen = true;
+            foreach (var brain in _brains) if (brain.Guest != null && brain.Pawn.Kind != NpcKind.Nemesis && brain.Guest.State == GuestState.Alarmed) anySeen = true;
             if (anyHidden && !anySeen && _model.Value > 0f) _model.Adjust(-HideCalmRate * dt);
             LastFrame = frame;
             _model.Tick(dt, frame);
@@ -170,7 +181,7 @@ namespace TrashPandas.Runtime.Npc
             float radius = Core.Raccoons.NoiseModel.Radius(kind);
             foreach (var brain in _brains)
             {
-                if (brain.Guest == null || !brain.Pawn) continue;
+                if (brain.Guest == null || !brain.Pawn || brain.Pawn.Kind == NpcKind.Nemesis) continue;
                 Vector3 ear = brain.Pawn.Eye;
                 bool occluded = Physics.Linecast(ear, at + Vector3.up * 0.3f, out var hit, ~0, QueryTriggerInteraction.Ignore)
                                 && !hit.collider.transform.IsChildOf(brain.Pawn.transform) && !hit.collider.GetComponentInParent<RaccoonController>();

@@ -107,6 +107,7 @@ namespace TrashPandas.Runtime.Raccoon
             if (!can || Crawling || InCan || Frozen || can.Occupant) return;
             if (!ReferenceEquals(Mount, null)) Dismount(Vector3.zero);
             InCan = can;
+            if (Net.SimulationAuthority.IsSimulating) Panic.NemesisDirector.Instance?.OnHid(can);
             _cc.enabled = false;
             _planar = Vector3.zero;
             StartCoroutine(can.HopIn(this));
@@ -155,6 +156,7 @@ namespace TrashPandas.Runtime.Raccoon
         bool IsAbove(RaccoonController other) { var m = Mount; while (m) { if (m == other) return true; m = m.Mount; } return false; }
 
         static readonly System.Collections.Generic.List<RaccoonController> All = new System.Collections.Generic.List<RaccoonController>();
+        public static System.Collections.Generic.IReadOnlyList<RaccoonController> Registered => All;
         // Registered for their whole life: other players' raccoons are disabled copies but still count (towers).
         void OnDestroy()
         {

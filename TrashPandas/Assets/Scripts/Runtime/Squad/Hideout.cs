@@ -14,6 +14,8 @@ namespace TrashPandas.Runtime.Squad
         public const float EnterRadius = 1.1f;
         public RaccoonController Occupant { get; private set; }
         public abstract string Prompt { get; }
+        /// <summary>Stable id (same on every machine): name + where it stands.</summary>
+        public int Id => Animator.StringToHash(name + transform.position.ToString("F1"));
 
         static readonly List<Hideout> s_all = new List<Hideout>();
         public static IReadOnlyList<Hideout> All => s_all;

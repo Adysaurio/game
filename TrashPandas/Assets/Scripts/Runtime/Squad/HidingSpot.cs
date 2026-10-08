@@ -79,7 +79,7 @@ namespace TrashPandas.Runtime.Squad
         }
 
         /// <summary>Debug squad: the raccoons you're not driving wait unseen, so you can switch with Tab calmly.</summary>
-        static bool DebugParked(RaccoonController r)
+        public static bool DebugParked(RaccoonController r)
         {
             var squad = SquadController.Instance;
             if (!squad || squad.Active == r) return false;

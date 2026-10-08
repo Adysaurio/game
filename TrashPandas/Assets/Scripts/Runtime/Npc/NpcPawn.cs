@@ -5,7 +5,7 @@ using UnityEngine.AI;
 
 namespace TrashPandas.Runtime.Npc
 {
-    public enum NpcKind : byte { Guest, Waiter, Cat }
+    public enum NpcKind : byte { Guest, Waiter, Cat, Nemesis }
 
     /// <summary>
     /// A wedding NPC's body: walks with a NavMeshAgent where the simulation runs, turns its head toward what
@@ -77,6 +77,9 @@ namespace TrashPandas.Runtime.Npc
         }
 
         public float Speed => _agent ? _agent.speed : 0f;
+        public Vector3 Velocity => _agent && _agent.enabled ? _agent.velocity : _lastVel;
+        Vector3 _lastPos, _lastVel;
+        void FixedUpdate() { _lastVel = (transform.position - _lastPos) / Time.fixedDeltaTime; _lastPos = transform.position; }
 
         public void SetSpeed(float speed)
         {
@@ -94,7 +97,7 @@ namespace TrashPandas.Runtime.Npc
         }
 
         /// <summary>Moods during the RUN (above the Guest/Cat states), drawn as speech bubbles.</summary>
-        public const byte MoodChasing = 10, MoodSearching = 11, MoodWinded = 12, MoodStunned = 13, MoodWindup = 14, MoodCalmAgain = 15;
+        public const byte MoodChasing = 10, MoodSearching = 11, MoodWinded = 12, MoodStunned = 13, MoodWindup = 14, MoodCalmAgain = 15, MoodPointing = 16;
 
         public void SetMood(byte mood)
         {

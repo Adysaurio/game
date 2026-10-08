@@ -36,6 +36,7 @@ namespace TrashPandas.Runtime.Squad
         {
             if (!r || r.Crawling || r.Frozen || !OtherEnd || Path.Length < 2) return;
             r.EnterTunnel(new Core.Raccoons.TunnelPath(Path), OtherEnd.forward, transform.forward);
+            if (Net.SimulationAuthority.IsSimulating) Panic.NemesisDirector.Instance?.OnPipe(r, OtherEnd.position);
         }
     }
 }

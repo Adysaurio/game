@@ -105,6 +105,39 @@ namespace TrashPandas.Runtime.Ui
             _icon ??= new GUIStyle(GUI.skin.label) { fontSize = 26, alignment = TextAnchor.MiddleCenter, fontStyle = FontStyle.Bold };
             DrawMinimap();
             DrawItemBar();
+            DrawNemesisCard();
+        }
+
+        float _cardFrom = -1f;
+        GUIStyle _cardTitle, _cardRule;
+
+        /// <summary>"Tonight's problem": who's hunting this round and their one rule (after the intro, then under the map).</summary>
+        void DrawNemesisCard()
+        {
+            var nd = Panic.NemesisDirector.Instance;
+            if (!nd) return;
+            if (_cardFrom < 0f) _cardFrom = Time.time;
+            var prof = nd.Profile;
+            float W = UiScale.Width, H = UiScale.Height;
+            _cardTitle ??= new GUIStyle(GUI.skin.label) { fontSize = 40, fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleCenter };
+            _cardRule ??= new GUIStyle(GUI.skin.label) { fontSize = 18, alignment = TextAnchor.MiddleCenter, wordWrap = true };
+            float t = Time.time - _cardFrom;
+            if (t < 6f)
+            {
+                float a = Mathf.Clamp01(t * 3f) * Mathf.Clamp01((6f - t) * 2f);
+                GUI.color = new Color(0f, 0f, 0f, 0.6f * a);
+                GUI.DrawTexture(new Rect(0, H * 0.28f, W, 130), Texture2D.whiteTexture);
+                GUI.color = new Color(1f, 0.85f, 0.4f, a);
+                GUI.Label(new Rect(0, H * 0.28f + 6, W, 22), "TONIGHT'S PROBLEM", _cardRule);
+                GUI.color = new Color(1f, 0.4f, 0.55f, a);
+                GUI.Label(new Rect(0, H * 0.28f + 30, W, 50), prof.Title, _cardTitle);
+                GUI.color = new Color(1f, 1f, 1f, a);
+                GUI.Label(new Rect(W * 0.2f, H * 0.28f + 82, W * 0.6f, 40), prof.Rule, _cardRule);
+                GUI.color = Color.white;
+            }
+            GUI.color = new Color(1f, 0.6f, 0.7f);
+            GUI.Label(new Rect(W - 194f - 14f, 84f + 180f + 8f, 194f, 18f), prof.Title, _small);
+            GUI.color = Color.white;
         }
 
         void Dot(Vector2 p, float size, Color c)
@@ -171,6 +204,18 @@ namespace TrashPandas.Runtime.Ui
                     bool curious = mood == 1 || mood == NpcPawn.MoodSearching;
                     if (alarmed || curious) Dot(ToMap(b.Pawn.transform.position, r), 7f, alarmed ? new Color(1f, 0.25f, 0.2f) : new Color(1f, 0.85f, 0.3f));
                 }
+            // The nemesis: shown when close (you'd hear them) or once it's RUN.
+            var nem = Panic.NemesisDirector.Instance;
+            var meNow = Me;
+            if (nem && nem.Pawn && (panic || (meNow && Vector3.Distance(meNow.transform.position, nem.Pawn.transform.position) < 20f)))
+            {
+                var p = ToMap(nem.Pawn.transform.position, r);
+                float pulse = 14f + 3f * Mathf.PingPong(Time.time * 3f, 1f);
+                Dot(p, pulse + 3f, Color.black);
+                Dot(p, pulse, new Color(0.85f, 0.25f, 0.75f));
+                GUI.color = Color.white;
+                GUI.Label(new Rect(p.x - 10, p.y - 9, 20, 18), "!", _small);
+            }
             // The crew (bandana colors), you on top with a facing tick.
             var me = Me;
             foreach (var rc in FindObjectsByType<RaccoonController>(FindObjectsSortMode.None))

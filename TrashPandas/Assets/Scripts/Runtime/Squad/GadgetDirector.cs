@@ -36,6 +36,8 @@ namespace TrashPandas.Runtime.Squad
     {
         public float ThrowSpeed = 11f, ThrowUp = 4.5f, SmokeRadius = 3f, SmokeSeconds = 7f;
         public static GadgetDirector Instance { get; private set; }
+        /// <summary>True while a pebble's clack is being heard (the nemesis learns to ignore them).</summary>
+        public static bool EmittingPebble { get; private set; }
 
         readonly NetworkVariable<GadgetSnapshot> _net = new NetworkVariable<GadgetSnapshot>();
         GadgetSnapshot _offline;
@@ -117,7 +119,8 @@ namespace TrashPandas.Runtime.Squad
         IEnumerator PebbleNoise(Vector3 landing, float flight)
         {
             yield return new WaitForSeconds(flight);
-            NoiseBus.Emit(NoiseKind.Crash, landing); // "what was that?" — and off they go to look
+            EmittingPebble = true;
+            try { NoiseBus.Emit(NoiseKind.Crash, landing); } finally { EmittingPebble = false; } // "what was that?" — and off they go to look
         }
 
         [Rpc(SendTo.Everyone)]

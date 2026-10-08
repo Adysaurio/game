@@ -229,8 +229,6 @@ namespace TrashPandas.EditorTools
             // Two standing groups chatting.
             Person("Guest_Standing_0", NpcKind.Guest, new Vector3(-10f, 0f, -2f), 90f, outfits[n++ % outfits.Length], skin, false);
             Person("Guest_Standing_1", NpcKind.Guest, new Vector3(-8.8f, 0f, -2f), -90f, outfits[n++ % outfits.Length], skin, false);
-            Person("Guest_Standing_2", NpcKind.Guest, new Vector3(11f, 0f, -3f), 90f, outfits[n++ % outfits.Length], skin, false);
-            Person("Guest_Standing_3", NpcKind.Guest, new Vector3(12.2f, 0f, -3f), -90f, outfits[n++ % outfits.Length], skin, false);
 
             // Social-event speakers (stage 3b). They're guests too: they see and react like everyone else.
             Person("MotherInLaw", NpcKind.Guest, new Vector3(-3f, 0f, 13f), 180f, new Color(0.55f, 0.3f, 0.65f), skin, false).SpeakerId = "MotherInLaw";
@@ -239,9 +237,7 @@ namespace TrashPandas.EditorTools
 
             // The rest of the estate (stage 3c-1): cooks, guests in the house, the chauffeur, a couple in the orchard.
             Person("Cook_0", NpcKind.Guest, new Vector3(-20f, 0f, 10.5f), 90f, new Color(0.95f, 0.95f, 0.95f), skin, false);
-            Person("Cook_1", NpcKind.Guest, new Vector3(-16.5f, 0f, 4.5f), -60f, new Color(0.95f, 0.95f, 0.95f), skin, false);
             Person("Guest_House_0", NpcKind.Guest, new Vector3(-7.5f, 0f, 21.5f), 90f, outfits[n++ % outfits.Length], skin, false);
-            Person("Guest_House_1", NpcKind.Guest, new Vector3(-6.3f, 0f, 22.5f), -120f, outfits[n++ % outfits.Length], skin, false);
             Person("Chauffeur", NpcKind.Guest, new Vector3(19.5f, 0f, 11f), -90f, new Color(0.15f, 0.15f, 0.2f), skin, false);
             Person("Guest_Orchard_0", NpcKind.Guest, new Vector3(14f, 0f, -16f), 90f, outfits[n++ % outfits.Length], skin, false);
             Person("Guest_Orchard_1", NpcKind.Guest, new Vector3(15.2f, 0f, -16f), -90f, outfits[n++ % outfits.Length], skin, false);
@@ -263,6 +259,8 @@ namespace TrashPandas.EditorTools
                 new Vector3(-3f, 0f, 22f), new Vector3(0f, 0f, 16.5f), new Vector3(-9f, 0f, 11.5f), new Vector3(-17f, 0f, 6f), new Vector3(-9f, 0f, 0f),
                 new Vector3(18f, 0f, -17f),
             };
+
+            BuildNemesis(skin);
 
             var director = new GameObject("SuspicionDirector");
             director.AddComponent<NetworkObject>();
@@ -382,6 +380,84 @@ namespace TrashPandas.EditorTools
             var weapon = go.AddComponent<PanicWeapon>();
             weapon.Kind = kind;
             return weapon;
+        }
+
+        /// <summary>Tonight's antagonist: one body, three costumes (the director shows the one picked this round).</summary>
+        static void BuildNemesis(Material skin)
+        {
+            var pawn = Person("Nemesis", NpcKind.Nemesis, new Vector3(0f, 0f, 9.5f), 180f, new Color(0.3f, 0.3f, 0.32f), skin, false);
+            pawn.SpeakerId = ""; // not part of the social events
+            var root = pawn.transform;
+            var head = pawn.Head;
+            Transform Costume(string name)
+            {
+                var c = new GameObject(name).transform;
+                c.SetParent(root, false);
+                return c;
+            }
+            Transform OnHead(Transform costume, string name)
+            {
+                // Head pieces follow the head (it turns), but switch on/off with the costume.
+                var h = new GameObject(name).transform;
+                h.SetParent(head, false);
+                costume.gameObject.AddComponent<TrashPandas.Runtime.Panic.CostumePart>().Linked = h.gameObject;
+                return h;
+            }
+            float H = 1.75f;
+
+            // The wedding planner: hot-pink blazer, headset with a mic, clipboard.
+            var planner = Costume("Costume_WeddingPlanner");
+            var pink = Mat("Planner", new Color(0.95f, 0.35f, 0.6f));
+            var black = Mat("Headset", new Color(0.08f, 0.08f, 0.1f));
+            Visual(PrimitiveType.Capsule, "Blazer", planner, new Vector3(0f, H * 0.45f, 0f), new Vector3(0.56f, H * 0.36f, 0.46f), pink);
+            Visual(PrimitiveType.Cube, "Clipboard", planner, new Vector3(0.36f, H * 0.6f, 0.22f), new Vector3(0.05f, 0.32f, 0.24f), Mat("Clipboard", new Color(0.75f, 0.6f, 0.4f)));
+            var ph = OnHead(planner, "PlannerHead");
+            Visual(PrimitiveType.Cube, "Band", ph, new Vector3(0f, 0.15f, 0f), new Vector3(0.34f, 0.03f, 0.06f), black);
+            Visual(PrimitiveType.Cube, "Mic", ph, new Vector3(0.13f, -0.06f, 0.1f), new Vector3(0.02f, 0.02f, 0.18f), black);
+            Visual(PrimitiveType.Sphere, "Bun", ph, new Vector3(0f, 0.12f, -0.12f), Vector3.one * 0.14f, Mat("Hair", new Color(0.35f, 0.2f, 0.1f)));
+
+            // The pest control guy: khaki overalls, yellow tank on his back, cap, flashlight (a real light).
+            var pest = Costume("Costume_PestControl");
+            var khaki = Mat("Khaki", new Color(0.6f, 0.55f, 0.35f));
+            Visual(PrimitiveType.Capsule, "Overalls", pest, new Vector3(0f, H * 0.45f, 0f), new Vector3(0.58f, H * 0.37f, 0.48f), khaki);
+            Visual(PrimitiveType.Cylinder, "Tank", pest, new Vector3(0f, H * 0.6f, -0.3f), new Vector3(0.24f, 0.28f, 0.24f), Mat("Tank", new Color(0.95f, 0.8f, 0.15f)));
+            var torch = Visual(PrimitiveType.Cylinder, "Flashlight", pest, new Vector3(0.34f, H * 0.62f, 0.3f), new Vector3(0.07f, 0.12f, 0.07f), black);
+            torch.localRotation = Quaternion.Euler(90f, 0f, 0f);
+            var beam = new GameObject("Beam").AddComponent<Light>();
+            beam.type = LightType.Spot;
+            beam.spotAngle = 50f;
+            beam.range = 14f;
+            beam.intensity = 6f;
+            beam.color = new Color(1f, 0.95f, 0.75f);
+            beam.transform.SetParent(pest, false);
+            beam.transform.localPosition = new Vector3(0.34f, H * 0.62f, 0.4f);
+            beam.transform.localRotation = Quaternion.Euler(12f, 0f, 0f);
+            var pc = OnHead(pest, "PestHead");
+            Visual(PrimitiveType.Cylinder, "Cap", pc, new Vector3(0f, 0.12f, 0f), new Vector3(0.32f, 0.04f, 0.32f), khaki);
+            Visual(PrimitiveType.Cube, "Visor", pc, new Vector3(0f, 0.1f, 0.16f), new Vector3(0.24f, 0.02f, 0.14f), khaki);
+
+            // Granny: lavender shawl, grey bun, glasses, a cane (and a slipper in reserve).
+            var granny = Costume("Costume_Granny");
+            var lavender = Mat("Shawl", new Color(0.7f, 0.6f, 0.85f));
+            Visual(PrimitiveType.Capsule, "Shawl", granny, new Vector3(0f, H * 0.42f, 0f), new Vector3(0.6f, H * 0.36f, 0.5f), lavender);
+            Visual(PrimitiveType.Cylinder, "Cane", granny, new Vector3(0.36f, 0.45f, 0.2f), new Vector3(0.04f, 0.45f, 0.04f), Mat("Cane", new Color(0.4f, 0.25f, 0.12f)));
+            var gh = OnHead(granny, "GrannyHead");
+            var grey = Mat("GreyHair", new Color(0.82f, 0.82f, 0.85f));
+            Visual(PrimitiveType.Sphere, "Hair", gh, new Vector3(0f, 0.06f, -0.03f), new Vector3(0.33f, 0.25f, 0.33f), grey);
+            Visual(PrimitiveType.Sphere, "Bun", gh, new Vector3(0f, 0.2f, -0.06f), Vector3.one * 0.15f, grey);
+            Visual(PrimitiveType.Cube, "Glasses", gh, new Vector3(0f, 0.02f, 0.15f), new Vector3(0.24f, 0.05f, 0.02f), black);
+
+            var go = new GameObject("NemesisDirector");
+            go.AddComponent<NetworkObject>();
+            var nd = go.AddComponent<TrashPandas.Runtime.Panic.NemesisDirector>();
+            nd.Pawn = pawn;
+            nd.Costumes = new[] { planner.gameObject, pest.gameObject, granny.gameObject };
+            // Round the estate: garden, house, kitchen, parking, orchard, south lawn.
+            nd.Patrol = new[]
+            {
+                new Vector3(0f, 0f, 9.5f), new Vector3(-3f, 0f, 19f), new Vector3(-15f, 0f, 9f), new Vector3(-8f, 0f, -1f),
+                new Vector3(4f, 0f, -8f), new Vector3(15f, 0f, -14f), new Vector3(20f, 0f, 0f), new Vector3(9f, 0f, 4f),
+            };
         }
 
         static NpcPawn Person(string name, NpcKind kind, Vector3 position, float yaw, Color outfit, Material skin, bool seated)

@@ -116,7 +116,10 @@ namespace TrashPandas.Runtime.Net
                 // Walk into the party until spotted, then run for an exit.
                 var pdl = TrashPandas.Runtime.Panic.PanicDirector.Instance;
                 if (pdl && pdl.Phase == TrashPandas.Runtime.Panic.RoundPhase.Panic) return FleeMove(r.transform.position) ?? Vector2.zero;
-                return TrashPandas.Runtime.Squad.SquadBots.Steer(r.transform.position, new Vector3(3f, 0f, 6.8f));
+                // Walk up to tonight's nemesis (falls back to the middle of the party).
+                var nem = TrashPandas.Runtime.Panic.NemesisDirector.Instance;
+                Vector3 goal = nem && nem.Pawn ? nem.Pawn.transform.position : new Vector3(3f, 0f, 6.8f);
+                return TrashPandas.Runtime.Squad.SquadBots.Steer(r.transform.position, goal);
             }
             if (Bot == "towerhost" || Bot == "towerclient") return TrashPandas.Runtime.Squad.SquadBots.OnlineTowerMove(r, Bot == "towerclient");
             if (Bot == "heavyonline") return TrashPandas.Runtime.Squad.SquadBots.OnlineHeavyMove(r);
@@ -305,6 +308,8 @@ namespace TrashPandas.Runtime.Net
             var ld = TrashPandas.Runtime.Loot.LootDirector.Instance;
             var pdx = TrashPandas.Runtime.Panic.PanicDirector.Instance;
             if (pdx) panic += $" chasers[{pdx.ChaserStates}]";
+            var nmx = TrashPandas.Runtime.Panic.NemesisDirector.Instance;
+            if (nmx && nmx.Pawn) panic += $" nemesis={nmx.Kind}/{nmx.Pawn.Mood}@{nmx.Pawn.transform.position:F1} nemnet={nmx.IsSpawned}/{nmx.DebugNet}";
             var sqx = TrashPandas.Runtime.Squad.SquadController.Instance;
             var cg = GameObject.Find("Crate_Garden");
             if (sqx && sqx.Active) panic += $" crate={(cg ? cg.transform.position.ToString("F2") : "-")} hanging={sqx.Active.Hanging} pushing={sqx.Active.Pushing}";
