@@ -65,6 +65,10 @@ namespace TrashPandas.Core.Panic
             _searchFor = 0f;
         }
 
+        /// <summary>Where caught raccoons wait: nobody camps it (a short look, then they leave).</summary>
+        public Vector3? CageAt;
+        public const float CageCampRadius = 5f, CageSearchSeconds = 1.5f;
+
         public void Stun(float seconds)
         {
             _stunnedFor = Mathf.Max(_stunnedFor, seconds);
@@ -128,7 +132,8 @@ namespace TrashPandas.Core.Panic
             if (_lastKnown.HasValue)
             {
                 _searchFor += dt;
-                if (_searchFor < P.SearchSeconds)
+                float searchFor = CageAt.HasValue && Flat(_lastKnown.Value, CageAt.Value) < CageCampRadius ? Mathf.Min(P.SearchSeconds, CageSearchSeconds) : P.SearchSeconds;
+                if (_searchFor < searchFor)
                     return new PursuitOutput { State = PursuitState.Search, Destination = _lastKnown.Value, TargetId = _target };
                 _lastKnown = null;
                 _target = -1;

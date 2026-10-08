@@ -214,3 +214,51 @@ namespace TrashPandas.Tests
         }
     }
 }
+
+namespace TrashPandas.Tests
+{
+    public class AwardsTests
+    {
+        [Test]
+        public void Awards_PickTheStandouts()
+        {
+            var stats = new[]
+            {
+                new TrashPandas.Core.Panic.PlayerStats { Player = 0, Loot = 300, Hits = 1, Rescues = 0, Escaped = true, CaughtOrder = -1 },
+                new TrashPandas.Core.Panic.PlayerStats { Player = 1, Loot = 40, Hits = 2, Rescues = 1, Escaped = true, CaughtOrder = 0 },
+                new TrashPandas.Core.Panic.PlayerStats { Player = 2, Loot = 0, Hits = 3, Rescues = 0, Escaped = false, CaughtOrder = 1 },
+            };
+            var awards = TrashPandas.Core.Panic.Awards.For(stats);
+            Assert.AreEqual(0, awards[TrashPandas.Core.Panic.Award.Boss]);
+            Assert.AreEqual(1, awards[TrashPandas.Core.Panic.Award.Hero]);
+            Assert.AreEqual(1, awards[TrashPandas.Core.Panic.Award.Pinata], "most hits among those who still got out");
+            Assert.AreEqual(1, awards[TrashPandas.Core.Panic.Award.FirstToFall]);
+        }
+
+        [Test]
+        public void NoStandout_NoAward()
+        {
+            var stats = new[] { new TrashPandas.Core.Panic.PlayerStats { Player = 0, CaughtOrder = -1 } };
+            var awards = TrashPandas.Core.Panic.Awards.For(stats);
+            Assert.IsFalse(awards.ContainsKey(TrashPandas.Core.Panic.Award.Hero));
+            Assert.IsFalse(awards.ContainsKey(TrashPandas.Core.Panic.Award.Boss), "no loot, no boss");
+        }
+    }
+}
+
+namespace TrashPandas.Tests
+{
+    public class NoCampingTests
+    {
+        [Test]
+        public void SearchingNearTheCage_IsShort()
+        {
+            var m = new PursuitMind(new Vector3(20, 0, 0), new PursuitPersonality { SearchSeconds = 6f });
+            m.CageAt = new Vector3(5, 0, 0);
+            m.Update(0.1f, new PursuitInput { Self = Vector3.zero, HasWeapon = true, Visible = new ChaseTarget { Id = 1, Position = new Vector3(5.5f, 0, 0) } });
+            PursuitOutput o = default;
+            for (int i = 0; i < 25; i++) o = m.Update(0.1f, new PursuitInput { Self = new Vector3(5, 0, 0), HasWeapon = true });
+            Assert.AreEqual(PursuitState.Return, o.State, "they don't camp the cage");
+        }
+    }
+}

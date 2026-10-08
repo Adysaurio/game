@@ -129,6 +129,23 @@ namespace TrashPandas.Runtime.Panic
                 GUI.Label(new Rect(box.x, box.y + 52 + p * 28, w, 26), $"{who} — {(o == PlayerOutcome.Escaped ? "ESCAPED" : "CAUGHT")}   ${snap.LootOf(p)}", _small);
             }
             GUI.color = Color.white;
+            // Highlights: something to brag about (or be roasted for).
+            var stats = new System.Collections.Generic.List<PlayerStats>();
+            for (int p = 0; p < snap.Count; p++)
+                if (snap.OutcomeOf(p) != PlayerOutcome.None)
+                    stats.Add(new PlayerStats { Player = p, Loot = snap.LootOf(p), Hits = snap.TotalHitsOf(p), Rescues = snap.RescuesOf(p), Escaped = snap.OutcomeOf(p) == PlayerOutcome.Escaped, CaughtOrder = snap.CaughtOrderOf(p) });
+            var awards = Awards.For(stats);
+            float ay = box.yMax + 8;
+            foreach (var pair in awards)
+            {
+                string who = me == pair.Value ? "you" : $"P{pair.Value}";
+                GUI.color = new Color(0f, 0f, 0f, 0.7f);
+                GUI.DrawTexture(new Rect(box.x, ay, w, 26), Texture2D.whiteTexture);
+                GUI.color = new Color(1f, 0.85f, 0.3f);
+                GUI.Label(new Rect(box.x, ay, w, 26), $"» {Awards.Title(pair.Key)}: {who}", _small);
+                ay += 28;
+            }
+            GUI.color = Color.white;
             // Team summary: objectives, clean exit, total.
             var loot = TrashPandas.Runtime.Loot.LootDirector.Instance;
             if (loot)

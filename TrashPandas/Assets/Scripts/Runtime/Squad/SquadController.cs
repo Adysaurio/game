@@ -35,7 +35,7 @@ namespace TrashPandas.Runtime.Squad
         int _active;
         float _nextRunNoise;
         GUIStyle _help;
-        float _helpUntil = 20f;
+        float _helpUntil = -1f;
 
         void Awake()
         {
@@ -64,6 +64,7 @@ namespace TrashPandas.Runtime.Squad
                 _raccoons.Add(r);
             }
             Activate(0);
+            _helpUntil = Time.unscaledTime + 25f;
             if (RoundIntro.Instance) RoundIntro.Instance.Begin(_raccoons.Count);
             RoundIntro.Finished += OnIntroFinished;
         }
@@ -90,7 +91,7 @@ namespace TrashPandas.Runtime.Squad
 
         void Update()
         {
-            if (UnityEngine.InputSystem.Keyboard.current?.f1Key.wasPressedThisFrame == true) _helpUntil = _helpUntil > Time.time ? 0f : Time.time + 30f;
+            if (UnityEngine.InputSystem.Keyboard.current?.f1Key.wasPressedThisFrame == true) _helpUntil = _helpUntil > Time.unscaledTime ? 0f : Time.unscaledTime + 30f;
             if (_raccoons.Count == 0 || RoundIntro.Playing) return;
             if (_reader.CyclePressed)
             {
@@ -135,7 +136,7 @@ namespace TrashPandas.Runtime.Squad
                 GUI.color = Color.white;
             }
             // "Text is evil": the full control list only at the start (or on F1); then just a reminder.
-            if (Time.time > _helpUntil)
+            if (Time.unscaledTime > _helpUntil)
             {
                 GUI.Label(new Rect(16, H - 30, 300, 22), "F1: controls · Tab: switch raccoon", _help);
                 return;

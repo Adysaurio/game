@@ -22,6 +22,7 @@ namespace TrashPandas.Runtime.Npc
         }
 
         GUIStyle _bubble;
+        readonly System.Collections.Generic.List<Rect> _drawnBubbles = new System.Collections.Generic.List<Rect>();
         static readonly string[] Chase = { "THIEF!", "RACCOON!", "GET IT!", "MY CAKE!", "COME BACK HERE!", "NOT TODAY!", "SECURITY!" };
         static readonly string[] Search = { "where'd it go?", "here, kitty…?", "I KNOW you're here", "hmm…", "show yourself!" };
         static readonly string[] Winded = { "huff… huff…", "too old for this", "*wheeze*", "gimme a sec…" };
@@ -69,6 +70,7 @@ namespace TrashPandas.Runtime.Npc
             GUI.Label(new Rect(x, y, w, 18), $"SUSPICION {Mathf.RoundToInt(d.Suspicion)}", _label);
 
             // Icons over humans
+            if (Event.current.type == EventType.Repaint || Event.current.type == EventType.Layout) _drawnBubbles.Clear();
             foreach (var brain in d.Brains)
             {
                 var pawn = brain.Pawn;
@@ -85,6 +87,11 @@ namespace TrashPandas.Runtime.Npc
                     bool windup = pawn.Mood == NpcPawn.MoodWindup;
                     var style = windup ? _icon : (_bubble ??= new GUIStyle(GUI.skin.label) { fontSize = 15, fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleCenter });
                     float bw = windup ? 60f : Mathf.Max(70f, line.Length * 10.5f + 18f);
+                    var rect = new Rect(q.x - bw / 2f, q.y - 14f, bw, 26f);
+                    bool overlaps = false;
+                    foreach (var other in _drawnBubbles) if (other.Overlaps(rect)) { overlaps = true; break; }
+                    if (overlaps && !windup) continue; // a crowd shouts one line at a time
+                    _drawnBubbles.Add(rect);
                     if (!windup)
                     {
                         GUI.color = new Color(1f, 1f, 1f, 0.92f);

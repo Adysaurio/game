@@ -83,6 +83,9 @@ namespace TrashPandas.Runtime.Panic
         public float RescueSeconds = 1f;
         public float ThrowStunSeconds = 1.8f;
         float _rescueProgress;
+        readonly Dictionary<int, int> _totalHits = new Dictionary<int, int>();
+        readonly Dictionary<int, int> _rescues = new Dictionary<int, int>();
+        readonly Dictionary<int, int> _caughtOrder = new Dictionary<int, int>();
         readonly List<PursuitAssigner.Chaser> _assignInput = new List<PursuitAssigner.Chaser>();
 
         /// <summary>Each human chases differently (Pac-Man ghosts): speed and personality.</summary>
@@ -213,7 +216,9 @@ namespace TrashPandas.Runtime.Panic
                 var (speed, personality, screams) = PersonalityOf(brain.Pawn);
                 brain.Pawn.Panic(speed);
                 brain.Pawn.SetMood((byte)Core.Npc.GuestState.Alarmed);
-                _chasers.Add(new Chaser { Brain = brain, Mind = new PursuitMind(brain.Pawn.transform.position, personality), Screams = screams });
+                var mind = new PursuitMind(brain.Pawn.transform.position, personality);
+                if (CageRadius > 0f) mind.CageAt = CagePosition;
+                _chasers.Add(new Chaser { Brain = brain, Mind = mind, Screams = screams });
             }
 
             // Everyone but the cat runs for the nearest free weapon.
@@ -375,11 +380,13 @@ namespace TrashPandas.Runtime.Panic
                 var result = _hits.TryHit(o.TargetId, now);
                 if (result == HitResult.Ignored) continue;
                 Push(target, dir * HitImpulse, _hits.StunSeconds);
+                _totalHits[o.TargetId] = (_totalHits.TryGetValue(o.TargetId, out int th) ? th : 0) + 1;
                 if (result == HitResult.Caught) HandOverBeforeCatch(o.TargetId);
                 if (result == HitResult.Caught && _outcome.MarkCaught(o.TargetId))
                 {
                     TrashPandas.Runtime.Loot.LootDirector.Instance?.DropMouth(o.TargetId);
                     Payout.Caught(o.TargetId);
+                    if (!_caughtOrder.ContainsKey(o.TargetId)) _caughtOrder[o.TargetId] = _caughtOrder.Count;
                     Cage(target);
                 }
             }
@@ -400,7 +407,12 @@ namespace TrashPandas.Runtime.Panic
         {
             var snap = new PanicSnapshot { SecondsLeft = _outcome.SecondsLeft(Time.time), CleanExit = _cleanExit };
             var roster = SimulationAuthority.IsOnline && SessionHost.Instance ? SessionHost.Instance.Roster : null;
-            foreach (int p in _players) { snap.Set(p, roster?.ClientOf(p), _outcome.StatusOf(p), _hits.Hits(p)); snap.SetLoot(p, Payout.Of(p)); }
+            foreach (int p in _players)
+            {
+                snap.Set(p, roster?.ClientOf(p), _outcome.StatusOf(p), _hits.Hits(p));
+                snap.SetLoot(p, Payout.Of(p));
+                snap.SetStats(p, _totalHits.TryGetValue(p, out int th) ? th : 0, _rescues.TryGetValue(p, out int rs) ? rs : 0, _caughtOrder.TryGetValue(p, out int co) ? co : -1);
+            }
             _offlineSnapshot = snap;
             if (IsSpawned && IsServer && !snap.Equals(_snapshot.Value)) _snapshot.Value = snap;
         }
@@ -433,16 +445,18 @@ namespace TrashPandas.Runtime.Panic
         {
             if (CagedCount() == 0 || CageRadius <= 0f) { _rescueProgress = 0f; return; }
             bool friendThere = false;
+            _rescuers.Clear();
             foreach (int p in _players)
             {
                 if (_outcome.StatusOf(p) != PlayerOutcome.Running || !_raccoonOf.TryGetValue(p, out var r) || r.Frozen) continue;
                 Vector3 d = r.transform.position - CagePosition;
                 d.y = 0f;
-                if (d.magnitude <= CageRadius) friendThere = true;
+                if (d.magnitude <= CageRadius) { friendThere = true; _rescuers.Add(p); }
             }
             _rescueProgress = friendThere ? _rescueProgress + dt : Mathf.Max(0f, _rescueProgress - dt * 2f);
             if (_rescueProgress < RescueSeconds) return;
             _rescueProgress = 0f;
+            foreach (int hero in _rescuers) _rescues[hero] = (_rescues.TryGetValue(hero, out int n) ? n : 0) + 1;
             foreach (int p in _players.ToArray())
             {
                 if (_outcome.StatusOf(p) != PlayerOutcome.Caught || !_outcome.Rescue(p)) continue;
@@ -464,6 +478,8 @@ namespace TrashPandas.Runtime.Panic
                 return string.Join(",", parts);
             }
         }
+
+        readonly List<int> _rescuers = new List<int>();
 
         public float RescueProgress01 => RescueSeconds > 0f ? Mathf.Clamp01(_rescueProgress / RescueSeconds) : 0f;
 
