@@ -25,7 +25,7 @@ namespace TrashPandas.Runtime.Net
         /// "hopgap" crouching through the hedge gap where humans can't follow.</summary>
         public static Vector2? FleeMove(Vector3 from)
         {
-            if (Bot != "hopflee" && Bot != "flee" && Bot != "hopgap" && Bot != "mouthflee" && Bot != "stashflee" && Bot != "sneakflee") return null;
+            if (Bot != "hopflee" && Bot != "flee" && Bot != "hopgap" && Bot != "mouthflee" && Bot != "stashflee" && Bot != "sneakflee" && Bot != "lureflee") return null;
             var pd = TrashPandas.Runtime.Panic.PanicDirector.Instance;
             if (!pd || pd.Phase != TrashPandas.Runtime.Panic.RoundPhase.Panic) return null;
             var open = pd.OpenExitPositions;
@@ -72,6 +72,13 @@ namespace TrashPandas.Runtime.Net
             }
             if (Bot == "fetch") return TrashPandas.Runtime.Squad.SquadBots.FetchMove(r);
             if (Bot == "flee" || Bot == "sneakflee") return FleeMove(r.transform.position) ?? Vector2.zero;
+            if (Bot == "lureflee")
+            {
+                // Walk into the party until spotted, then run for an exit.
+                var pdl = TrashPandas.Runtime.Panic.PanicDirector.Instance;
+                if (pdl && pdl.Phase == TrashPandas.Runtime.Panic.RoundPhase.Panic) return FleeMove(r.transform.position) ?? Vector2.zero;
+                return TrashPandas.Runtime.Squad.SquadBots.Steer(r.transform.position, new Vector3(3f, 0f, 6.8f));
+            }
             if (Bot == "towerhost" || Bot == "towerclient") return TrashPandas.Runtime.Squad.SquadBots.OnlineTowerMove(r, Bot == "towerclient");
             if (Bot == "heavyonline") return TrashPandas.Runtime.Squad.SquadBots.OnlineHeavyMove(r);
             return null;
