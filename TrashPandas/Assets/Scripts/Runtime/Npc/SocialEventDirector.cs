@@ -114,6 +114,7 @@ namespace TrashPandas.Runtime.Npc
 
         void Update()
         {
+            if (Squad.GameMode.Raccoons) return; // v2: events come back as trenchcoat events (delivery 3)
             if (!SimulationAuthority.IsSimulating) return;
             var suspicion = SuspicionDirector.Instance;
             var coat = suspicion ? suspicion.Coat : null;

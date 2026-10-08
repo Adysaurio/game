@@ -104,7 +104,9 @@ namespace TrashPandas.Runtime.Panic
         {
             get
             {
-                if (!SimulationAuthority.IsOnline) return TrenchcoatController.Instance ? TrenchcoatController.Instance.LocalPlayerId : (int?)null;
+                if (!SimulationAuthority.IsOnline)
+                    return Squad.SquadController.Instance ? Squad.SquadController.Instance.ActivePlayerId
+                         : TrenchcoatController.Instance ? TrenchcoatController.Instance.LocalPlayerId : (int?)null;
                 return Snapshot.PlayerOfClient(NetworkManager.Singleton.LocalClientId);
             }
         }
@@ -188,7 +190,12 @@ namespace TrashPandas.Runtime.Panic
             {
                 var roster = SessionHost.Instance ? SessionHost.Instance.Roster : null;
                 if (roster != null) for (int p = 0; p < roster.Clients.Count + 5; p++) if (roster.ClientOf(p).HasValue) _players.Add(p);
-                if (burst && NetworkedTrenchcoat.Instance) NetworkedTrenchcoat.Instance.BurstAll();
+                if (burst && !Squad.GameMode.Raccoons && NetworkedTrenchcoat.Instance) NetworkedTrenchcoat.Instance.BurstAll();
+            }
+            else if (Squad.SquadController.Instance)
+            {
+                // v2 debug: the raccoon you're driving decides the round (the others are parked props).
+                _players.Add(Squad.SquadController.Instance.ActivePlayerId);
             }
             else if (TrenchcoatController.Instance)
             {
@@ -322,6 +329,8 @@ namespace TrashPandas.Runtime.Panic
             var net = r.GetComponent<NetworkObject>();
             if (SimulationAuthority.IsOnline && net && net.IsSpawned) { net.Despawn(destroy: true); return; }
             if (TrenchcoatController.Instance && r.PlayerId == TrenchcoatController.Instance.LocalPlayerId) TrenchcoatController.Instance.ShowOverview(Overview);
+            if (Squad.SquadController.Instance && r.PlayerId == Squad.SquadController.Instance.ActivePlayerId && Overview)
+                Squad.SquadController.Instance.CameraRig.SetTarget(Overview, 16f, 0f);
             Destroy(r.gameObject);
         }
 

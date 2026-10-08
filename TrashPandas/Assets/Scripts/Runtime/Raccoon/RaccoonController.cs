@@ -10,7 +10,13 @@ namespace TrashPandas.Runtime.Raccoon
     [RequireComponent(typeof(CharacterController))]
     public sealed class RaccoonController : MonoBehaviour
     {
-        public float RunSpeed = 4.4f;
+        public float WalkSpeed = 3f;
+        public float RunSpeed = 5f;
+        public float SneakSpeed = 1.5f;
+        [Tooltip("Towers and heavy loads slow you down (1 = normal).")]
+        public float SpeedMultiplier = 1f;
+        [Tooltip("Falling faster than this when you land makes noise.")]
+        public float HardLandingSpeed = 7f;
         public float Acceleration = 30f;
         public float Deceleration = 40f;
         public float AirControl = 0.5f;
@@ -28,6 +34,10 @@ namespace TrashPandas.Runtime.Raccoon
         /// <summary>Caught in the panic: no more control.</summary>
         public bool Frozen;
         public bool IsStunned => Time.time < _stunnedUntil;
+        public bool IsRunning => _runHeld && !_crouchHeld && _planar.sqrMagnitude > 1f;
+        public bool IsSneaking => _crouchHeld;
+        /// <summary>Raised where the noise happens (running is reported continuously by the owner).</summary>
+        public event System.Action<Core.Raccoons.NoiseKind, Vector3> Noise;
         float _stunnedUntil;
 
         readonly JumpAssist _jump = new JumpAssist();
@@ -35,6 +45,8 @@ namespace TrashPandas.Runtime.Raccoon
         Vector2 _move;
         bool _jumpHeld;
         bool _crouchHeld;
+        bool _runHeld;
+        bool _wasGrounded = true;
         Vector3 _planar;
         float _verticalVelocity;
 
@@ -47,8 +59,9 @@ namespace TrashPandas.Runtime.Raccoon
             _stunnedUntil = Mathf.Max(_stunnedUntil, Time.time + stunSeconds);
         }
 
-        public void SetInput(Vector2 worldMove, bool jumpPressed, bool jumpHeld, bool crouchHeld)
+        public void SetInput(Vector2 worldMove, bool jumpPressed, bool jumpHeld, bool crouchHeld, bool runHeld = false)
         {
+            _runHeld = runHeld;
             if (Frozen || IsStunned) { _move = Vector2.zero; _jumpHeld = false; return; }
             _move = worldMove;
             if (jumpPressed) _jump.Press(Time.time);
@@ -69,7 +82,10 @@ namespace TrashPandas.Runtime.Raccoon
             _jump.SetGrounded(grounded, Time.time);
 
             if (Frozen) { _move = Vector2.zero; }
-            Vector3 wish = new Vector3(_move.x, 0f, _move.y) * (_crouchHeld ? RunSpeed * 0.5f : RunSpeed);
+            float speed = _crouchHeld ? SneakSpeed : _runHeld ? RunSpeed : WalkSpeed;
+            Vector3 wish = new Vector3(_move.x, 0f, _move.y) * speed * SpeedMultiplier;
+            if (grounded && !_wasGrounded && _verticalVelocity < -HardLandingSpeed) Noise?.Invoke(Core.Raccoons.NoiseKind.HardLanding, transform.position);
+            _wasGrounded = grounded;
             float rate = IsStunned ? Deceleration * 0.25f : wish.sqrMagnitude > _planar.sqrMagnitude ? Acceleration : Deceleration;
             _planar = Vector3.MoveTowards(_planar, wish, rate * (grounded ? 1f : AirControl) * dt);
             if (IsStunned) transform.Rotate(0f, 720f * dt, 0f); // dizzy spin

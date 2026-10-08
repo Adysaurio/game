@@ -20,7 +20,9 @@ namespace TrashPandas.Runtime.Loot
         {
             get
             {
-                if (!SimulationAuthority.IsOnline) return TrenchcoatController.Instance ? TrenchcoatController.Instance.LocalPlayerId : (int?)null;
+                if (!SimulationAuthority.IsOnline)
+                    return Squad.SquadController.Instance ? Squad.SquadController.Instance.ActivePlayerId
+                         : TrenchcoatController.Instance ? TrenchcoatController.Instance.LocalPlayerId : (int?)null;
                 return NetworkedRaccoon.LocalOwned ? NetworkedRaccoon.LocalOwned.Controller.PlayerId : (int?)null;
             }
         }

@@ -84,7 +84,8 @@ namespace TrashPandas.Runtime.Npc
 
         void Update()
         {
-            if (!SimulationAuthority.IsSimulating || !Coat || Suspended) return;
+            bool coatInPlay = Coat && !Squad.GameMode.Raccoons;
+            if (!SimulationAuthority.IsSimulating || Suspended || (!coatInPlay && !Squad.GameMode.Raccoons)) return;
             float dt = Time.deltaTime, now = Time.time;
 
             if (now >= _nextRaccoonScan)
@@ -94,30 +95,39 @@ namespace TrashPandas.Runtime.Npc
                 _raccoons.AddRange(FindObjectsByType<RaccoonController>(FindObjectsSortMode.None));
             }
 
-            var intent = Coat.CurrentIntent;
-            float weirdness = Weirdness.Of(intent);
-            Vector3 coatTarget = Coat.ChestWorld;
-            var frame = new SuspicionFrame { MissingParts = MissingParts(intent) };
+            var intent = coatInPlay ? Coat.CurrentIntent : default;
+            float weirdness = coatInPlay ? Weirdness.Of(intent) : 0f;
+            Vector3 coatTarget = coatInPlay ? Coat.ChestWorld : Vector3.down * 100f;
+            var frame = new SuspicionFrame { MissingParts = coatInPlay ? MissingParts(intent) : BodyPart.None };
+            // v2: the cat sniffs out the nearest raccoon instead of the coat.
+            Vector3 catQuarry = coatInPlay ? Coat.transform.position : Vector3.one * 1e4f;
 
             foreach (var brain in _brains)
             {
                 var pawn = brain.Pawn;
                 if (brain.Cat != null)
                 {
-                    brain.Cat.Update(dt, pawn.transform.position, Coat.transform.position);
+                    Vector3 quarry = catQuarry;
+                    if (!coatInPlay)
+                        foreach (var r in _raccoons)
+                            if (r && Vector3.Distance(r.transform.position, pawn.transform.position) < Vector3.Distance(quarry, pawn.transform.position)) quarry = r.transform.position;
+                    brain.Cat.Update(dt, pawn.transform.position, quarry);
                     pawn.GoTo(brain.Cat.Destination);
                     pawn.SetMood((byte)brain.Cat.State);
-                    pawn.LookAt(brain.Cat.State == CatState.Patrol ? (Vector3?)null : coatTarget);
+                    pawn.LookAt(brain.Cat.State == CatState.Patrol ? (Vector3?)null : quarry);
                     frame.CatHissing |= brain.Cat.IsHissing;
                     continue;
                 }
 
-                bool seesCoat = Sees(pawn, coatTarget, Coat.transform);
+                bool seesCoat = coatInPlay && Sees(pawn, coatTarget, Coat.transform);
                 RaccoonController seenRaccoon = null;
                 foreach (var r in _raccoons)
                     if (r && Sees(pawn, r.transform.position + Vector3.up * 0.3f, r.transform)) { seenRaccoon = r; break; }
 
                 float seen = seesCoat ? weirdness : 0f;
+                // A noise nearby: they turn, get curious ("?") and, if standing, go and have a look.
+                bool hearing = brain.HeardNoise.HasValue && now < brain.HeardUntil;
+                if (hearing) seen = Mathf.Max(seen, 0.35f);
                 var state = brain.Guest.Update(dt, seen, seenRaccoon);
                 // Only once the guest has actually registered the raccoon (not on a split-second glimpse).
                 if (seenRaccoon && state == GuestState.Alarmed) _model.ReportRaccoonSighting(brain.Id, now);
@@ -125,13 +135,34 @@ namespace TrashPandas.Runtime.Npc
                 if (seesCoat) { frame.CoatWitnessed = true; frame.SeenWeirdness = Mathf.Max(frame.SeenWeirdness, weirdness); }
 
                 pawn.SetMood((byte)state);
-                pawn.LookAt(seenRaccoon ? seenRaccoon.transform.position : state != GuestState.Calm || seesCoat ? coatTarget : (Vector3?)null);
-                brain.Stroll(dt, state);
+                pawn.LookAt(seenRaccoon ? seenRaccoon.transform.position : hearing ? brain.HeardNoise.Value : state != GuestState.Calm || seesCoat ? coatTarget : (Vector3?)null);
+                if (hearing && state != GuestState.Alarmed && !pawn.Seated && !brain.Busy) pawn.GoTo(brain.HeardNoise.Value);
+                else brain.Stroll(dt, state);
             }
 
             LastFrame = frame;
             _model.Tick(dt, frame);
             Publish();
+        }
+
+        void OnEnable() => Squad.NoiseBus.Heard += OnNoise;
+        void OnDisable() => Squad.NoiseBus.Heard -= OnNoise;
+
+        /// <summary>Host/offline: who hears it (walls halve the distance) turns toward it for a few seconds.</summary>
+        void OnNoise(Core.Raccoons.NoiseKind kind, Vector3 at)
+        {
+            if (!SimulationAuthority.IsSimulating || Suspended) return;
+            float radius = Core.Raccoons.NoiseModel.Radius(kind);
+            foreach (var brain in _brains)
+            {
+                if (brain.Guest == null || !brain.Pawn) continue;
+                Vector3 ear = brain.Pawn.Eye;
+                bool occluded = Physics.Linecast(ear, at + Vector3.up * 0.3f, out var hit, ~0, QueryTriggerInteraction.Ignore)
+                                && !hit.collider.transform.IsChildOf(brain.Pawn.transform) && !hit.collider.GetComponentInParent<RaccoonController>();
+                if (!Core.Raccoons.NoiseModel.Hears(ear, at, radius, occluded)) continue;
+                brain.HeardNoise = at;
+                brain.HeardUntil = Time.time + 4f;
+            }
         }
 
         void Publish()
@@ -179,6 +210,9 @@ namespace TrashPandas.Runtime.Npc
         public readonly CatMind Cat;
         /// <summary>Where this guest last saw a loose raccoon (alarmed guests go and look).</summary>
         public Vector3? LastSeenRaccoon;
+        /// <summary>Where they last heard a raccoon noise, and until when they care.</summary>
+        public Vector3? HeardNoise;
+        public float HeardUntil;
         readonly Vector3 _home;
         readonly float _wander;
         readonly Vector3[] _route;

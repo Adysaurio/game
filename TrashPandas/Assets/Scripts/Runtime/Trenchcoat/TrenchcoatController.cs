@@ -111,6 +111,8 @@ namespace TrashPandas.Runtime.Trenchcoat
 
         void Awake()
         {
+            // Concept v2 plays with loose raccoons (SquadController); this split-body debug mode is shelved.
+            if (Squad.GameMode.Raccoons) { enabled = false; return; }
             Instance = this;
             // This is the single-person debug mode; online play is driven by OnlinePlayerController.
             var nm = Unity.Netcode.NetworkManager.Singleton;

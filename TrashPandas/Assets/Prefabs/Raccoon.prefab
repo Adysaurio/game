@@ -166,7 +166,11 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 5e646db5150bc401e8846557122d4cbb, type: 3}
   m_Name: 
   m_EditorClassIdentifier: TrashPandas.Runtime::TrashPandas.Runtime.Raccoon.RaccoonController
-  RunSpeed: 4.4
+  WalkSpeed: 3
+  RunSpeed: 5
+  SneakSpeed: 1.5
+  SpeedMultiplier: 1
+  HardLandingSpeed: 7
   Acceleration: 30
   Deceleration: 40
   AirControl: 0.5

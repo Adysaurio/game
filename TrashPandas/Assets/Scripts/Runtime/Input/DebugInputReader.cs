@@ -37,7 +37,12 @@ namespace TrashPandas.Runtime.Input
         public bool ClearGhostsPressed => K != null && K.backspaceKey.wasPressedThisFrame;
         public bool JumpPressed => K != null && K.spaceKey.wasPressedThisFrame;
         public bool JumpHeld => K != null && K.spaceKey.isPressed;
-        public bool CrouchHeld => K != null && K.leftCtrlKey.isPressed;
+        /// <summary>C (never Ctrl: on a Mac, Ctrl+click is a right click).</summary>
+        public bool CrouchHeld => K != null && K.cKey.isPressed;
+        public bool RunHeld => K != null && (K.leftShiftKey.isPressed || K.rightShiftKey.isPressed);
+        public bool UsePressed => K != null && K.eKey.wasPressedThisFrame;
+        public bool ClickPressed(PlayerCameraRig rig) => M != null && M.leftButton.wasPressedThisFrame && !rig.CursorFreed;
+        public bool ClickReleased(PlayerCameraRig rig) => M != null && M.leftButton.wasReleasedThisFrame && !rig.CursorFreed;
 
         /// <summary>Player index 0-4 if a number key 1-5 was pressed this frame, else -1.</summary>
         public int SelectPressed()

@@ -60,6 +60,15 @@ namespace TrashPandas.Runtime.Net
 
         static bool s_mouthTaken;
 
+        /// <summary>Squad (v2) dev bots steer the active raccoon; null = use the keyboard.</summary>
+        public static Vector2? SquadMove(TrashPandas.Runtime.Raccoon.RaccoonController r)
+        {
+            if (Bot == "walk") return new Vector2(0f, 1f);
+            if (Bot == "noisy") return new Vector2(0f, 1f);
+            return null;
+        }
+        public static bool SquadRun => Bot == "noisy";
+
         /// <summary>"mouthflee": in the panic, grab the nearest loot with the mouth, then run for an exit.</summary>
         public static bool MouthBot(Vector3 raccoonPos)
         {

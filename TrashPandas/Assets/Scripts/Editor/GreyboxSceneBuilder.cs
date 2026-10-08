@@ -158,6 +158,13 @@ namespace TrashPandas.EditorTools
             controller.RaccoonPrefab = raccoonPrefab;
             controller.CameraRig = rig;
 
+            // Concept v2: a squad of loose raccoons (debug); the coat waits for the events.
+            var squad = new GameObject("SquadController").AddComponent<TrashPandas.Runtime.Squad.SquadController>();
+            squad.RaccoonPrefab = raccoonPrefab;
+            squad.CameraRig = rig;
+            squad.Coat = body;
+            new GameObject("GrabHighlight").AddComponent<TrashPandas.Runtime.Raccoon.GrabHighlight>();
+
             var online = new GameObject("OnlinePlayerController").AddComponent<OnlinePlayerController>();
             online.CameraRig = rig;
 
