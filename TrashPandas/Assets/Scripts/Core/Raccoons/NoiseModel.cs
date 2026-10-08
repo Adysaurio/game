@@ -2,7 +2,7 @@ using UnityEngine;
 
 namespace TrashPandas.Core.Raccoons
 {
-    public enum NoiseKind { Sneaking, Running, HardLanding, Crash }
+    public enum NoiseKind { Sneaking, Running, HardLanding, Crash, Rustle }
 
     /// <summary>How far each noise carries, and who hears it (walls halve the distance).</summary>
     public static class NoiseModel
@@ -12,6 +12,7 @@ namespace TrashPandas.Core.Raccoons
             NoiseKind.Running => 6f,
             NoiseKind.HardLanding => 4f,
             NoiseKind.Crash => 7f,
+            NoiseKind.Rustle => 3.5f,
             _ => 0f,
         };
 

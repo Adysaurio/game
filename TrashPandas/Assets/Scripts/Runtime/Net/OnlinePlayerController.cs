@@ -90,7 +90,13 @@ namespace TrashPandas.Runtime.Net
                 var move = DevAutomation.SquadMove(raccoon.Controller) ?? DevAutomation.FleeMove(raccoon.transform.position)
                     ?? (DevAutomation.Bot == "hopflee" || DevAutomation.Bot == "mouthflee" ? new Vector2(0f, 1f) : _reader.CameraRelativeMove(CameraRig)); // dev bots
                 raccoon.Controller.SetInput(move, _reader.JumpPressed, _reader.JumpHeld, _reader.CrouchHeld || DevAutomation.FleeCrouchAt(raccoon.transform.position), _reader.RunHeld || DevAutomation.SquadRun);
-                if (_reader.UsePressed) Squad.RaccoonPipe.Near(raccoon.transform.position)?.Crawl(raccoon.Controller);
+                var r = raccoon.Controller;
+                if (_reader.UsePressed)
+                {
+                    if (r.InCan) r.ExitCan();
+                    else if (Squad.TrashCanHideout.Near(r.transform.position) is Squad.TrashCanHideout can) r.EnterCan(can);
+                    else Squad.RaccoonPipe.Near(r.transform.position)?.Crawl(r);
+                }
                 Squad.HidePeek.Tick(CameraRig, raccoon.Controller, RaccoonCameraRadius, RaccoonLookHeight);
                 if (raccoon.Controller.IsRunning && Time.time >= _nextRunNoise) { _nextRunNoise = Time.time + 0.5f; raccoon.MakeNoise(Core.Raccoons.NoiseKind.Running, raccoon.transform.position); }
                 _hands.Tick(_reader, CameraRig, raccoon.Controller,

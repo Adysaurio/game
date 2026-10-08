@@ -5,49 +5,73 @@ using UnityEngine;
 namespace TrashPandas.Runtime.Squad
 {
     /// <summary>
-    /// Hiding switches to a low first-person view from inside your hiding spot: watch the shoes go by and
-    /// pick the moment to come out. Moving (or leaving the spot) brings the normal camera back.
+    /// The camera while hiding: in a bush or under a table it rises a little to see over the cover; in a trash
+    /// can it orbits the can (look around freely, like Fortnite's dumpsters); in a drain pipe it follows you
+    /// down the tunnel, looking where you crawl.
     /// </summary>
     public static class HidePeek
     {
-        static RaccoonController s_peeking;
+        enum Mode { None, Raised, Can, Tunnel }
+        static Mode s_mode;
+        static RaccoonController s_who;
         static float s_stillFor;
 
-        public static bool Active => s_peeking;
+        public static bool Active => s_mode != Mode.None;
 
         public static void Tick(PlayerCameraRig rig, RaccoonController r, float normalRadius, float normalLook)
         {
             if (!rig || !r) { Exit(rig, normalRadius, normalLook); return; }
-            if (s_peeking && s_peeking != r) Exit(rig, normalRadius, normalLook);
-            bool hidden = !r.Crawling && !r.Frozen && HidingSpot.SpotOf(r).HasValue && HidingSpot.Hides(r);
-            float speed = r.PlanarSpeed;
-            s_stillFor = hidden && speed < 0.25f ? s_stillFor + Time.deltaTime : 0f;
+            if (s_who && s_who != r) Exit(rig, normalRadius, normalLook);
 
-            if (!s_peeking && hidden && s_stillFor > 0.35f)
+            Mode want = Mode.None;
+            if (r.Crawling) want = Mode.Tunnel;
+            else if (r.InCan) want = Mode.Can;
+            else
             {
-                s_peeking = r;
-                rig.SetTarget(r.transform, 0.12f, 0.24f);
-                rig.Orbit.VerticalAxis.Value = 4f;
-                SetVisible(r, false); // we're looking out of its eyes
-                Ui.Sfx.Play2D(Ui.Sound.Grab, 0.35f);
+                bool hidden = !r.Frozen && HidingSpot.SpotOf(r).HasValue && HidingSpot.Hides(r);
+                s_stillFor = hidden ? s_stillFor + Time.deltaTime : 0f;
+                if (hidden && s_stillFor > 0.25f) want = Mode.Raised;
             }
-            else if (s_peeking && (!hidden || speed > 0.7f)) Exit(rig, normalRadius, normalLook);
+
+            if (want != s_mode)
+            {
+                Exit(rig, normalRadius, normalLook);
+                s_mode = want;
+                s_who = r;
+                switch (want)
+                {
+                    case Mode.Raised:
+                        rig.SetTarget(r.transform, normalRadius + 0.9f, normalLook + 0.35f);
+                        rig.Orbit.VerticalAxis.Value = Mathf.Max(rig.Orbit.VerticalAxis.Value, 28f);
+                        break;
+                    case Mode.Can:
+                        rig.SetTarget(r.InCan.transform, 3.2f, 0.9f);
+                        rig.Orbit.VerticalAxis.Value = Mathf.Max(rig.Orbit.VerticalAxis.Value, 22f);
+                        break;
+                    case Mode.Tunnel:
+                        rig.SetTarget(r.transform, 0.95f, 0.22f);
+                        PlayerCameraRig.CinematicLock = true;
+                        break;
+                }
+            }
+            if (s_mode == Mode.Tunnel)
+            {
+                // Look down the tunnel the way you're crawling.
+                Vector3 d = r.transform.forward;
+                rig.Orbit.HorizontalAxis.Value = Mathf.Atan2(d.x, d.z) * Mathf.Rad2Deg;
+                rig.Orbit.VerticalAxis.Value = 6f;
+            }
         }
 
         public static void Exit(PlayerCameraRig rig, float normalRadius, float normalLook)
         {
-            if (!s_peeking) { s_peeking = null; return; }
-            var r = s_peeking;
-            s_peeking = null;
-            SetVisible(r, true);
-            if (rig && r) rig.SetTarget(r.transform, normalRadius, normalLook);
-        }
-
-        static void SetVisible(RaccoonController r, bool on)
-        {
-            if (!r) return;
-            foreach (var rend in r.GetComponentsInChildren<Renderer>())
-                if (!(rend is ParticleSystemRenderer)) rend.enabled = on;
+            var who = s_who;
+            var mode = s_mode;
+            s_mode = Mode.None;
+            s_who = null;
+            if (mode == Mode.None) return;
+            if (mode == Mode.Tunnel) PlayerCameraRig.CinematicLock = false;
+            if (rig && who) rig.SetTarget(who.transform, normalRadius, normalLook);
         }
     }
 }

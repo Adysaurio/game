@@ -66,6 +66,7 @@ namespace TrashPandas.Tests
             Assert.AreEqual(4f, NoiseModel.Radius(NoiseKind.HardLanding));
             Assert.AreEqual(7f, NoiseModel.Radius(NoiseKind.Crash));
             Assert.AreEqual(0f, NoiseModel.Radius(NoiseKind.Sneaking));
+            Assert.AreEqual(3.5f, NoiseModel.Radius(NoiseKind.Rustle), "moving inside a bush");
         }
 
         [Test]

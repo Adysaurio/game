@@ -30,23 +30,48 @@ namespace TrashPandas.Runtime.Squad
         public static bool Hides(RaccoonController r)
         {
             if (!r) return false;
-            if (r.Crawling) return true; // inside a pipe
+            if (r.HiddenInside) return true; // inside a pipe or a trash can
             if (DebugParked(r)) return true;
             if (!ReferenceEquals(r.Mount, null) || r.RidersAbove > 0) return false; // a tower sticks out of anything
             Vector3 p = r.transform.position + Vector3.up * 0.1f;
             foreach (var h in s_all)
             {
                 if (!h || !h.Contains(p)) continue;
-                // A trash can only hides you if you crouch into it; bushes and tablecloths hide you anyway.
-                if (h.Kind == HidingKind.TrashCan && !r.IsSneakingOrRemote) continue;
                 return true;
             }
             return false;
         }
 
+        public static HidingSpot At(Vector3 position)
+        {
+            Vector3 p = position + Vector3.up * 0.1f;
+            foreach (var h in s_all) if (h && h.Contains(p)) return h;
+            return null;
+        }
+
+        float _rustleT = -1f;
+        Vector3 _restScale;
+
+        /// <summary>Something moved inside: the bush shakes for a moment.</summary>
+        public void Rustle()
+        {
+            if (_rustleT < 0f) _restScale = transform.localScale;
+            _rustleT = 0f;
+        }
+
+        void Update()
+        {
+            if (_rustleT < 0f) return;
+            _rustleT += Time.deltaTime;
+            float k = Mathf.Exp(-_rustleT * 6f) * Mathf.Sin(_rustleT * 40f) * 0.08f;
+            transform.localScale = _restScale + new Vector3(k, -k * 0.5f, k);
+            if (_rustleT > 0.6f) { transform.localScale = _restScale; _rustleT = -1f; }
+        }
+
         public static HidingKind? SpotOf(RaccoonController r)
         {
             if (!r) return null;
+            if (r.InCan) return HidingKind.TrashCan;
             Vector3 p = r.transform.position + Vector3.up * 0.1f;
             foreach (var h in s_all) if (h && h.Contains(p)) return h.Kind;
             return null;

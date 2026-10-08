@@ -140,10 +140,10 @@ namespace TrashPandas.Runtime.Raccoon
             bool riding = _raccoon && !ReferenceEquals(_raccoon.Mount, null);
             bool local = _raccoon && _raccoon.enabled;
             bool running = !riding && (local ? _raccoon.IsRunning : planar > 3.7f);
-            bool sneaking = !riding && !running && (local ? _raccoon.IsSneaking : planar > 0.2f && planar < 2.0f);
+            bool sneaking = !riding && !running && (_raccoon && _raccoon.Crawling || (local ? _raccoon.IsSneaking : planar > 0.2f && planar < 2.0f));
             _runK = Mathf.MoveTowards(_runK, running ? 1f : 0f, dt * 6f);
             _sneakK = Mathf.MoveTowards(_sneakK, sneaking ? 1f : 0f, dt * 6f);
-            bool moving = !riding && planar > 0.3f;
+            bool moving = !riding && (planar > 0.3f || (_raccoon && _raccoon.Crawling && v.magnitude > 0.3f));
 
             _phase += planar * dt * Mathf.Lerp(Mathf.Lerp(4.2f, 2.6f, _sneakK), 3.4f, _runK);
             float walkBob = moving ? Mathf.Abs(Mathf.Sin(_phase)) * 0.06f : 0f;
@@ -238,15 +238,17 @@ namespace TrashPandas.Runtime.Raccoon
         {
             if (Squad.RoundIntro.Playing) return;
             if (!s_rig) s_rig = FindFirstObjectByType<Cameras.PlayerCameraRig>();
-            if (!s_rig || !s_rig.VirtualCamera || s_rig.VirtualCamera.Follow != transform || !_raccoon || _raccoon.Crawling) return;
+            if (!s_rig || !s_rig.VirtualCamera || !_raccoon || _raccoon.Crawling) return;
+            if (s_rig.VirtualCamera.Follow != transform && !(_raccoon.InCan && s_rig.VirtualCamera.Follow == _raccoon.InCan.transform)) return;
             var cam = Camera.main;
             if (!cam) return;
             string text = null;
             Color color = Color.white;
             var spot = Squad.HidingSpot.SpotOf(_raccoon);
-            if (Squad.RaccoonPipe.Near(transform.position)) { text = "E: crawl"; color = new Color(0.6f, 0.9f, 1f); }
+            if (_raccoon.InCan) { text = "IN THE CAN — E: hop out"; color = new Color(0.5f, 1f, 0.6f); Ui.DebugChecklist.Mark("hide"); }
+            else if (Squad.TrashCanHideout.Near(transform.position)) { text = "E: hide in the can"; color = new Color(1f, 0.9f, 0.5f); }
+            else if (Squad.RaccoonPipe.Near(transform.position)) { text = "E: crawl in"; color = new Color(0.6f, 0.9f, 1f); }
             else if (spot.HasValue && Squad.HidingSpot.Hides(_raccoon)) { text = "HIDDEN"; color = new Color(0.5f, 1f, 0.6f); Ui.DebugChecklist.Mark("hide"); }
-            else if (spot == Squad.HidingKind.TrashCan) { text = "C: duck in"; color = new Color(1f, 0.9f, 0.5f); }
             if (text == null) return;
             Vector3 sp = cam.WorldToScreenPoint(transform.position + Vector3.up * 0.95f);
             if (sp.z <= 0f) return;

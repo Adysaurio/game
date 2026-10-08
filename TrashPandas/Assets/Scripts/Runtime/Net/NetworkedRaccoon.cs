@@ -22,7 +22,13 @@ namespace TrashPandas.Runtime.Net
         readonly NetworkVariable<bool> _crawling = new NetworkVariable<bool>(false, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Owner);
         readonly NetworkVariable<int> _mountedOn = new NetworkVariable<int>(-1, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Owner);
 
+        bool _remoteInsideShown;
+
         void Awake() => Controller = GetComponent<RaccoonController>();
+
+        /// <summary>Host → owner: a human kicked the trash can you were hiding in.</summary>
+        [Rpc(SendTo.Owner)]
+        public void KickOutRpc() => Controller.ExitCan(kicked: true);
 
         void Update()
         {
@@ -31,13 +37,15 @@ namespace TrashPandas.Runtime.Net
             {
                 int m = Controller.Mount ? Controller.Mount.PlayerId : -1;
                 if (_mountedOn.Value != m) _mountedOn.Value = m;
-                if (_crawling.Value != Controller.Crawling) _crawling.Value = Controller.Crawling;
+                bool inside = Controller.Crawling || Controller.InCan;
+                if (_crawling.Value != inside) _crawling.Value = inside;
                 return;
             }
-            if (Controller.Crawling != _crawling.Value)
+            if (_remoteInsideShown != _crawling.Value)
             {
-                Controller.SetRemoteCrawling(_crawling.Value);
-                foreach (var rend in GetComponentsInChildren<Renderer>()) rend.enabled = !_crawling.Value;
+                _remoteInsideShown = _crawling.Value;
+                Controller.SetRemoteInside(_crawling.Value);
+                foreach (var rend in GetComponentsInChildren<Renderer>()) if (!(rend is ParticleSystemRenderer)) rend.enabled = !_crawling.Value;
             }
             RaccoonController mount = null;
             if (_mountedOn.Value >= 0)

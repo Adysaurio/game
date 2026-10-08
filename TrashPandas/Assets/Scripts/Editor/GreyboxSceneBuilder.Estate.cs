@@ -201,17 +201,41 @@ namespace TrashPandas.EditorTools
             var root = new GameObject("TrashCan").transform;
             root.position = at;
             Visual(PrimitiveType.Cylinder, "Can", root, new Vector3(0f, 0.42f, 0f), new Vector3(0.6f, 0.42f, 0.6f), s_can);
-            var lid = Visual(PrimitiveType.Cylinder, "Lid", root, new Vector3(0.15f, 0.9f, 0f), new Vector3(0.64f, 0.03f, 0.64f), s_can);
-            lid.localRotation = Quaternion.Euler(0f, 0f, 25f); // ajar: a raccoon's door
-            var spot = root.gameObject.AddComponent<TrashPandas.Runtime.Squad.HidingSpot>();
-            spot.Kind = TrashPandas.Runtime.Squad.HidingKind.TrashCan;
-            spot.Size = new Vector3(0.75f, 0.9f, 0.75f);
+            // The lid hinges on its back edge (pivot), so it flips open when a raccoon hops in.
+            var hinge = new GameObject("LidHinge").transform;
+            hinge.SetParent(root, false);
+            hinge.localPosition = new Vector3(-0.32f, 0.86f, 0f);
+            Visual(PrimitiveType.Cylinder, "Lid", hinge, new Vector3(0.32f, 0.02f, 0f), new Vector3(0.66f, 0.03f, 0.66f), s_can);
+            Visual(PrimitiveType.Cube, "Handle", hinge, new Vector3(0.32f, 0.06f, 0f), new Vector3(0.18f, 0.04f, 0.04f), s_can);
+            var hideout = root.gameObject.AddComponent<TrashPandas.Runtime.Squad.TrashCanHideout>();
+            hideout.Lid = hinge;
         }
 
-        /// <summary>Two pipe mouths that lead into each other (raccoon shortcut, E to crawl).</summary>
+        /// <summary>Two pipe mouths joined by a real tunnel: down a shaft, along under the ground, up the other shaft.</summary>
         static void Pipe(Vector3 a, float yawA, Vector3 b, float yawB)
         {
             s_pipe ??= Mat("Pipe", new Color(0.3f, 0.36f, 0.32f));
+            var inside = Mat("PipeInside", new Color(0.36f, 0.4f, 0.34f));
+            inside.SetFloat("_Cull", 0f); // seen from the inside
+            const float depth = -1.3f;
+            var path = new[] { a + Vector3.up * 0.3f, new Vector3(a.x, depth, a.z), new Vector3(b.x, depth, b.z), b + Vector3.up * 0.3f };
+            var tunnel = new GameObject("Tunnel").transform;
+            for (int s = 0; s < path.Length - 1; s++)
+            {
+                Vector3 from = path[s], to = path[s + 1], mid = (from + to) * 0.5f, dir = to - from;
+                var seg = Visual(PrimitiveType.Cylinder, $"Segment_{s}", tunnel, mid, new Vector3(1.0f, dir.magnitude * 0.5f + 0.5f, 1.0f), inside);
+                seg.rotation = Quaternion.FromToRotation(Vector3.up, dir.normalized);
+            }
+            foreach (var end in new[] { path[1], path[2] })
+            {
+                var light = new GameObject("TunnelLight").AddComponent<Light>();
+                light.type = LightType.Point;
+                light.color = new Color(1f, 0.85f, 0.6f);
+                light.range = 6f;
+                light.intensity = 2.2f;
+                light.transform.SetParent(tunnel, false);
+                light.transform.position = end + Vector3.up * 0.3f;
+            }
             var ends = new Transform[2];
             var at = new[] { a, b };
             var yaw = new[] { yawA, yawB };
@@ -225,8 +249,12 @@ namespace TrashPandas.EditorTools
                 hole.localRotation = Quaternion.Euler(90f, 0f, 0f);
                 ends[i] = mouth;
             }
-            ends[0].gameObject.AddComponent<TrashPandas.Runtime.Squad.RaccoonPipe>().OtherEnd = ends[1];
-            ends[1].gameObject.AddComponent<TrashPandas.Runtime.Squad.RaccoonPipe>().OtherEnd = ends[0];
+            var pa = ends[0].gameObject.AddComponent<TrashPandas.Runtime.Squad.RaccoonPipe>();
+            pa.OtherEnd = ends[1];
+            pa.Path = path;
+            var pb = ends[1].gameObject.AddComponent<TrashPandas.Runtime.Squad.RaccoonPipe>();
+            pb.OtherEnd = ends[0];
+            pb.Path = new[] { path[3], path[2], path[1], path[0] };
         }
 
         /// <summary>Playtest: "faltan bushes o lugares donde esconderte, pasadizos". Cover, hiding spots and raccoon shortcuts.</summary>

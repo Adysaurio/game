@@ -42,24 +42,94 @@ namespace TrashPandas.Runtime.Raccoon
         /// <summary>Sneaking as far as this machine can tell (remote copies: moving slowly or standing still crouched is unknown, so assume yes).</summary>
         public bool IsSneakingOrRemote => enabled ? _crouchHeld : true;
 
-        /// <summary>Inside a drain pipe: unseen, no control.</summary>
-        public bool Crawling { get; private set; }
+        // --- Drain pipes: crawl through a real tunnel (W forward, S back) -------------------------------
+        Core.Raccoons.TunnelPath _tunnel;
+        float _tunnelS;
+        Vector3 _tunnelFlatDir, _exitForwardEnd, _exitForwardStart;
+        bool _remoteInside;
+        public const float CrawlSpeed = 2.4f;
 
-        public void SetRemoteCrawling(bool crawling) => Crawling = crawling;
+        /// <summary>Inside a drain pipe.</summary>
+        public bool Crawling => _tunnel != null;
+        /// <summary>The overall direction of the tunnel you're in (for the camera).</summary>
+        public Vector3 TunnelDirection => _tunnelFlatDir;
+        /// <summary>Hidden inside something (pipe or trash can) — as this machine knows it.</summary>
+        public bool HiddenInside => Crawling || InCan || _remoteInside;
+        public void SetRemoteInside(bool inside) => _remoteInside = inside;
 
-        public System.Collections.IEnumerator CrawlTo(Vector3 exit, float seconds)
+        public void EnterTunnel(Core.Raccoons.TunnelPath path, Vector3 exitForwardAtEnd, Vector3 exitForwardAtStart)
         {
-            Crawling = true;
+            if (Crawling || InCan || Frozen) return;
             if (!ReferenceEquals(Mount, null)) Dismount(Vector3.zero);
-            foreach (var rend in GetComponentsInChildren<Renderer>()) rend.enabled = false;
+            _tunnel = path;
+            _tunnelS = 0.05f;
+            Vector3 flat = path.PointAt(path.Length) - path.PointAt(0f);
+            flat.y = 0f;
+            _tunnelFlatDir = flat.sqrMagnitude > 1e-4f ? flat.normalized : transform.forward;
+            _exitForwardEnd = exitForwardAtEnd;
+            _exitForwardStart = exitForwardAtStart;
+            _cc.enabled = false;
+            _planar = Vector3.zero;
+            _verticalVelocity = 0f;
             Ui.Sfx.Play(Ui.Sound.Throw, transform.position, 0.6f);
-            yield return new WaitForSeconds(seconds);
-            TeleportTo(exit);
-            foreach (var rend in GetComponentsInChildren<Renderer>()) rend.enabled = true;
-            Crawling = false;
-            Ui.Sfx.Play(Ui.Sound.Grab, exit, 0.8f);
+        }
+
+        void TickCrawl(float dt)
+        {
+            // W/S along the tunnel (the camera looks down the tunnel, so "forward" input means "deeper").
+            float along = Vector3.Dot(new Vector3(_move.x, 0f, _move.y), _tunnelFlatDir);
+            _tunnelS += along * CrawlSpeed * dt;
+            Vector3 dir = _tunnel.DirectionAt(_tunnelS);
+            Vector3 face = Mathf.Abs(dir.y) > 0.7f ? _tunnelFlatDir : new Vector3(dir.x, 0f, dir.z).normalized;
+            if (along < -0.1f) face = -face;
+            transform.SetPositionAndRotation(_tunnel.PointAt(_tunnelS) + Vector3.down * 0.2f, Quaternion.LookRotation(face));
+            if (_tunnelS >= _tunnel.Length) ExitTunnel(_tunnel.PointAt(_tunnel.Length), _exitForwardEnd);
+            else if (_tunnelS <= 0f) ExitTunnel(_tunnel.PointAt(0f), _exitForwardStart);
+        }
+
+        void ExitTunnel(Vector3 mouth, Vector3 outward)
+        {
+            _tunnel = null;
+            Vector3 at = new Vector3(mouth.x, 0.05f, mouth.z) + new Vector3(outward.x, 0f, outward.z).normalized * 0.7f;
+            TeleportTo(at);
+            transform.rotation = Quaternion.LookRotation(new Vector3(outward.x, 0f, outward.z).normalized);
+            _cc.enabled = true;
+            _verticalVelocity = 2.5f; // pop out
+            Ui.Sfx.Play(Ui.Sound.Grab, at, 0.8f);
             Ui.DebugChecklist.Mark("pipe");
         }
+
+        // --- Trash cans: E to hop in (lid opens and closes), look around, E or Space to hop out ----------
+        public Squad.TrashCanHideout InCan { get; private set; }
+
+        public void EnterCan(Squad.TrashCanHideout can)
+        {
+            if (!can || Crawling || InCan || Frozen || can.Occupant) return;
+            if (!ReferenceEquals(Mount, null)) Dismount(Vector3.zero);
+            InCan = can;
+            _cc.enabled = false;
+            _planar = Vector3.zero;
+            StartCoroutine(can.HopIn(this));
+            Ui.DebugChecklist.Mark("trashcan");
+        }
+
+        /// <param name="kicked">A human kicked the can: you tumble out dazed.</param>
+        public void ExitCan(bool kicked = false)
+        {
+            var can = InCan;
+            if (!can) return;
+            InCan = null;
+            StartCoroutine(can.HopOut(this, kicked));
+        }
+
+        /// <summary>Called by the can when the hop-out animation lands.</summary>
+        public void LandedOutOfCan(bool kicked)
+        {
+            _cc.enabled = true;
+            _verticalVelocity = kicked ? 4f : 2.5f;
+            if (kicked) _stunnedUntil = Time.time + 1f;
+        }
+
 
         // --- Raccoon towers ---------------------------------------------------------------------------
         /// <summary>The raccoon I'm standing on (null = on my own feet).</summary>
@@ -192,7 +262,8 @@ namespace TrashPandas.Runtime.Raccoon
 
         public void SetInput(Vector2 worldMove, bool jumpPressed, bool jumpHeld, bool crouchHeld, bool runHeld = false)
         {
-            if (Squad.RoundIntro.Playing || Crawling) { _move = Vector2.zero; _runHeld = false; return; }
+            if (Squad.RoundIntro.Playing) { _move = Vector2.zero; _runHeld = false; return; }
+            if (InCan && jumpPressed) { ExitCan(); return; }
             _runHeld = runHeld;
             if (Frozen || IsStunned) { _move = Vector2.zero; _jumpHeld = false; return; }
             _move = worldMove;
@@ -217,6 +288,8 @@ namespace TrashPandas.Runtime.Raccoon
         {
             float dt = Time.deltaTime;
             if (Squad.RoundIntro.Playing) return; // the intro animates us
+            if (Crawling) { TickCrawl(dt); return; }
+            if (InCan) return; // tucked in a trash can
             if (!ReferenceEquals(Mount, null))
             {
                 // Riding: stand on the head below; jump to hop off. (A destroyed mount compares equal to null.)
@@ -272,6 +345,18 @@ namespace TrashPandas.Runtime.Raccoon
             if (_cc.isGrounded && _verticalVelocity <= 0f) _jumpedSinceGrounded = false;
             // Only a deliberate jump lands you on someone's head (bumping into them from behind doesn't).
             if (!grounded && _verticalVelocity < 0f && AutoMount && (_jumpedSinceGrounded || DroppedFromAbove)) TryLandOnHead();
+            // Moving inside a bush shakes it and makes a little noise (humans nearby turn around).
+            if (_planar.magnitude > 0.5f && Time.time >= _nextRustle)
+            {
+                var bush = Squad.HidingSpot.At(transform.position);
+                if (bush && bush.Kind == Squad.HidingKind.Bush)
+                {
+                    _nextRustle = Time.time + 0.45f;
+                    bush.Rustle();
+                    Noise?.Invoke(Core.Raccoons.NoiseKind.Rustle, transform.position);
+                    Ui.Sfx.Play(Ui.Sound.Throw, transform.position, 0.35f);
+                }
+            }
         }
 
         float _nextPush;
@@ -297,6 +382,7 @@ namespace TrashPandas.Runtime.Raccoon
         [System.NonSerialized] public bool AutoMount = true;
 
         float _noMountUntil;
+        float _nextRustle;
         bool _hopOff;
         bool _jumpedSinceGrounded;
         /// <summary>Dev bots that place a raccoon above another one.</summary>

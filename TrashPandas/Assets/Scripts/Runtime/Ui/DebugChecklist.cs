@@ -26,6 +26,7 @@ namespace TrashPandas.Runtime.Ui
             ("heard", "Make a guest hear you (run near them)"),
             ("hide", "Hide (bush, trash can, under a tablecloth)"),
             ("pipe", "Crawl through a drain pipe (E)"),
+            ("trashcan", "Hide in a trash can (E), look around, hop out"),
             ("panic", "Get spotted → ¡¡RUUUN!!"),
             ("lost", "Lose a chaser (break line of sight)"),
             ("daze", "Daze a human with a thrown object"),

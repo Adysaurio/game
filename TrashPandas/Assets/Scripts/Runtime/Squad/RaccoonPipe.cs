@@ -11,7 +11,8 @@ namespace TrashPandas.Runtime.Squad
     public sealed class RaccoonPipe : MonoBehaviour
     {
         public Transform OtherEnd;
-        public float CrawlSeconds = 1.1f;
+        [Tooltip("World points from this mouth, down the shaft, along the tunnel, up to the other mouth.")]
+        public Vector3[] Path = new Vector3[0];
         public const float EnterRadius = 0.9f;
 
         static readonly List<RaccoonPipe> s_all = new List<RaccoonPipe>();
@@ -33,8 +34,8 @@ namespace TrashPandas.Runtime.Squad
         /// <summary>Owner side: crawl through (works offline and online — the owner moves its raccoon).</summary>
         public void Crawl(RaccoonController r)
         {
-            if (!r || r.Crawling || r.Frozen || !OtherEnd) return;
-            r.StartCoroutine(r.CrawlTo(OtherEnd.position + OtherEnd.forward * 0.6f, CrawlSeconds));
+            if (!r || r.Crawling || r.Frozen || !OtherEnd || Path.Length < 2) return;
+            r.EnterTunnel(new Core.Raccoons.TunnelPath(Path), OtherEnd.forward, transform.forward);
         }
     }
 }
