@@ -368,6 +368,9 @@ namespace TrashPandas.Runtime.Net
             var nmx = TrashPandas.Runtime.Panic.NemesisDirector.Instance;
             if (nmx && nmx.Pawn) panic += $" nemesis={nmx.Kind}/{nmx.Pawn.Mood}@{nmx.Pawn.transform.position:F1} nemnet={nmx.IsSpawned}/{nmx.DebugNet}";
             if (pdx) panic += $" alert={pdx.Alert01:F2}";
+            int occupied = 0;
+            var who = ""; foreach (var h in TrashPandas.Runtime.Squad.Hideout.All) if (h && h.Occupant) { occupied++; who += h.Occupant.PlayerId; }
+            panic += $" occupied={occupied}:{who}";
             var sqx = TrashPandas.Runtime.Squad.SquadController.Instance;
             var cg = GameObject.Find("Crate_Garden");
             if (sqx && sqx.Active) panic += $" crate={(cg ? cg.transform.position.ToString("F2") : "-")} hanging={sqx.Active.Hanging} pushing={sqx.Active.Pushing}";

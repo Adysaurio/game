@@ -91,7 +91,7 @@ namespace TrashPandas.Runtime.Net
                     ?? (DevAutomation.Bot == "hopflee" || DevAutomation.Bot == "mouthflee" ? new Vector2(0f, 1f) : _reader.CameraRelativeMove(CameraRig)); // dev bots
                 raccoon.Controller.SetInput(move, _reader.JumpPressed, _reader.JumpHeld, _reader.CrouchHeld || DevAutomation.FleeCrouchAt(raccoon.transform.position), _reader.RunHeld || DevAutomation.SquadRun);
                 var r = raccoon.Controller;
-                if (_reader.UsePressed)
+                if (_reader.UsePressed || DevAutomation.SquadUse(r))
                 {
                     if (r.InCan) r.ExitCan();
                     else if (Squad.Hideout.Near(r.transform.position) is Squad.Hideout can) r.EnterCan(can);

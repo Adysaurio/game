@@ -85,6 +85,38 @@ namespace TrashPandas.Runtime.Squad
             yield return CloseFx();
         }
 
+        /// <summary>Another player's raccoon went in (seen through the network): mark it taken, play the lid / leaves.</summary>
+        public void RemoteEnter(RaccoonController r)
+        {
+            if (Occupant == r) return;
+            Occupant = r;
+            if (Net.SimulationAuthority.IsSimulating) Panic.NemesisDirector.Instance?.OnHid(this);
+            StartCoroutine(RemoteFx(true));
+        }
+
+        public void RemoteExit(RaccoonController r)
+        {
+            if (Occupant != r) return;
+            Occupant = null;
+            StartCoroutine(RemoteFx(false));
+        }
+
+        IEnumerator RemoteFx(bool entering)
+        {
+            Ui.Sfx.Play(entering ? Ui.Sound.Grab : Ui.Sound.Land, transform.position, 0.6f);
+            yield return OpenFx(false);
+            OnEnteredFx();
+            yield return new WaitForSeconds(0.25f);
+            yield return CloseFx();
+        }
+
+        /// <summary>By network id (see <see cref="Id"/>).</summary>
+        public static Hideout ById(int id)
+        {
+            foreach (var h in s_all) if (h && h.Id == id) return h;
+            return null;
+        }
+
         static void SetVisible(RaccoonController r, bool on)
         {
             foreach (var rend in r.GetComponentsInChildren<Renderer>()) if (!(rend is ParticleSystemRenderer)) rend.enabled = on;
