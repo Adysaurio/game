@@ -142,23 +142,24 @@ namespace TrashPandas.Runtime.Squad
         void PickupFx(Vector3 at) { if (SimulationAuthority.IsOnline && IsSpawned) PickupFxRpc(at); else Ui.Sfx.Play(Ui.Sound.Grab, at, 0.8f); }
         [Rpc(SendTo.Everyone)] void PickupFxRpc(Vector3 at) => Ui.Sfx.Play(Ui.Sound.Grab, at, 0.8f);
 
-        /// <summary>Owner side: use the selected tool toward where the camera looks.</summary>
-        public void Use(RaccoonController r, Gadget g, Vector3 look)
+        /// <summary>Owner side: throw the tool so it lands on <paramref name="target"/> (the aim point).</summary>
+        public void Use(RaccoonController r, Gadget g, Vector3 target)
         {
             if (!r || r.Frozen || r.HiddenInside) return;
             var net = r.GetComponent<NetworkedRaccoon>();
             Vector3 origin = Origin(r);
-            if (SimulationAuthority.IsOnline && net && net.IsSpawned && !IsServer) net.UseGadgetRpc((byte)g, origin, look);
-            else HostUse(r.PlayerId, g, origin, look);
+            if (SimulationAuthority.IsOnline && net && net.IsSpawned && !IsServer) net.UseGadgetRpc((byte)g, origin, target);
+            else HostUse(r.PlayerId, g, origin, target);
         }
 
         public static Vector3 Origin(RaccoonController r) => r.transform.position + Vector3.up * 0.6f + r.transform.forward * 0.3f;
 
         /// <summary>Host/offline.</summary>
-        public void HostUse(int player, Gadget g, Vector3 origin, Vector3 look)
+        public void HostUse(int player, Gadget g, Vector3 origin, Vector3 target)
         {
             if (!KitOf(player).TryUse(g)) return;
-            Vector3 v = GadgetThrow.Velocity(g, look);
+            target = GadgetThrow.ClampToRange(g, origin, target, out _);
+            Vector3 v = GadgetThrow.VelocityTo(origin, target, out _);
             var (landing, flight, hitPawn) = Ballistic(origin, v);
             Debug.Log($"[Gadget] player {player} threw {g} → {landing:F1}{(hitPawn ? " hitting " + hitPawn.name : "")}");
             if (SimulationAuthority.IsOnline && IsSpawned) ThrowFxRpc((byte)g, origin, v, flight); else StartCoroutine(ThrowFx(g, origin, v, flight));

@@ -92,7 +92,7 @@ namespace TrashPandas.Runtime.Squad
 
         void Update()
         {
-            if (UnityEngine.InputSystem.Keyboard.current?.f1Key.wasPressedThisFrame == true) _helpUntil = _helpUntil > Time.unscaledTime ? 0f : Time.unscaledTime + 30f;
+            if (UnityEngine.InputSystem.Keyboard.current?.f1Key.wasPressedThisFrame == true || Input.Pad.HelpPressed) _helpUntil = _helpUntil > Time.unscaledTime ? 0f : Time.unscaledTime + 30f;
             if (_raccoons.Count == 0 || RoundIntro.Playing) return;
             if (_reader.CyclePressed)
             {
@@ -120,14 +120,18 @@ namespace TrashPandas.Runtime.Squad
                     else RaccoonPipe.Near(r.transform.position)?.Crawl(r);
                 }
                 var kb = UnityEngine.InputSystem.Keyboard.current;
-                if (kb != null && kb.gKey.wasPressedThisFrame) r.ToggleEmote(1);
-                if (kb != null && kb.hKey.wasPressedThisFrame) r.ToggleEmote(2);
+                if ((kb != null && kb.gKey.wasPressedThisFrame) || Input.Pad.DancePressed) r.ToggleEmote(1);
+                if ((kb != null && kb.hKey.wasPressedThisFrame) || Input.Pad.CheerPressed) r.ToggleEmote(2);
                 bool botJump = Net.DevAutomation.SquadJump(r);
                 r.SetInput(move, _reader.JumpPressed || botJump, _reader.JumpHeld || botJump, _reader.CrouchHeld || Net.DevAutomation.SquadCrouch, run);
                 if (r.IsRunning && Time.time >= _nextRunNoise) { _nextRunNoise = Time.time + 0.5f; NoiseBus.Emit(NoiseKind.Running, r.transform.position); }
             }
             var active = Active;
             if (active) HidePeek.Tick(CameraRig, active, CameraRadius, LookHeight);
+            // Dev "-sidecam": watch the active raccoon from the side (to judge the gait).
+            if (active && Debug.isDebugBuild && System.Array.IndexOf(System.Environment.GetCommandLineArgs(), "-sidecam") >= 0)
+                CameraRig.Orbit.HorizontalAxis.Value = Mathf.DeltaAngle(0f, active.transform.eulerAngles.y + 90f);
+            Ui.GameHud.SquadAiming = _hands.Aiming;
             if (active)
                 _hands.Tick(_reader, CameraRig, active,
                     (index, at) => CarryDirector.Instance.Tap(active, index, at),

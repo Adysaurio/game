@@ -1,4 +1,5 @@
 using NUnit.Framework;
+using UnityEngine;
 using TrashPandas.Core.Raccoons;
 
 namespace TrashPandas.Tests
@@ -23,6 +24,36 @@ namespace TrashPandas.Tests
             Assert.Greater(GadgetThrow.FlatRange(up), GadgetThrow.FlatRange(level));
             Assert.Greater(GadgetThrow.FlatRange(level), GadgetThrow.FlatRange(down));
             Assert.Greater(level.z, 0f, "forward");
+        }
+
+        [Test]
+        public void AimAtAPoint_LandsExactlyThere()
+        {
+            var o = new Vector3(1f, 0.6f, 2f);
+            var target = new Vector3(7f, 0f, 9f);
+            var v = GadgetThrow.VelocityTo(o, target, out float t);
+            Vector3 at = o + v * t + 0.5f * Physics.gravity * t * t;
+            Assert.Less(Vector3.Distance(at, target), 0.01f);
+            Assert.Greater(t, 0.3f, "a visible arc, not a laser");
+        }
+
+        [Test]
+        public void TooFar_IsClampedToTheToolsRange()
+        {
+            var o = Vector3.zero;
+            var far = new Vector3(0f, 0f, 100f);
+            var clamped = GadgetThrow.ClampToRange(Gadget.Banana, o, far, out bool tooFar);
+            Assert.IsTrue(tooFar);
+            Assert.AreEqual(GadgetThrow.MaxRange(Gadget.Banana), new Vector2(clamped.x, clamped.z).magnitude, 0.01f);
+            GadgetThrow.ClampToRange(Gadget.Pebble, o, new Vector3(0f, 0f, 5f), out tooFar);
+            Assert.IsFalse(tooFar);
+        }
+
+        [Test]
+        public void EachTool_ShowsItsEffectRadius()
+        {
+            Assert.Greater(GadgetThrow.EffectRadius(Gadget.SmokeBomb), 2f);
+            Assert.Greater(GadgetThrow.EffectRadius(Gadget.Pebble), GadgetThrow.EffectRadius(Gadget.Banana), "the clack carries");
         }
 
         [Test]

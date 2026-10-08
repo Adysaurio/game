@@ -131,10 +131,10 @@ namespace TrashPandas.Runtime.Net
 
         /// <summary>Owner → host: hold and release (throw).</summary>
         [Rpc(SendTo.Server)]
-        public void ThrowRpc(UnityEngine.Vector3 direction, float strength, RpcParams rpc = default)
+        public void ThrowRpc(UnityEngine.Vector3 velocity, float strength, RpcParams rpc = default)
         {
             if (rpc.Receive.SenderClientId != OwnerClientId) return;
-            Squad.CarryDirector.Instance?.Throw(Controller, direction, strength);
+            Squad.CarryDirector.Instance?.Throw(Controller, velocity, strength);
         }
 
         /// <summary>Host → owner: caught, no more control.</summary>

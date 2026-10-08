@@ -32,17 +32,17 @@ namespace TrashPandas.Runtime.Input
         static Mouse M => Mouse.current;
 
         public bool TogglePressed => K != null && K.eKey.wasPressedThisFrame;
-        public bool CyclePressed => K != null && K.tabKey.wasPressedThisFrame;
+        public bool CyclePressed => (K != null && K.tabKey.wasPressedThisFrame) || Pad.SwitchPressed;
         public bool RecordPressed => K != null && K.rKey.wasPressedThisFrame;
         public bool ClearGhostsPressed => K != null && K.backspaceKey.wasPressedThisFrame;
-        public bool JumpPressed => K != null && K.spaceKey.wasPressedThisFrame;
-        public bool JumpHeld => K != null && K.spaceKey.isPressed;
+        public bool JumpPressed => (K != null && K.spaceKey.wasPressedThisFrame) || Pad.JumpPressed;
+        public bool JumpHeld => (K != null && K.spaceKey.isPressed) || Pad.JumpHeld;
         /// <summary>C (never Ctrl: on a Mac, Ctrl+click is a right click).</summary>
-        public bool CrouchHeld => K != null && K.cKey.isPressed;
-        public bool RunHeld => K != null && (K.leftShiftKey.isPressed || K.rightShiftKey.isPressed);
-        public bool UsePressed => K != null && K.eKey.wasPressedThisFrame;
-        public bool ClickPressed(PlayerCameraRig rig) => M != null && M.leftButton.wasPressedThisFrame && !rig.CursorFreed;
-        public bool ClickReleased(PlayerCameraRig rig) => M != null && M.leftButton.wasReleasedThisFrame && !rig.CursorFreed;
+        public bool CrouchHeld => (K != null && K.cKey.isPressed) || Pad.SneakHeld;
+        public bool RunHeld => (K != null && (K.leftShiftKey.isPressed || K.rightShiftKey.isPressed)) || Pad.RunHeld;
+        public bool UsePressed => (K != null && K.eKey.wasPressedThisFrame) || Pad.UsePressed;
+        public bool ClickPressed(PlayerCameraRig rig) => (M != null && M.leftButton.wasPressedThisFrame && !rig.CursorFreed) || Pad.GrabPressed;
+        public bool ClickReleased(PlayerCameraRig rig) => (M != null && M.leftButton.wasReleasedThisFrame && !rig.CursorFreed) || Pad.GrabReleased;
 
         /// <summary>Player index 0-4 if a number key 1-5 was pressed this frame, else -1.</summary>
         public int SelectPressed()
@@ -68,9 +68,14 @@ namespace TrashPandas.Runtime.Input
         /// <summary>WASD turned into a world XZ direction relative to the camera, magnitude 0..1.</summary>
         public Vector2 CameraRelativeMove(PlayerCameraRig rig)
         {
-            if (K == null) return Vector2.zero;
-            float x = (K.dKey.isPressed ? 1f : 0f) - (K.aKey.isPressed ? 1f : 0f);
-            float y = (K.wKey.isPressed ? 1f : 0f) - (K.sKey.isPressed ? 1f : 0f);
+            float x = 0f, y = 0f;
+            if (K != null)
+            {
+                x = (K.dKey.isPressed ? 1f : 0f) - (K.aKey.isPressed ? 1f : 0f);
+                y = (K.wKey.isPressed ? 1f : 0f) - (K.sKey.isPressed ? 1f : 0f);
+            }
+            var stick = Pad.Move;
+            if (stick.sqrMagnitude > 0f) { x = stick.x; y = stick.y; }
             rig.GroundAxes(out var forward, out var right);
             Vector3 world = Vector3.ClampMagnitude(right * x + forward * y, 1f);
             return new Vector2(world.x, world.z);

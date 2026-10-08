@@ -11,6 +11,9 @@ namespace TrashPandas.Runtime.Squad
     {
         readonly ClickIntent _click = new ClickIntent();
         public float Charge(float now) => _click.Charge(now);
+        /// <summary>Holding to aim a throw (the camera goes over the shoulder).</summary>
+        public bool Aiming { get; private set; }
+        Vector3 _lastThrow;
 
         /// <param name="tap">(highlighted item index, where I see myself)</param>
         /// <param name="throwIt">(camera direction, strength 0..1)</param>
@@ -24,13 +27,22 @@ namespace TrashPandas.Runtime.Squad
             float now = Time.time;
             if (reader.ClickPressed(rig)) _click.Press(now);
             float charge = _click.Charge(now);
-            if (carrying && charge > 0f && rig.OutputCamera)
-                Ui.AimArc.Show(raccoon.transform.position + Vector3.up * 0.8f, CarryDirector.ThrowVelocity(rig.OutputCamera.transform.forward, charge), new Color(1f, 0.6f, 0.3f));
+            Aiming = carrying && charge > 0f && rig.OutputCamera;
+            Vector3 throwVelocity = Vector3.zero;
+            if (Aiming)
+            {
+                Vector3 origin = raccoon.transform.position + Vector3.up * 0.8f;
+                Vector3 target = Ui.AimArc.AimPoint(rig.OutputCamera, origin, CarryDirector.MaxThrowRange, out bool tooFar);
+                throwVelocity = Core.Raccoons.GadgetThrow.VelocityTo(origin, target, out _);
+                Ui.AimArc.Show(origin, throwVelocity, new Color(1f, 0.6f, 0.3f), 0f, tooFar);
+                raccoon.FaceToward(target);
+                _lastThrow = throwVelocity;
+            }
             if (reader.ClickReleased(rig) || botTap)
             {
                 var outcome = botTap ? new ClickOutcome { Kind = ClickResult.Tap } : _click.Release(now);
                 if (outcome.Kind == ClickResult.Tap) tap(botTap && Net.DevAutomation.SquadTapIndex.HasValue ? Net.DevAutomation.SquadTapIndex.Value : carry.IndexOf(highlight), raccoon.transform.position);
-                else if (outcome.Kind == ClickResult.Throw && carrying) throwIt(rig.OutputCamera.transform.forward, outcome.Strength);
+                else if (outcome.Kind == ClickResult.Throw && carrying) throwIt(_lastThrow, outcome.Strength);
             }
         }
     }

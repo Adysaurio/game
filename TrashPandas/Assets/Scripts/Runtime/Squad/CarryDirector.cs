@@ -73,7 +73,10 @@ namespace TrashPandas.Runtime.Squad
         }
 
         /// <summary>Hold and release: fling it where the camera looks.</summary>
-        public void Throw(RaccoonController raccoon, Vector3 direction, float strength)
+        public const float MaxThrowRange = 9f;
+
+        /// <summary>Throw what you carry with this velocity (aimed at a point by the owner; capped).</summary>
+        public void Throw(RaccoonController raccoon, Vector3 velocity, float _ = 0f)
         {
             if (!raccoon || !_carry.ContainsKey(raccoon.PlayerId)) return;
             var g = _items[_carry[raccoon.PlayerId]];
@@ -81,7 +84,7 @@ namespace TrashPandas.Runtime.Squad
             Ui.DebugChecklist.Mark("throw");
             var impact = g.GetComponent<ImpactNoise>();
             if (impact) impact.ThrownUntil = Time.time + 2f;
-            Drop(raccoon.PlayerId, ThrowVelocity(direction, strength));
+            Drop(raccoon.PlayerId, Vector3.ClampMagnitude(velocity, 16f));
         }
 
         /// <summary>How hard a held thing flies (also drawn as the aim arc while you charge).</summary>

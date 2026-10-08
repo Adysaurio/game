@@ -95,7 +95,7 @@ namespace TrashPandas.Runtime.Ui
             if (!Enabled) return;
             var k = UnityEngine.InputSystem.Keyboard.current;
             if (k == null) return;
-            if (k.f3Key.wasPressedThisFrame) s_visible = !s_visible;
+            if (k.f3Key.wasPressedThisFrame || Input.Pad.ChecklistPressed) s_visible = !s_visible;
             if (k.f4Key.wasPressedThisFrame)
             {
                 foreach (var item in Items) PlayerPrefs.DeleteKey(Prefix + item.key);

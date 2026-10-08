@@ -53,6 +53,36 @@ namespace TrashPandas.Core.Raccoons
             return flat * speed + Vector3.up * up;
         }
 
+        /// <summary>How far each tool can be thrown (the aim marker stops there and turns red).</summary>
+        public static float MaxRange(Gadget g) => g == Gadget.Pebble ? 16f : g == Gadget.SmokeBomb ? 12f : 8f;
+
+        /// <summary>The area the landing marker shows: the clack's hearing radius, the smoke cloud, the peel.</summary>
+        public static float EffectRadius(Gadget g) => g == Gadget.Pebble ? NoiseModel.Radius(NoiseKind.Crash) : g == Gadget.SmokeBomb ? 3f : 0.5f;
+
+        /// <summary>Keep the aim point within the tool's range (horizontally).</summary>
+        public static Vector3 ClampToRange(Gadget g, Vector3 origin, Vector3 target, out bool tooFar)
+        {
+            Vector3 d = target - origin;
+            Vector2 flat = new Vector2(d.x, d.z);
+            float max = MaxRange(g);
+            tooFar = flat.magnitude > max;
+            if (!tooFar) return target;
+            flat = flat.normalized * max;
+            return new Vector3(origin.x + flat.x, target.y, origin.z + flat.y);
+        }
+
+        /// <summary>
+        /// Aim at a point and it lands there (Fortnite / Splatoon style): a lob whose flight time grows with distance,
+        /// so short tosses are quick and long throws arc high.
+        /// </summary>
+        public static Vector3 VelocityTo(Vector3 origin, Vector3 target, out float flightTime)
+        {
+            Vector3 d = target - origin;
+            float dist = new Vector2(d.x, d.z).magnitude;
+            flightTime = Mathf.Clamp(0.35f + dist * 0.055f, 0.35f, 1.3f);
+            return d / flightTime - 0.5f * Physics.gravity * flightTime;
+        }
+
         /// <summary>Distance covered before falling back to launch height (for tests / HUD).</summary>
         public static float FlatRange(Vector3 v) => new Vector2(v.x, v.z).magnitude * 2f * v.y / 9.81f;
     }

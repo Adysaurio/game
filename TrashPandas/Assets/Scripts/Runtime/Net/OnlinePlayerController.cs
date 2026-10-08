@@ -92,8 +92,8 @@ namespace TrashPandas.Runtime.Net
                 raccoon.Controller.SetInput(move, _reader.JumpPressed, _reader.JumpHeld, _reader.CrouchHeld || DevAutomation.FleeCrouchAt(raccoon.transform.position), _reader.RunHeld || DevAutomation.SquadRun);
                 var r = raccoon.Controller;
                 var kb = UnityEngine.InputSystem.Keyboard.current;
-                if (kb != null && kb.gKey.wasPressedThisFrame) r.ToggleEmote(1);
-                if (kb != null && kb.hKey.wasPressedThisFrame) r.ToggleEmote(2);
+                if ((kb != null && kb.gKey.wasPressedThisFrame) || Input.Pad.DancePressed) r.ToggleEmote(1);
+                if ((kb != null && kb.hKey.wasPressedThisFrame) || Input.Pad.CheerPressed) r.ToggleEmote(2);
                 if (_reader.UsePressed || DevAutomation.SquadUse(r))
                 {
                     if (r.InCan) r.ExitCan();
@@ -102,6 +102,7 @@ namespace TrashPandas.Runtime.Net
                 }
                 Squad.HidePeek.Tick(CameraRig, raccoon.Controller, RaccoonCameraRadius, RaccoonLookHeight);
                 if (raccoon.Controller.IsRunning && Time.time >= _nextRunNoise) { _nextRunNoise = Time.time + 0.5f; raccoon.MakeNoise(Core.Raccoons.NoiseKind.Running, raccoon.transform.position); }
+                Ui.GameHud.SquadAiming = _hands.Aiming;
                 _hands.Tick(_reader, CameraRig, raccoon.Controller,
                     (index, at) => raccoon.TapRpc(index, at),
                     (dir, strength) => raccoon.ThrowRpc(dir, strength),

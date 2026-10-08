@@ -24,7 +24,10 @@ namespace TrashPandas.Runtime.Ui
         Texture2D _mapTex;
         int _renderedFrames;
         Gadget _selected = Gadget.Pebble;
-        bool _aiming;
+        bool _aiming, _aimHeldLast;
+        Vector3 _aimTarget;
+        /// <summary>Set by the hands while a carried throw is being aimed.</summary>
+        public static bool SquadAiming;
         float _nextScroll;
 
         static string Name(Gadget g) => g == Gadget.Pebble ? "pebble" : g == Gadget.SmokeBomb ? "smoke bomb" : "banana";
@@ -65,6 +68,34 @@ namespace TrashPandas.Runtime.Ui
                 }
                 _countsKnown = true;
             }
+        }
+
+        GUIStyle _aimStyle;
+        /// <summary>While aiming: a crosshair, and the distance on the landing marker (red when out of range).</summary>
+        void DrawAim()
+        {
+            if (!AimArc.Showing) return;
+            float W = UiScale.Width, H = UiScale.Height;
+            s_round ??= MakeRound();
+            GUI.color = new Color(1f, 1f, 1f, 0.9f);
+            GUI.DrawTexture(new Rect(W / 2f - 3f, H / 2f - 3f, 6f, 6f), s_round);
+            GUI.DrawTexture(new Rect(W / 2f - 14f, H / 2f - 1f, 8f, 2f), Texture2D.whiteTexture);
+            GUI.DrawTexture(new Rect(W / 2f + 6f, H / 2f - 1f, 8f, 2f), Texture2D.whiteTexture);
+            GUI.DrawTexture(new Rect(W / 2f - 1f, H / 2f - 14f, 2f, 8f), Texture2D.whiteTexture);
+            GUI.DrawTexture(new Rect(W / 2f - 1f, H / 2f + 6f, 2f, 8f), Texture2D.whiteTexture);
+            var cam = Camera.main;
+            if (!cam) { GUI.color = Color.white; return; }
+            Vector3 sp = cam.WorldToScreenPoint(AimArc.Landing + Vector3.up * 0.4f);
+            if (sp.z > 0f)
+            {
+                Vector2 p = UiScale.FromScreen(sp);
+                _aimStyle ??= new GUIStyle(GUI.skin.label) { fontSize = 15, fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleCenter };
+                GUI.color = new Color(0f, 0f, 0f, 0.55f);
+                GUI.DrawTexture(new Rect(p.x - 34, p.y - 12, 68, 22), Texture2D.whiteTexture);
+                GUI.color = AimArc.TooFar ? new Color(1f, 0.4f, 0.35f) : Color.white;
+                GUI.Label(new Rect(p.x - 34, p.y - 12, 68, 22), AimArc.TooFar ? "too far" : $"{AimArc.Distance:F0} m", _aimStyle);
+            }
+            GUI.color = Color.white;
         }
 
         GUIStyle _tipStyle;
@@ -143,6 +174,8 @@ namespace TrashPandas.Runtime.Ui
                 if (k.digit3Key.wasPressedThisFrame) _selected = Gadget.SmokeBomb;
                 if (k.digit4Key.wasPressedThisFrame) _selected = Gadget.Banana;
             }
+            if (Input.Pad.ToolNext) _selected = (Gadget)(((int)_selected + 1) % 3);
+            if (Input.Pad.ToolPrev) _selected = (Gadget)(((int)_selected + 2) % 3);
             if (m != null && Mathf.Abs(m.scroll.ReadValue().y) > 0.1f && Time.time > _nextScroll)
             {
                 _nextScroll = Time.time + 0.15f;
@@ -154,19 +187,29 @@ namespace TrashPandas.Runtime.Ui
             Vector3 look = cam ? cam.transform.forward : me ? me.transform.forward : Vector3.forward;
             bool canUse = me && gd && !RoundIntro.Playing && !me.Frozen && !me.HiddenInside && gd.Snapshot.Count(me.PlayerId, _selected) > 0;
             // Hold Q: the arc shows where it'll land (look up = farther). Release: throw.
-            if (k != null && k.qKey.wasPressedThisFrame && me && gd && !RoundIntro.Playing && gd.Snapshot.Count(me.PlayerId, _selected) == 0)
+            bool aimHeld = (k != null && k.qKey.isPressed) || Input.Pad.AimHeld
+                           || (Debug.isDebugBuild && System.Array.IndexOf(System.Environment.GetCommandLineArgs(), "-aimtest") >= 0 && Time.timeSinceLevelLoad > 2f);
+            if (aimHeld && !_aimHeldLast && me && gd && !RoundIntro.Playing && gd.Snapshot.Count(me.PlayerId, _selected) == 0)
                 Tip("empty", $"No {Name(_selected)}s left — grab more around the estate");
-            if (k != null && k.qKey.isPressed && canUse)
+            _aimHeldLast = aimHeld;
+            if (aimHeld && canUse && cam)
             {
                 _aiming = true;
-                AimArc.Show(GadgetDirector.Origin(me), GadgetThrow.Velocity(_selected, look), _selected == Gadget.Banana ? new Color(1f, 0.9f, 0.2f) : _selected == Gadget.SmokeBomb ? new Color(0.75f, 0.6f, 1f) : Color.white);
+                // Aim at a point (the crosshair): it lands there; the ring shows what it'll affect.
+                Vector3 origin = GadgetDirector.Origin(me);
+                _aimTarget = AimArc.AimPoint(cam, origin, GadgetThrow.MaxRange(_selected), out bool tooFar);
+                var v = GadgetThrow.VelocityTo(origin, _aimTarget, out _);
+                AimArc.Show(origin, v, _selected == Gadget.Banana ? new Color(1f, 0.9f, 0.2f) : _selected == Gadget.SmokeBomb ? new Color(0.75f, 0.6f, 1f) : Color.white,
+                            GadgetThrow.EffectRadius(_selected), tooFar);
+                me.FaceToward(_aimTarget);
             }
-            if (_aiming && k != null && !k.qKey.isPressed)
+            if (_aiming && !aimHeld)
             {
                 _aiming = false;
-                if (canUse) gd.Use(me, _selected, look);
+                if (canUse) gd.Use(me, _selected, _aimTarget);
             }
-            if (Net.DevAutomation.GadgetBot(me, out var g, out var aim) && gd) gd.Use(me, g, aim);
+            Cameras.PlayerCameraRig.Aiming = _aiming || SquadAiming;
+            if (Net.DevAutomation.GadgetBot(me, out var g, out var aim) && gd && me) gd.Use(me, g, GadgetDirector.Origin(me) + aim * 6f);
             if (me && Debug.isDebugBuild && System.Array.IndexOf(System.Environment.GetCommandLineArgs(), "-aimshot") >= 0)
                 AimArc.Show(GadgetDirector.Origin(me), GadgetThrow.Velocity(Gadget.Banana, look + Vector3.up * 0.25f), new Color(1f, 0.9f, 0.2f)); // dev: screenshot of the aim
             TickTips(me, gd);
@@ -183,6 +226,7 @@ namespace TrashPandas.Runtime.Ui
             DrawMinimap();
             DrawItemBar();
             DrawTip();
+            DrawAim();
             DrawNemesisCard();
         }
 

@@ -36,6 +36,13 @@ namespace TrashPandas.Runtime.Raccoon
         /// <summary>Caught in the panic: no more control.</summary>
         public bool Frozen;
         public bool IsStunned => Time.time < _stunnedUntil;
+        /// <summary>Aiming a throw: turn to face where it'll land (unless running somewhere).</summary>
+        public void FaceToward(Vector3 point)
+        {
+            Vector3 d = point - transform.position; d.y = 0f;
+            if (d.sqrMagnitude < 0.01f || _move.sqrMagnitude > 0.5f) return;
+            transform.rotation = Quaternion.RotateTowards(transform.rotation, Quaternion.LookRotation(d), 540f * Time.deltaTime);
+        }
         /// <summary>0 none, 1 dance, 2 cheer (G / H). Moving cancels it. Synced to the others online.</summary>
         public byte Emote { get; set; }
         public void ToggleEmote(byte e) { Emote = Emote == e ? (byte)0 : e; if (Emote != 0) Ui.DebugChecklist.Mark("emote"); }

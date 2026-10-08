@@ -20,6 +20,10 @@ namespace TrashPandas.Runtime.Cameras
         public float Sensitivity = LookSensitivity.Default;
         [Tooltip("Degrees per second when orbiting with the arrow keys.")]
         public float KeyOrbitSpeed = 140f;
+        public float PadOrbitSpeed = 180f;
+        /// <summary>Someone is aiming a throw: the camera comes in over the shoulder (Fortnite-style), aim is finer.</summary>
+        public static bool Aiming;
+        float _aimK, _radiusBase = -1f;
         public bool InvertY;
         public Vector2 PitchRange = new Vector2(-20f, 70f);
 
@@ -143,13 +147,40 @@ namespace TrashPandas.Runtime.Cameras
                 _filter.NotifyLockChanged();
             }
 
+            UpdateAimCamera();
             if (InConversation) { UpdateConversationFocus(); return; } // the shot is composed, not steered
             if (UiWantsCursor || CinematicLock) return;
+            // Right stick: orbit at a steady speed (with a little ease-in), pitch at half speed.
+            var look = Input.Pad.Look;
+            if (look.sqrMagnitude > 0f)
+            {
+                float k = look.magnitude * look.magnitude;
+                Orbit.HorizontalAxis.Value = Mathf.Repeat(Orbit.HorizontalAxis.Value + look.x / look.magnitude * k * PadOrbitSpeed * Time.deltaTime + 180f, 360f) - 180f;
+                Orbit.VerticalAxis.Value = Mathf.Clamp(Orbit.VerticalAxis.Value + (InvertY ? look.y : -look.y) / look.magnitude * k * PadOrbitSpeed * 0.5f * Time.deltaTime, PitchRange.x, PitchRange.y);
+            }
             if (!_locked || mouse == null) return;
             Vector2 delta = _filter.Filter(mouse.delta.ReadValue());
             Orbit.HorizontalAxis.Value = Mathf.Repeat(Orbit.HorizontalAxis.Value + delta.x * Sensitivity + 180f, 360f) - 180f;
             float pitch = Orbit.VerticalAxis.Value + (InvertY ? delta.y : -delta.y) * Sensitivity;
             Orbit.VerticalAxis.Value = Mathf.Clamp(pitch, PitchRange.x, PitchRange.y);
+        }
+
+        void UpdateAimCamera()
+        {
+            float target = Aiming && !CinematicLock && !InConversation ? 1f : 0f;
+            if (Mathf.Approximately(_aimK, target) && target == 0f) { _radiusBase = -1f; return; }
+            if (_radiusBase < 0f) _radiusBase = Orbit.Radius;
+            _aimK = Mathf.MoveTowards(_aimK, target, Time.deltaTime * 5f);
+            float e = Mathf.SmoothStep(0f, 1f, _aimK);
+            Orbit.Radius = Mathf.Lerp(_radiusBase, _radiusBase * 0.55f, e);
+            if (Composer)
+            {
+                var comp = Composer.Composition;
+                comp.ScreenPosition = new Vector2(Mathf.Lerp(0f, -0.14f, e), Mathf.Lerp(0f, 0.08f, e)); // raccoon left of the crosshair
+                Composer.Composition = comp;
+            }
+            if (VirtualCamera) { var lens = VirtualCamera.Lens; lens.FieldOfView = Mathf.Lerp(55f, 46f, e); VirtualCamera.Lens = lens; }
+            if (_aimK <= 0f) _radiusBase = -1f;
         }
 
         void OnDisable()

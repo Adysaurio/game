@@ -23,6 +23,8 @@ namespace TrashPandas.Runtime.Raccoon
         /// <summary>The model's material per player (its bandana recolored).</summary>
         public Material[] Skins = new Material[0];
         string _clip;
+        float _jitter = 1f, _gaitPhase, _gaitK, _gallopK, _tiptoeK, _crouchK;
+        Transform _hips, _spine, _head, _armL, _armR, _foreL, _foreR, _thighL, _thighR, _shinL, _shinR;
         public string CurrentClip => _clip;
         public float Lean => _leanK;
         float _leanK;
@@ -170,14 +172,20 @@ namespace TrashPandas.Runtime.Raccoon
                 // The model animates itself; keep the squash & stretch (juice) and a little sway.
                 if (Visual)
                 {
-                    Visual.localScale = new Vector3(sxz, sy, sxz);
+                    // No squashing a real model: only a subtle settle on landing (crouching is a pose, below).
+                    float mSy = 1f - _squash * 0.18f + _stretch * 0.1f;
+                    float mSxz = 1f + _squash * 0.08f - _stretch * 0.04f;
+                    Visual.localScale = new Vector3(mSxz, mSy, mSxz);
                     // Running: a low forward lean, paws reaching for the ground (the gallop).
-                    float lean = 42f * _runK * (moving ? 1f : 0f);
+                    float lean = 55f * _runK * (moving ? 1f : 0f);
                     _leanK = Mathf.MoveTowards(_leanK, lean, dt * 160f);
-                    Visual.localPosition = new Vector3(0f, 0f, -0.05f * _leanK / 42f);
+                    _crouchK = Mathf.MoveTowards(_crouchK, !riding && _sneakK > 0.5f && _runK < 0.5f ? 1f : 0f, dt * 6f);
+                    Visual.localPosition = new Vector3(0f, -0.07f * _crouchK, -0.05f * _leanK / 42f);
                     Visual.localRotation = Quaternion.Euler(_leanK + (moving ? Mathf.Sin(_phase * 2f) * 5f * _runK : 0f), 0f, sway * 0.4f);
                 }
                 PlayModelClip(planar, moving, riding);
+                BuildGait(planar, moving && _clip == "Idle", dt);
+                Crouch();
                 UpdateBandana();
                 return;
             }
@@ -291,6 +299,107 @@ namespace TrashPandas.Runtime.Raccoon
             GUI.color = Color.white;
         }
 
+        void FindBones()
+        {
+            if (_hips || !Model) return;
+            foreach (var t in Model.GetComponentsInChildren<Transform>())
+                switch (t.name)
+                {
+                    case "Hips": _hips = t; break;
+                    case "Spine": _spine = t; break;
+                    case "Head": _head = t; break;
+                    case "LeftArm": _armL = t; break;
+                    case "RightArm": _armR = t; break;
+                    case "LeftForeArm": _foreL = t; break;
+                    case "RightForeArm": _foreR = t; break;
+                    case "LeftUpLeg": _thighL = t; break;
+                    case "RightUpLeg": _thighR = t; break;
+                    case "LeftLeg": _shinL = t; break;
+                    case "RightLeg": _shinR = t; break;
+                }
+            _jitter = Random.Range(0.9f, 1.12f);
+            _gaitPhase = Random.value * Mathf.PI * 2f;
+        }
+
+        /// <summary>Sneaking (moving or not): a real crouch — knees bent, back forward, head up — instead of squashing.</summary>
+        void Crouch()
+        {
+            if (_crouchK <= 0.001f || !_hips || _clip != "Idle") return;
+            Transform body = Model.transform;
+            Vector3 right = body.right;
+            float k = _crouchK;
+            Turn(_thighL, -38f * k, right);
+            Turn(_thighR, -38f * k, right);
+            Turn(_shinL, 62f * k, right);
+            Turn(_shinR, 62f * k, right);
+            Turn(_spine, 22f * k, right);
+            if (_head) Turn(_head, -18f * k, right);
+        }
+
+        static void Turn(Transform bone, float degrees, Vector3 worldAxis)
+        {
+            if (bone && Mathf.Abs(degrees) > 0.01f) bone.rotation = Quaternion.AngleAxis(degrees, worldAxis) * bone.rotation;
+        }
+
+        /// <summary>
+        /// Our own gait for a short-legged chubby raccoon, layered on the idle pose: a waddle (short steps, hip roll,
+        /// arm swing), a tiptoe sneak (paws up), and a bounding gallop (front paws and back legs alternate, body low).
+        /// Positive degrees about the body's right axis swing a limb backward; negative, forward.
+        /// </summary>
+        void BuildGait(float planar, bool moving, float dt)
+        {
+            FindBones();
+            _gaitK = Mathf.MoveTowards(_gaitK, moving ? 1f : 0f, dt * 6f);
+            _gallopK = Mathf.MoveTowards(_gallopK, moving && _runK > 0.5f ? 1f : 0f, dt * 5f);
+            _tiptoeK = Mathf.MoveTowards(_tiptoeK, moving && _sneakK > 0.5f && _runK < 0.5f ? 1f : 0f, dt * 5f);
+            if (_gaitK <= 0.001f || !_hips) return;
+            // Short legs: about 0.32 m per step walking, longer bounds galloping.
+            float stride = Mathf.Lerp(Mathf.Lerp(0.44f, 0.26f, _tiptoeK), 0.8f, _gallopK);
+            _gaitPhase += planar / stride * Mathf.PI * dt * _jitter;
+            float s = Mathf.Sin(_gaitPhase), c = Mathf.Cos(_gaitPhase);
+            Transform body = Model.transform;
+            Vector3 right = body.right, fwd = body.forward, up = body.up;
+            float k = _gaitK;
+            float walkK = k * (1f - _gallopK);
+
+            // Legs: walk/sneak alternate; gallop = both together.
+            float legAmp = Mathf.Lerp(Mathf.Lerp(30f, 18f, _tiptoeK), 0f, _gallopK);
+            Turn(_thighL, -legAmp * s * walkK, right);
+            Turn(_thighR, legAmp * s * walkK, right);
+            // Knee lifts on the forward swing (the leg that's coming through bends).
+            Turn(_shinL, Mathf.Max(0f, c) * Mathf.Lerp(30f, 40f, _tiptoeK) * walkK, right);
+            Turn(_shinR, Mathf.Max(0f, -c) * Mathf.Lerp(30f, 40f, _tiptoeK) * walkK, right);
+            // A light, fluid sway (not a waddle): a touch of hip roll and counter-twist.
+            Turn(_hips, s * 2.5f * walkK, fwd);
+            Turn(_hips, s * 3f * walkK, up);
+            Turn(_spine, -s * 3f * walkK, up);
+            Turn(_spine, 6f * walkK * (1f - _tiptoeK), right); // leaning into the walk
+            // Arms: swing against the legs walking; held up and forward (sneaky paws) when tiptoeing.
+            Turn(_armL, legAmp * 0.8f * s * walkK * (1f - _tiptoeK), right);
+            Turn(_armR, -legAmp * 0.8f * s * walkK * (1f - _tiptoeK), right);
+            Turn(_armL, -55f * _tiptoeK * k, right);
+            Turn(_armR, -55f * _tiptoeK * k, right);
+            Turn(_foreL, -45f * _tiptoeK * k + s * 6f * _tiptoeK, right);
+            Turn(_foreR, -45f * _tiptoeK * k - s * 6f * _tiptoeK, right);
+
+            // Gallop: body pitched (Visual lean), front paws reach and push, back legs drive together, in turn.
+            if (_gallopK > 0.001f)
+            {
+                float g = _gallopK * k;
+                float front = Mathf.Sin(_gaitPhase), back = Mathf.Sin(_gaitPhase + Mathf.PI * 0.6f);
+                Turn(_armL, (-70f + front * 40f) * g, right);
+                Turn(_armR, (-70f + front * 40f + 8f) * g, right);
+                Turn(_foreL, -15f * g, right);
+                Turn(_foreR, -15f * g, right);
+                Turn(_thighL, (back * 45f + 10f) * g, right);
+                Turn(_thighR, (back * 45f + 14f) * g, right);
+                Turn(_shinL, Mathf.Max(0f, -back) * 50f * g, right);
+                Turn(_shinR, Mathf.Max(0f, -back) * 50f * g, right);
+                Turn(_spine, front * 8f * g, right); // the back flexes with each bound
+                if (_head) Turn(_head, -_leanK * 0.75f, right); // keep looking ahead
+            }
+        }
+
         /// <summary>Which clip fits what the raccoon is doing (owner: from its state; others: from how it moves).</summary>
         void PlayModelClip(float planar, bool moving, bool riding)
         {
@@ -304,10 +413,7 @@ namespace TrashPandas.Runtime.Raccoon
             else if (riding) clip = "Idle";
             else if (airborne) { clip = "Jump"; speed = 1.4f; }
             else if (r && r.Pushing) clip = "Push";
-            else if (_runK > 0.5f && moving) { clip = "Run"; speed = Mathf.Clamp(planar * 0.32f, 1.1f, 2.2f); } // leaning gallop
-            else if (carrying && moving) { clip = "Carry"; speed = Mathf.Clamp(planar * 0.7f, 0.8f, 2.2f); }
-            else if (_sneakK > 0.5f && moving) { clip = "Sneak"; speed = Mathf.Clamp(planar * 0.9f, 0.7f, 2f); }
-            else if (moving) { clip = "Walk"; speed = Mathf.Clamp(planar * 0.75f, 0.8f, 2.6f); }
+            else if (moving) { clip = "Idle"; speed = 0.6f; } // walk / sneak / gallop: our own gait on the bones (BuildGait)
             else if (r && r.Emote == 1) clip = "Dance";
             else if (r && r.Emote == 2) clip = "Cheer";
             else clip = "Idle";
@@ -315,9 +421,11 @@ namespace TrashPandas.Runtime.Raccoon
             {
                 _clip = clip;
                 _clipSince = Time.time;
-                Model.CrossFadeInFixedTime(clip, clip == "Jump" ? 0.08f : 0.18f);
+                // Loops start somewhere random so a crew never moves in lockstep.
+                bool loop = clip == "Idle" || clip == "Dance" || clip == "Hang" || clip == "Crawl" || clip == "Push";
+                Model.CrossFade(clip, clip == "Jump" ? 0.06f : 0.15f, 0, loop ? Random.value : 0f);
             }
-            Model.speed = speed;
+            Model.speed = speed * _jitter;
         }
 
         void UpdateBandana()
