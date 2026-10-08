@@ -27,7 +27,8 @@ namespace TrashPandas.Runtime.Raccoon
         void OnEnable() => Instance = this;
         void OnDisable() { if (Instance == this) Instance = null; Clear(); }
 
-        public static Vector3 MouthOf(Transform raccoon) => raccoon.position + raccoon.forward * 0.28f + Vector3.up * 0.32f;
+        public static Vector3 MouthOf(Transform raccoon) => MouthOf(raccoon, raccoon.position);
+        public static Vector3 MouthOf(Transform raccoon, Vector3 position) => position + raccoon.forward * 0.28f + Vector3.up * 0.32f;
 
         /// <summary>Recompute for the raccoon this machine controls (null = nothing to highlight).</summary>
         public Grabbable Refresh(PlayerCameraRig rig, RaccoonController raccoon, bool carrying)
@@ -39,7 +40,7 @@ namespace TrashPandas.Runtime.Raccoon
                 _candidates.Clear();
                 var all = Grabbable.All;
                 for (int i = 0; i < all.Count; i++)
-                    if (all[i] && !all[i].IsHeld) _candidates.Add(new GrabCandidate { Id = i, Position = all[i].transform.position });
+                    if (all[i] && (!all[i].IsHeld || all[i].RequiresBothHands)) _candidates.Add(new GrabCandidate { Id = i, Position = all[i].transform.position });
                 int? id = GrabPick.Pick(cam.position, cam.forward, MouthOf(raccoon.transform), _candidates);
                 pick = id.HasValue ? all[id.Value] : null;
             }

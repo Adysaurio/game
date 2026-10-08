@@ -184,6 +184,10 @@ namespace TrashPandas.EditorTools
                 item.Kind = LootKind.Objective;
                 item.Objective = id;
             }
+            // Heavy loot: needs two raccoons (concept v2). Not shuffled with the loose loot (LootDirector skips it).
+            var gift = Mat("GiantGift", new Color(0.85f, 0.25f, 0.45f));
+            var giant = Prop("Loot_GiantGift", PrimitiveType.Cube, new Vector3(3f, 0.4f, -2f), new Vector3(0.8f, 0.8f, 0.8f), gift, 8f, true).AddComponent<LootItem>();
+            giant.Kind = LootKind.GiantGift;
             Objective(ObjectiveId.Ring, PrimitiveType.Sphere, new Vector3(0.09f, 0.09f, 0.09f));
             Objective(ObjectiveId.CakeTopper, PrimitiveType.Capsule, new Vector3(0.1f, 0.12f, 0.1f));
             Objective(ObjectiveId.Envelope, PrimitiveType.Cube, new Vector3(0.26f, 0.03f, 0.16f));

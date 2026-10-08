@@ -268,8 +268,7 @@ namespace TrashPandas.Runtime.Trenchcoat
                 var raccoonMove = Net.DevAutomation.FleeMove(_raccoon.transform.position)
                     ?? (dashBot ? new Vector2(0f, 1f) : _reader.CameraRelativeMove(CameraRig)); // dev bots
                 _raccoon.SetInput(raccoonMove, _reader.JumpPressed, _reader.JumpHeld, _reader.CrouchHeld || Net.DevAutomation.FleeCrouchAt(_raccoon.transform.position));
-                if ((_reader.MouthPressed(CameraRig) || Net.DevAutomation.MouthBot(_raccoon.transform.position)) && TrashPandas.Runtime.Loot.LootDirector.Instance)
-                    TrashPandas.Runtime.Loot.LootDirector.Instance.ToggleMouth(_raccoon);
+
             }
             else
             {

@@ -33,8 +33,21 @@ namespace TrashPandas.Runtime.Net
         public void HitRpc(UnityEngine.Vector3 impulse, float stunSeconds) => Controller.ApplyHit(impulse, stunSeconds);
 
         /// <summary>Owner → host: pick up / spit out loot with the mouth.</summary>
+        /// <summary>Owner → host: quick click (grab the highlighted thing, or drop what you carry).</summary>
         [Rpc(SendTo.Server)]
-        public void MouthRpc(UnityEngine.Vector3 ownerPosition) { if (Loot.LootDirector.Instance) Loot.LootDirector.Instance.ToggleMouth(Controller, ownerPosition); }
+        public void TapRpc(int pickedIndex, UnityEngine.Vector3 ownerPosition, RpcParams rpc = default)
+        {
+            if (rpc.Receive.SenderClientId != OwnerClientId) return;
+            Squad.CarryDirector.Instance?.Tap(Controller, pickedIndex, ownerPosition);
+        }
+
+        /// <summary>Owner → host: hold and release (throw).</summary>
+        [Rpc(SendTo.Server)]
+        public void ThrowRpc(UnityEngine.Vector3 direction, float strength, RpcParams rpc = default)
+        {
+            if (rpc.Receive.SenderClientId != OwnerClientId) return;
+            Squad.CarryDirector.Instance?.Throw(Controller, direction, strength);
+        }
 
         /// <summary>Host → owner: caught, no more control.</summary>
         [Rpc(SendTo.Owner)]

@@ -19,6 +19,8 @@ namespace TrashPandas.Runtime.Net
         public float RaccoonCameraRadius = 3f, RaccoonLookHeight = 0.4f;
 
         readonly DebugInputReader _reader = new DebugInputReader();
+
+        readonly Squad.RaccoonHands _hands = new Squad.RaccoonHands();
         uint _sequence;
         float _nextSend;
         bool? _armsCamera;
@@ -78,7 +80,10 @@ namespace TrashPandas.Runtime.Net
                 var move = DevAutomation.FleeMove(raccoon.transform.position)
                     ?? (DevAutomation.Bot == "hopflee" || DevAutomation.Bot == "mouthflee" ? new Vector2(0f, 1f) : _reader.CameraRelativeMove(CameraRig)); // dev bots
                 raccoon.Controller.SetInput(move, _reader.JumpPressed, _reader.JumpHeld, _reader.CrouchHeld || DevAutomation.FleeCrouchAt(raccoon.transform.position));
-                if (_reader.MouthPressed(CameraRig) || DevAutomation.MouthBot(raccoon.transform.position)) raccoon.MouthRpc(raccoon.transform.position);
+                _hands.Tick(_reader, CameraRig, raccoon.Controller,
+                    (index, at) => raccoon.TapRpc(index, at),
+                    (dir, strength) => raccoon.ThrowRpc(dir, strength),
+                    DevAutomation.SquadTap(raccoon.Controller));
                 return;
             }
             if (_cameraOnRaccoon) { _cameraOnRaccoon = null; _armsCamera = null; }

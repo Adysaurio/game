@@ -15,6 +15,8 @@ namespace TrashPandas.Runtime.Raccoon
         public float SneakSpeed = 1.5f;
         [Tooltip("Towers and heavy loads slow you down (1 = normal).")]
         public float SpeedMultiplier = 1f;
+        /// <summary>Set from the carry state: slower under a heavy load (1 = free).</summary>
+        [System.NonSerialized] public float CarryFactor = 1f;
         [Tooltip("Falling faster than this when you land makes noise.")]
         public float HardLandingSpeed = 7f;
         public float Acceleration = 30f;
@@ -69,7 +71,12 @@ namespace TrashPandas.Runtime.Raccoon
             _crouchHeld = crouchHeld;
         }
 
-        void Awake() => _cc = GetComponent<CharacterController>();
+        void Awake()
+        {
+            _cc = GetComponent<CharacterController>();
+            // The default (1 mm) swallows small per-frame steps at high frame rates (sneaking on a fast PC).
+            _cc.minMoveDistance = 0f;
+        }
 
         void Update()
         {
@@ -83,7 +90,7 @@ namespace TrashPandas.Runtime.Raccoon
 
             if (Frozen) { _move = Vector2.zero; }
             float speed = _crouchHeld ? SneakSpeed : _runHeld ? RunSpeed : WalkSpeed;
-            Vector3 wish = new Vector3(_move.x, 0f, _move.y) * speed * SpeedMultiplier;
+            Vector3 wish = new Vector3(_move.x, 0f, _move.y) * speed * SpeedMultiplier * CarryFactor;
             if (grounded && !_wasGrounded && _verticalVelocity < -HardLandingSpeed) Noise?.Invoke(Core.Raccoons.NoiseKind.HardLanding, transform.position);
             _wasGrounded = grounded;
             float rate = IsStunned ? Deceleration * 0.25f : wish.sqrMagnitude > _planar.sqrMagnitude ? Acceleration : Deceleration;

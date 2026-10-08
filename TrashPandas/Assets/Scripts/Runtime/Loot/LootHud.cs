@@ -79,10 +79,10 @@ namespace TrashPandas.Runtime.Loot
             int? me = LocalPlayer;
             if (me.HasValue)
             {
-                int item = s.MouthItemOf(me.Value);
-                if (item >= 0 && item < d.Items.Count && d.Items[item])
+                var carried = Squad.CarryDirector.Instance ? Squad.CarryDirector.Instance.ItemOf(me.Value) : null;
+                var it = carried ? carried.GetComponent<LootItem>() : null;
+                if (it)
                 {
-                    var it = d.Items[item];
                     GUI.color = new Color(1f, 0.85f, 0.3f);
                     GUI.Label(new Rect(0, UiScale.Height - 150, W, 28), $"In your mouth: {it.Label} (${it.Value}) — click to spit it out", new GUIStyle(_line) { alignment = TextAnchor.MiddleCenter, fontSize = 18 });
                     GUI.color = Color.white;

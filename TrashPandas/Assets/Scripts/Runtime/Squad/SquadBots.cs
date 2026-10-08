@@ -1,0 +1,94 @@
+using TrashPandas.Runtime.Grabbing;
+using TrashPandas.Runtime.Loot;
+using TrashPandas.Runtime.Raccoon;
+using UnityEngine;
+using UnityEngine.AI;
+
+namespace TrashPandas.Runtime.Squad
+{
+    /// <summary>Dev automation for concept v2: simple raccoon bots that steer along the navmesh.</summary>
+    public static class SquadBots
+    {
+        static NavMeshPath s_path;
+        public static Vector3? DenTarget; // set by the den when it exists
+
+        /// <summary>Direction along the navmesh from <paramref name="from"/> toward <paramref name="to"/>.</summary>
+        public static Vector2 Steer(Vector3 from, Vector3 to)
+        {
+            Vector3 direct = to - from;
+            direct.y = 0f;
+            s_path ??= new NavMeshPath();
+            if (NavMesh.SamplePosition(to, out var goal, 2f, NavMesh.AllAreas) && NavMesh.SamplePosition(from, out var me, 1.5f, NavMesh.AllAreas)
+                && NavMesh.CalculatePath(me.position, goal.position, NavMesh.AllAreas, s_path) && s_path.corners.Length > 1)
+            {
+                for (int i = 1; i < s_path.corners.Length; i++)
+                {
+                    Vector3 d = s_path.corners[i] - from;
+                    d.y = 0f;
+                    if (d.magnitude > 0.35f || i == s_path.corners.Length - 1) { direct = d; break; }
+                }
+            }
+            return direct.sqrMagnitude < 1e-4f ? Vector2.zero : new Vector2(direct.x, direct.z).normalized;
+        }
+
+        static LootItem Target(RaccoonController r)
+        {
+            var ld = LootDirector.Instance;
+            if (!ld) return null;
+            LootItem best = null;
+            foreach (var item in ld.Items)
+                if (item && item.State == LootState.Active && !item.IsObjective && !item.Grabbable.IsHeld && item.transform.position.y < 1.2f
+                    && (!best || Vector3.Distance(item.transform.position, r.transform.position) < Vector3.Distance(best.transform.position, r.transform.position)))
+                    best = item;
+            return best;
+        }
+
+        public static Vector2? FetchMove(RaccoonController r)
+        {
+            var carry = CarryDirector.Instance;
+            if (carry && carry.IsCarrying(r.PlayerId)) return DenTarget.HasValue ? Steer(r.transform.position, DenTarget.Value) : Vector2.zero;
+            var t = Target(r);
+            if (!t) return Vector2.zero;
+            Vector3 flat = t.transform.position - r.transform.position;
+            flat.y = 0f;
+            if (flat.magnitude < 0.5f) return Vector2.zero;
+            return Steer(r.transform.position, t.transform.position);
+        }
+
+        /// <summary>"heavy": raccoons 0 and 1 go to the giant gift, both grab it, and carry it toward the hedge.</summary>
+        public static void HeavyTick(System.Collections.Generic.IReadOnlyList<RaccoonController> squad)
+        {
+            var carry = CarryDirector.Instance;
+            Grabbable gift = null;
+            if (carry) foreach (var g in carry.Items) if (g && g.name == "Loot_GiantGift") gift = g;
+            for (int i = 0; i < squad.Count; i++)
+            {
+                var r = squad[i];
+                if (!r) continue;
+                if (i > 1 || !gift || !carry) { r.SetInput(Vector2.zero, false, false, false); continue; }
+                bool holding = carry.IsCarrying(r.PlayerId);
+                Vector3 side = gift.transform.position + (i == 0 ? Vector3.left : Vector3.right) * 0.75f;
+                Vector3 goal = holding ? (carry.Snapshot.Lifted(r.PlayerId) ? new Vector3(i == 0 ? 2.4f : 3.6f, 0f, -6f) : r.transform.position) : side;
+                Vector3 flat = goal - r.transform.position;
+                flat.y = 0f;
+                r.SetInput(flat.magnitude > 0.2f ? Steer(r.transform.position, goal) : Vector2.zero, false, false, false);
+                if (!holding && flat.magnitude < 0.35f)
+                {
+                    r.transform.rotation = Quaternion.LookRotation(Vector3.ProjectOnPlane(gift.transform.position - r.transform.position, Vector3.up));
+                    carry.Tap(r, carry.IndexOf(gift), r.transform.position);
+                }
+            }
+        }
+
+        static float s_nextTap;
+        public static bool FetchTap(RaccoonController r)
+        {
+            var carry = CarryDirector.Instance;
+            if (!carry || carry.IsCarrying(r.PlayerId) || Time.time < s_nextTap) return false;
+            var h = GrabHighlight.Instance ? GrabHighlight.Instance.Current : null;
+            if (!h || !h.GetComponent<LootItem>()) return false;
+            s_nextTap = Time.time + 0.5f;
+            return true;
+        }
+    }
+}

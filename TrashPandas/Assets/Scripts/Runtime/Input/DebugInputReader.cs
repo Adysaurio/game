@@ -79,7 +79,7 @@ namespace TrashPandas.Runtime.Input
         bool _wasGrabOne, _latchedLeft;
 
         /// <summary>Raccoon: left click picks up / spits out loot.</summary>
-        public bool MouthPressed(PlayerCameraRig rig) => M != null && M.leftButton.wasPressedThisFrame && !rig.CursorFreed;
+
         /// <summary>Q is held this frame (HUD hint).</summary>
         public bool StashHeld { get; private set; }
 

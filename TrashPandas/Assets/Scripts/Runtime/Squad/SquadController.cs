@@ -31,6 +31,7 @@ namespace TrashPandas.Runtime.Squad
 
         readonly List<RaccoonController> _raccoons = new List<RaccoonController>();
         readonly DebugInputReader _reader = new DebugInputReader();
+        readonly RaccoonHands _hands = new RaccoonHands();
         int _active;
         float _nextRunNoise;
         GUIStyle _help;
@@ -56,6 +57,8 @@ namespace TrashPandas.Runtime.Squad
                 float a = i * Mathf.PI * 2f / Mathf.Max(1, Count);
                 var r = Instantiate(RaccoonPrefab, SpawnCenter + new Vector3(Mathf.Sin(a), 0f, Mathf.Cos(a)) * 0.9f, Quaternion.identity);
                 r.name = $"Raccoon_{i}";
+                // Offline: the network sync components must not touch the transform.
+                foreach (var nb in r.GetComponents<Unity.Netcode.Components.NetworkTransform>()) nb.enabled = false;
                 r.PlayerId = i;
                 r.Noise += (kind, at) => NoiseBus.Emit(kind, at);
                 _raccoons.Add(r);
@@ -81,6 +84,7 @@ namespace TrashPandas.Runtime.Squad
                     if (_raccoons[i] && !_raccoons[i].Frozen) { Activate(i); break; }
                 }
             }
+            if (Net.DevAutomation.Bot == "heavy") { SquadBots.HeavyTick(_raccoons); return; }
             for (int i = 0; i < _raccoons.Count; i++)
             {
                 var r = _raccoons[i];
@@ -91,7 +95,12 @@ namespace TrashPandas.Runtime.Squad
                 r.SetInput(move, _reader.JumpPressed, _reader.JumpHeld, _reader.CrouchHeld, run);
                 if (r.IsRunning && Time.time >= _nextRunNoise) { _nextRunNoise = Time.time + 0.5f; NoiseBus.Emit(NoiseKind.Running, r.transform.position); }
             }
-            if (GrabHighlight.Instance) GrabHighlight.Instance.Refresh(CameraRig, Active, carrying: false);
+            var active = Active;
+            if (active)
+                _hands.Tick(_reader, CameraRig, active,
+                    (index, at) => CarryDirector.Instance.Tap(active, index, at),
+                    (dir, strength) => CarryDirector.Instance.Throw(active, dir, strength),
+                    Net.DevAutomation.SquadTap(active));
         }
 
         void OnGUI()

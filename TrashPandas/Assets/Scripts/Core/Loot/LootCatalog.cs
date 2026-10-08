@@ -2,7 +2,7 @@ using System.Collections.Generic;
 
 namespace TrashPandas.Core.Loot
 {
-    public enum LootKind : byte { Wallet, Phone, Cutlery, Bottle, Food, Objective }
+    public enum LootKind : byte { Wallet, Phone, Cutlery, Bottle, Food, Objective, GiantGift }
 
     public enum ObjectiveId : byte { Ring, CakeTopper, Envelope, Champagne, Bouquet, Keys }
 
@@ -23,6 +23,7 @@ namespace TrashPandas.Core.Loot
             LootKind.Cutlery => 15,
             LootKind.Bottle => 30,
             LootKind.Food => 5,
+            LootKind.GiantGift => 150,
             _ => 0,
         };
 
