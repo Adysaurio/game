@@ -56,7 +56,7 @@ namespace TrashPandas.Runtime.Net
         /// <summary>Squad (v2) dev bots steer the active raccoon; null = use the keyboard.</summary>
         public static Vector2? SquadMove(TrashPandas.Runtime.Raccoon.RaccoonController r)
         {
-            if (Bot == "walk") return new Vector2(0f, 1f);
+            if (Bot == "walk" || Bot == "sneak" || Bot == "sprint") return new Vector2(Mathf.Sin(Time.time * 0.6f), Mathf.Cos(Time.time * 0.6f));
             if (Bot == "noisy")
             {
                 // Behind the two guests chatting west of the garden (they face each other, not us): run around.
@@ -84,7 +84,8 @@ namespace TrashPandas.Runtime.Net
             return null;
         }
         public static bool TowerHop => Array.IndexOf(Args, "-hopoff") >= 0;
-        public static bool SquadRun => (Bot == "noisy" && Time.timeSinceLevelLoad > 4f) || (Bot == "towerhost" && Time.timeSinceLevelLoad > 24f);
+        public static bool SquadCrouch => Bot == "sneak";
+        public static bool SquadRun => Bot == "sprint" || (Bot == "noisy" && Time.timeSinceLevelLoad > 4f) || (Bot == "towerhost" && Time.timeSinceLevelLoad > 24f);
         static bool s_noisyPlaced;
         /// <summary>Dev: -nointro, and the bots that test specific mechanics skip the intro.</summary>
         public static bool SkipIntro => Array.IndexOf(Args, "-nointro") >= 0 || Bot == "heavy" || Bot == "tower" || Bot == "flee" || Bot == "sneakflee" || Bot == "rescue";

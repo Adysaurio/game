@@ -554,7 +554,14 @@ namespace TrashPandas.EditorTools
             tail.localPosition = new Vector3(0f, 0.18f, -0.18f);
             for (int t = 0; t < 4; t++)
                 Visual(PrimitiveType.Sphere, $"Ring_{t}", tail, new Vector3(0f, t * 0.045f, -0.06f - t * 0.075f), new Vector3(0.12f, 0.12f, 0.1f) * (1f - t * 0.08f), t % 2 == 0 ? fur : mask);
+            // Four little paws on the ground (they stay under the body whatever the pose).
+            var paws = new Transform[4];
+            var pawPos = new[] { new Vector3(-0.1f, 0.04f, 0.1f), new Vector3(0.1f, 0.04f, 0.1f), new Vector3(-0.1f, 0.04f, -0.1f), new Vector3(0.1f, 0.04f, -0.1f) };
+            for (int i = 0; i < 4; i++)
+                paws[i] = Visual(PrimitiveType.Sphere, $"Paw_{i}", root.transform, pawPos[i], new Vector3(0.09f, 0.07f, 0.11f), mask);
             var look = root.AddComponent<RaccoonLook>();
+            look.Head = head;
+            look.Paws = paws;
             look.Visual = visual;
             look.Tail = tail;
             look.Pupils = pupils;

@@ -112,7 +112,7 @@ namespace TrashPandas.Runtime.Squad
                 Vector2 move = (Net.DevAutomation.Bot == "rescue" ? SquadBots.RescueMove(r) : null) ?? Net.DevAutomation.SquadMove(r) ?? _reader.CameraRelativeMove(CameraRig);
                 bool run = _reader.RunHeld || Net.DevAutomation.SquadRun;
                 if (_reader.JumpPressed) Ui.DebugChecklist.Mark("jump");
-                r.SetInput(move, _reader.JumpPressed, _reader.JumpHeld, _reader.CrouchHeld, run);
+                r.SetInput(move, _reader.JumpPressed, _reader.JumpHeld, _reader.CrouchHeld || Net.DevAutomation.SquadCrouch, run);
                 if (r.IsRunning && Time.time >= _nextRunNoise) { _nextRunNoise = Time.time + 0.5f; NoiseBus.Emit(NoiseKind.Running, r.transform.position); }
             }
             var active = Active;

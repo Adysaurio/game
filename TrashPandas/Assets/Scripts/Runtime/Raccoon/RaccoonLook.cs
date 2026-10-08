@@ -12,6 +12,9 @@ namespace TrashPandas.Runtime.Raccoon
     {
         public Transform Visual;     // pivot at the feet: squash & stretch scale from here
         public Transform Tail;
+        public Transform Head;
+        /// <summary>Front-left, front-right, back-left, back-right (children of the root, on the ground).</summary>
+        public Transform[] Paws = new Transform[0];
         public Transform[] Pupils = new Transform[0];
         public Transform[] Lids = new Transform[0];
         public Renderer Bandana;
@@ -29,7 +32,9 @@ namespace TrashPandas.Runtime.Raccoon
         int _colorFor = -999;
         ParticleSystem _dust;
         MaterialPropertyBlock _block;
-        Vector3[] _pupilRest;
+        Vector3[] _pupilRest, _pawRest;
+        Vector3 _headRest;
+        float _runK, _sneakK;
 
         void Awake()
         {
@@ -40,6 +45,9 @@ namespace TrashPandas.Runtime.Raccoon
             _pupilRest = new Vector3[Pupils.Length];
             for (int i = 0; i < Pupils.Length; i++) _pupilRest[i] = Pupils[i] ? Pupils[i].localPosition : Vector3.zero;
             _dust = MakeDust();
+            _pawRest = new Vector3[Paws.Length];
+            for (int i = 0; i < Paws.Length; i++) _pawRest[i] = Paws[i] ? Paws[i].localPosition : Vector3.zero;
+            if (Head) _headRest = Head.localPosition;
         }
 
         ParticleSystem MakeDust()
@@ -72,7 +80,31 @@ namespace TrashPandas.Runtime.Raccoon
                       new[] { new GradientAlphaKey(0.8f, 0f), new GradientAlphaKey(0f, 1f) });
             color.color = g;
             var r = go.GetComponent<ParticleSystemRenderer>();
-            s_dustMaterial ??= new Material(Shader.Find("Universal Render Pipeline/Particles/Unlit") ?? Shader.Find("Sprites/Default"));
+            if (!s_dustMaterial)
+            {
+                s_dustMaterial = new Material(Shader.Find("Universal Render Pipeline/Particles/Unlit") ?? Shader.Find("Sprites/Default"));
+                // A soft round puff (without a texture the particles render as squares).
+                const int n = 32;
+                var tex = new Texture2D(n, n, TextureFormat.RGBA32, false) { wrapMode = TextureWrapMode.Clamp };
+                for (int y = 0; y < n; y++)
+                    for (int x = 0; x < n; x++)
+                    {
+                        float dx = (x + 0.5f) / n - 0.5f, dy = (y + 0.5f) / n - 0.5f;
+                        float a = Mathf.Clamp01(1f - Mathf.Sqrt(dx * dx + dy * dy) * 2f);
+                        tex.SetPixel(x, y, new Color(1f, 1f, 1f, a * a));
+                    }
+                tex.Apply();
+                s_dustMaterial.mainTexture = tex;
+                if (s_dustMaterial.HasProperty("_BaseMap")) s_dustMaterial.SetTexture("_BaseMap", tex);
+                // Transparent blending for the URP particle shader.
+                if (s_dustMaterial.HasProperty("_Surface")) s_dustMaterial.SetFloat("_Surface", 1f);
+                s_dustMaterial.SetOverrideTag("RenderType", "Transparent");
+                s_dustMaterial.renderQueue = 3000;
+                s_dustMaterial.SetFloat("_SrcBlend", (float)UnityEngine.Rendering.BlendMode.SrcAlpha);
+                s_dustMaterial.SetFloat("_DstBlend", (float)UnityEngine.Rendering.BlendMode.OneMinusSrcAlpha);
+                s_dustMaterial.SetFloat("_ZWrite", 0f);
+                s_dustMaterial.EnableKeyword("_SURFACE_TYPE_TRANSPARENT");
+            }
             r.sharedMaterial = s_dustMaterial;
             return ps;
         }
@@ -103,20 +135,68 @@ namespace TrashPandas.Runtime.Raccoon
             _squash = Mathf.MoveTowards(_squash, 0f, dt * 2.2f);
             _stretch = Mathf.MoveTowards(_stretch, 0f, dt * 1.8f);
 
-            // A bouncy little walk.
+            // Poses: on all fours when running, low and tiptoeing when sneaking, upright and bouncy otherwise.
+            // The owner knows the input; remote copies read it from the speed.
             bool riding = _raccoon && !ReferenceEquals(_raccoon.Mount, null);
-            _phase += planar * dt * 4.2f;
-            float bob = !riding && planar > 0.3f ? Mathf.Abs(Mathf.Sin(_phase)) * 0.06f : 0f;
-            float sy = 1f - _squash + _stretch + bob, sxz = 1f + _squash * 0.6f - _stretch * 0.35f;
+            bool local = _raccoon && _raccoon.enabled;
+            bool running = !riding && (local ? _raccoon.IsRunning : planar > 3.7f);
+            bool sneaking = !riding && !running && (local ? _raccoon.IsSneaking : planar > 0.2f && planar < 2.0f);
+            _runK = Mathf.MoveTowards(_runK, running ? 1f : 0f, dt * 6f);
+            _sneakK = Mathf.MoveTowards(_sneakK, sneaking ? 1f : 0f, dt * 6f);
+            bool moving = !riding && planar > 0.3f;
+
+            _phase += planar * dt * Mathf.Lerp(Mathf.Lerp(4.2f, 2.6f, _sneakK), 3.4f, _runK);
+            float walkBob = moving ? Mathf.Abs(Mathf.Sin(_phase)) * 0.06f : 0f;
+            float gallop = moving ? Mathf.Max(0f, Mathf.Sin(_phase * 2f)) * 0.09f : 0f; // bounding leaps
+            float bob = Mathf.Lerp(Mathf.Lerp(walkBob, walkBob * 0.4f, _sneakK), gallop, _runK);
+            float sy = (1f - _squash + _stretch + bob) * Mathf.Lerp(1f, 0.72f, _sneakK);
+            float sxz = (1f + _squash * 0.6f - _stretch * 0.35f) * Mathf.Lerp(1f, 1.08f, _sneakK);
+            float pitch = Mathf.Lerp(Mathf.Lerp(Mathf.Clamp(planar * 2.2f, 0f, 12f), 22f, _sneakK), 68f, _runK);
+            float sway = moving ? Mathf.Sin(_phase) * Mathf.Lerp(Mathf.Lerp(4f, 9f, _sneakK), 2f, _runK) : 0f;
             if (Visual)
             {
                 Visual.localScale = new Vector3(sxz, sy, sxz);
-                Visual.localRotation = Quaternion.Euler(Mathf.Clamp(planar * 2.2f, 0f, 12f), 0f, Mathf.Sin(_phase) * (planar > 0.3f ? 4f : 0f));
+                // Lying forward on all fours: lift and pull back the pivot so the belly clears the ground.
+                Visual.localPosition = new Vector3(0f, 0.13f * _runK + 0.02f * _sneakK, -0.16f * _runK);
+                Visual.localRotation = Quaternion.Euler(pitch + (moving ? Mathf.Sin(_phase * 2f) * 6f * _runK : 0f), 0f, sway);
             }
-            if (Tail) Tail.localRotation = Quaternion.Euler(-25f + Mathf.Sin(Time.time * (planar > 0.3f ? 14f : 3f)) * 8f, Mathf.Sin(Time.time * (planar > 0.3f ? 9f : 2.2f)) * (planar > 0.3f ? 28f : 12f), 0f);
+            if (Head)
+            {
+                // Keep looking ahead: counter the body's pitch; sneaking pokes the head out low.
+                Head.localPosition = _headRest + new Vector3(0f, -0.07f * _sneakK, 0.06f * _sneakK);
+                Head.localRotation = Quaternion.Euler(-pitch * 0.85f + 8f * _sneakK, Mathf.Sin(Time.time * 1.7f) * 14f * _sneakK, 0f); // sneaky glances
+            }
+            float tailFast = moving ? 14f : 3f;
+            if (Tail) Tail.localRotation = Quaternion.Euler(Mathf.Lerp(Mathf.Lerp(-25f, 10f, _sneakK), -60f, _runK) + Mathf.Sin(Time.time * tailFast) * 8f,
+                                                            Mathf.Sin(Time.time * (moving ? 9f : 2.2f)) * (moving ? Mathf.Lerp(28f, 10f, _runK) : 12f), 0f);
+            UpdatePaws(moving, planar);
 
             UpdateEyes();
             UpdateBandana();
+        }
+
+        /// <summary>
+        /// Four little paws: a trot when walking, a bound (front pair, then back pair) when running, high slow
+        /// tiptoe steps when sneaking. They hang from the root, so they stay on the ground under the pose.
+        /// </summary>
+        void UpdatePaws(bool moving, float planar)
+        {
+            for (int i = 0; i < Paws.Length && i < 4; i++)
+            {
+                var paw = Paws[i];
+                if (!paw) continue;
+                bool front = i < 2, left = i % 2 == 0;
+                // Trot: diagonal pairs. Gallop: front pair together, back pair together.
+                float trotPhase = _phase + ((left == front) ? 0f : Mathf.PI);
+                float gallopPhase = _phase * 2f + (front ? 0f : Mathf.PI * 0.8f);
+                float ph = Mathf.Lerp(trotPhase, gallopPhase, _runK);
+                float lift = moving ? Mathf.Max(0f, Mathf.Sin(ph)) * Mathf.Lerp(Mathf.Lerp(0.06f, 0.11f, _sneakK), 0.09f, _runK) : 0f;
+                float reach = moving ? Mathf.Cos(ph) * Mathf.Lerp(Mathf.Lerp(0.06f, 0.04f, _sneakK), 0.14f, _runK) : 0f;
+                Vector3 rest = _pawRest[i];
+                // Running: front paws reach forward under the chest, back paws push from behind.
+                rest += new Vector3(0f, 0f, (front ? 0.12f : -0.08f) * _runK);
+                paw.localPosition = rest + new Vector3(0f, lift, reach);
+            }
         }
 
         /// <summary>Pupils look at the nearest interesting thing (a grabbable, a raccoon friend); they blink now and then.</summary>
