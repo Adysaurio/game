@@ -18,7 +18,7 @@ namespace TrashPandas.Runtime.Squad
     public sealed class RoundIntro : NetworkBehaviour
     {
         public PlayerCameraRig CameraRig;
-        public float CameraDistance = 4.6f;
+        public float CameraDistance = 3.3f;
         public float CameraLookHeight = 0.45f;
 
         public static RoundIntro Instance { get; private set; }

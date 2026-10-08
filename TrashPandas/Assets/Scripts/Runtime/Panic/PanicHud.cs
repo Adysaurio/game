@@ -11,6 +11,8 @@ namespace TrashPandas.Runtime.Panic
         float _panicStartedAt = -1f;
         GUIStyle _big, _mid, _small, _exit;
 
+        RoundPhase _lastPhase;
+
         void OnDisable() => TrashPandas.Runtime.Cameras.PlayerCameraRig.UiWantsCursor = false;
 
         void OnGUI()
@@ -18,6 +20,9 @@ namespace TrashPandas.Runtime.Panic
             var d = PanicDirector.Instance;
             var cam = Camera.main;
             TrashPandas.Runtime.Cameras.PlayerCameraRig.UiWantsCursor = d && d.Phase == RoundPhase.Results;
+            if (d && d.Phase == RoundPhase.Panic && _lastPhase != RoundPhase.Panic && TrashPandas.Runtime.Cameras.CameraShake.Instance)
+                TrashPandas.Runtime.Cameras.CameraShake.Instance.Kick(0.9f); // ¡¡RUUUN!!
+            if (d) _lastPhase = d.Phase;
             if (!d || d.Phase == RoundPhase.Infiltration) { _panicStartedAt = -1f; return; }
             UiScale.Apply();
             if (_panicStartedAt < 0f) _panicStartedAt = Time.time;

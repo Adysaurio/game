@@ -153,6 +153,10 @@ namespace TrashPandas.Runtime.Raccoon
         /// <summary>Knocked by a broom (or the cat): flung along <paramref name="impulse"/> and dizzy for a moment.</summary>
         public void ApplyHit(Vector3 impulse, float stunSeconds)
         {
+            // Juice: if this is the raccoon on my screen, the camera feels it.
+            var shake = Cameras.CameraShake.Instance;
+            var cam = Camera.main;
+            if (shake && cam && Vector3.Distance(cam.transform.position, transform.position) < 6f) { shake.Kick(0.55f); shake.HitStop(0.07f); }
             if (Mount) Dismount(impulse);
             if (RidersAbove > 0 && Core.Raccoons.TowerRules.Collapses(false, bottomHit: true)) CollapseTower();
             _planar = new Vector3(impulse.x, 0f, impulse.z);
@@ -242,6 +246,14 @@ namespace TrashPandas.Runtime.Raccoon
             if (_cc.isGrounded && _verticalVelocity <= 0f) _jumpedSinceGrounded = false;
             // Only a deliberate jump lands you on someone's head (bumping into them from behind doesn't).
             if (!grounded && _verticalVelocity < 0f && AutoMount && (_jumpedSinceGrounded || DroppedFromAbove)) TryLandOnHead();
+        }
+
+        /// <summary>Bumping into light things knocks them about (Astro Bot: every touch gets a reaction).</summary>
+        void OnControllerColliderHit(ControllerColliderHit hit)
+        {
+            var rb = hit.rigidbody;
+            if (!rb || rb.isKinematic || rb.mass > 2f || hit.moveDirection.y < -0.3f) return;
+            rb.AddForceAtPosition(new Vector3(hit.moveDirection.x, 0.15f, hit.moveDirection.z) * (1.2f + _planar.magnitude * 0.35f), hit.point, ForceMode.Impulse);
         }
 
         /// <summary>Off for raccoons this machine doesn't own (their owner decides).</summary>

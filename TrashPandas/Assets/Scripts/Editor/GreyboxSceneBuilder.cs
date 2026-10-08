@@ -150,6 +150,7 @@ namespace TrashPandas.EditorTools
             camGo.AddComponent<AudioListener>();
             camGo.transform.position = new Vector3(0f, 3f, -5f);
             camGo.AddComponent<CinemachineBrain>().UpdateMethod = CinemachineBrain.UpdateMethods.LateUpdate;
+            camGo.AddComponent<CameraShake>();
             var rig = BuildPlayerCamera(outputCamera, body.transform);
 
 
@@ -517,8 +518,46 @@ namespace TrashPandas.EditorTools
             cc.height = 0.6f;
             cc.radius = 0.2f;
             cc.center = new Vector3(0f, 0.3f, 0f);
-            Visual(PrimitiveType.Capsule, "Body", root.transform, new Vector3(0f, 0.3f, 0f), new Vector3(0.4f, 0.3f, 0.4f), fur);
-            Visual(PrimitiveType.Sphere, "Snout", root.transform, new Vector3(0f, 0.4f, 0.22f), Vector3.one * 0.12f, fur);
+            // A greybox raccoon you can read at a glance: grey body, black mask, ears, ringed tail, big eyes,
+            // and a bandana in the player's color. Everything hangs from a pivot at the feet (squash & stretch).
+            var mask = Mat("RaccoonMask", new Color(0.12f, 0.12f, 0.14f));
+            var white = Mat("EyeWhite", new Color(0.97f, 0.97f, 0.97f));
+            var light = Mat("RaccoonLight", new Color(0.78f, 0.78f, 0.8f));
+            var bandanaMat = Mat("Bandana", new Color(0.9f, 0.25f, 0.25f));
+            var visual = new GameObject("Visual").transform;
+            visual.SetParent(root.transform, false);
+            Visual(PrimitiveType.Capsule, "Body", visual, new Vector3(0f, 0.27f, 0f), new Vector3(0.4f, 0.27f, 0.4f), fur);
+            Visual(PrimitiveType.Sphere, "Belly", visual, new Vector3(0f, 0.24f, 0.12f), new Vector3(0.26f, 0.3f, 0.18f), light);
+            var head = new GameObject("Head").transform;
+            head.SetParent(visual, false);
+            head.localPosition = new Vector3(0f, 0.5f, 0.05f);
+            Visual(PrimitiveType.Sphere, "Skull", head, Vector3.zero, new Vector3(0.34f, 0.28f, 0.3f), fur);
+            Visual(PrimitiveType.Sphere, "Snout", head, new Vector3(0f, -0.04f, 0.15f), new Vector3(0.14f, 0.1f, 0.14f), light);
+            Visual(PrimitiveType.Sphere, "Nose", head, new Vector3(0f, -0.02f, 0.22f), Vector3.one * 0.045f, mask);
+            Visual(PrimitiveType.Cube, "Mask", head, new Vector3(0f, 0.025f, 0.11f), new Vector3(0.32f, 0.07f, 0.1f), mask);
+            Visual(PrimitiveType.Sphere, "EarL", head, new Vector3(-0.12f, 0.14f, -0.02f), new Vector3(0.09f, 0.1f, 0.05f), fur);
+            Visual(PrimitiveType.Sphere, "EarR", head, new Vector3(0.12f, 0.14f, -0.02f), new Vector3(0.09f, 0.1f, 0.05f), fur);
+            var pupils = new Transform[2];
+            var lids = new Transform[2];
+            for (int e = 0; e < 2; e++)
+            {
+                float x = e == 0 ? -0.07f : 0.07f;
+                Visual(PrimitiveType.Sphere, e == 0 ? "EyeL" : "EyeR", head, new Vector3(x, 0.03f, 0.145f), Vector3.one * 0.075f, white);
+                pupils[e] = Visual(PrimitiveType.Sphere, e == 0 ? "PupilL" : "PupilR", head, new Vector3(x, 0.03f, 0.175f), Vector3.one * 0.038f, mask);
+                lids[e] = Visual(PrimitiveType.Cube, e == 0 ? "LidL" : "LidR", head, new Vector3(x, 0.06f, 0.18f), new Vector3(0.085f, 0.001f, 0.02f), fur);
+            }
+            var bandana = Visual(PrimitiveType.Cylinder, "Bandana", visual, new Vector3(0f, 0.38f, 0.01f), new Vector3(0.44f, 0.035f, 0.44f), bandanaMat);
+            var tail = new GameObject("Tail").transform;
+            tail.SetParent(visual, false);
+            tail.localPosition = new Vector3(0f, 0.18f, -0.18f);
+            for (int t = 0; t < 4; t++)
+                Visual(PrimitiveType.Sphere, $"Ring_{t}", tail, new Vector3(0f, t * 0.045f, -0.06f - t * 0.075f), new Vector3(0.12f, 0.12f, 0.1f) * (1f - t * 0.08f), t % 2 == 0 ? fur : mask);
+            var look = root.AddComponent<RaccoonLook>();
+            look.Visual = visual;
+            look.Tail = tail;
+            look.Pupils = pupils;
+            look.Lids = lids;
+            look.Bandana = bandana.GetComponent<Renderer>();
             root.AddComponent<RaccoonController>();
             root.AddComponent<NetworkObject>();
             var nt = root.AddComponent<NetworkTransform>();
