@@ -11,6 +11,9 @@ namespace TrashPandas.Core.Panic
     {
         struct Carried { public int Value; public ObjectiveId? Objective; }
 
+        /// <summary>Concept v2: shares are loot already delivered to the den — kept even if caught.</summary>
+        public bool SharesAreSafe;
+
         readonly Dictionary<int, int> _shares = new Dictionary<int, int>();
         readonly Dictionary<int, Carried> _mouth = new Dictionary<int, Carried>();
         readonly Dictionary<int, int> _paid = new Dictionary<int, int>();
@@ -43,7 +46,7 @@ namespace TrashPandas.Core.Panic
         /// <returns>True if the player dropped something from its mouth.</returns>
         public bool Caught(int player)
         {
-            if (!_paid.ContainsKey(player)) _paid[player] = 0;
+            if (!_paid.ContainsKey(player)) _paid[player] = SharesAreSafe && _shares.TryGetValue(player, out var safe) ? safe : 0;
             return Drop(player);
         }
 

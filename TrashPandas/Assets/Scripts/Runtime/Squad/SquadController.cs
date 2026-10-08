@@ -54,8 +54,7 @@ namespace TrashPandas.Runtime.Squad
             GameMode.ParkCoat(Coat);
             for (int i = 0; i < Count; i++)
             {
-                float a = i * Mathf.PI * 2f / Mathf.Max(1, Count);
-                var r = Instantiate(RaccoonPrefab, SpawnCenter + new Vector3(Mathf.Sin(a), 0f, Mathf.Cos(a)) * 0.9f, Quaternion.identity);
+                var r = Instantiate(RaccoonPrefab, Net.DevAutomation.SquadNearOrigin ? SpawnCenter + new Vector3(Mathf.Sin(i * 2.1f), 0f, Mathf.Cos(i * 2.1f)) * 0.9f : GameMode.SpawnPoint(i), Quaternion.Euler(0f, 180f, 0f));
                 r.name = $"Raccoon_{i}";
                 // Offline: the network sync components must not touch the transform.
                 foreach (var nb in r.GetComponents<Unity.Netcode.Components.NetworkTransform>()) nb.enabled = false;

@@ -55,7 +55,7 @@ namespace TrashPandas.Runtime.Loot
                 GUI.color = new Color(0f, 0f, 0f, 0.5f);
                 GUI.DrawTexture(new Rect(12, 50, 270, 118), Texture2D.whiteTexture);
                 GUI.color = new Color(1f, 0.85f, 0.3f);
-                GUI.Label(new Rect(22, 54, 250, 30), $"POCKET  ${s.Total}", _title);
+                GUI.Label(new Rect(22, 54, 250, 30), Squad.GameMode.Raccoons ? $"LOOT AT THE DEN  ${s.Total}" : $"POCKET  ${s.Total}", _title);
                 GUI.color = Color.white;
                 float y = 86;
                 foreach (var info in LootCatalog.Objectives)
@@ -75,6 +75,19 @@ namespace TrashPandas.Runtime.Loot
                 GUI.color = Color.white;
             }
 
+            // The den: always marked, so you know where to bring things.
+            if (Squad.GameMode.Raccoons && Camera.main)
+            {
+                Vector3 dp = Camera.main.WorldToScreenPoint(d.DenCenter + Vector3.up * 2.2f);
+                if (dp.z > 0f)
+                {
+                    Vector2 p = UiScale.FromScreen(dp);
+                    GUI.color = new Color(1f, 0.75f, 0.35f);
+                    GUI.Label(new Rect(p.x - 70, p.y - 22, 140, 44), "▼ DEN", new GUIStyle(_title) { alignment = TextAnchor.MiddleCenter });
+                    GUI.color = Color.white;
+                }
+            }
+
             // What's in my mouth.
             int? me = LocalPlayer;
             if (me.HasValue)
@@ -84,7 +97,7 @@ namespace TrashPandas.Runtime.Loot
                 if (it)
                 {
                     GUI.color = new Color(1f, 0.85f, 0.3f);
-                    GUI.Label(new Rect(0, UiScale.Height - 150, W, 28), $"In your mouth: {it.Label} (${it.Value}) — click to spit it out", new GUIStyle(_line) { alignment = TextAnchor.MiddleCenter, fontSize = 18 });
+                    GUI.Label(new Rect(0, UiScale.Height - 150, W, 28), $"Carrying: {it.Label} (${it.Value}) — take it to the DEN · click to drop", new GUIStyle(_line) { alignment = TextAnchor.MiddleCenter, fontSize = 18 });
                     GUI.color = Color.white;
                 }
             }

@@ -108,3 +108,29 @@ namespace TrashPandas.Tests
         }
     }
 }
+
+namespace TrashPandas.Tests
+{
+    public class SafeDeliveryTests
+    {
+        [Test]
+        public void Delivered_IsSafe_WhenCaught()
+        {
+            var pay = new TrashPandas.Core.Panic.RoundPayout { SharesAreSafe = true };
+            pay.SetShares(new System.Collections.Generic.Dictionary<int, int> { [0] = 80 });
+            pay.Carry(0, 40, null);
+            pay.Caught(0);
+            Assert.AreEqual(80, pay.Of(0), "what reached the den stays yours; only the mouth item is lost");
+        }
+
+        [Test]
+        public void Delivered_PlusMouth_WhenEscaped()
+        {
+            var pay = new TrashPandas.Core.Panic.RoundPayout { SharesAreSafe = true };
+            pay.SetShares(new System.Collections.Generic.Dictionary<int, int> { [0] = 80 });
+            pay.Carry(0, 40, null);
+            pay.Escaped(0);
+            Assert.AreEqual(120, pay.Of(0));
+        }
+    }
+}

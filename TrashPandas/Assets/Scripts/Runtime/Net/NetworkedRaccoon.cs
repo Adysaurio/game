@@ -55,7 +55,11 @@ namespace TrashPandas.Runtime.Net
 
         public override void OnNetworkSpawn()
         {
-            if (IsOwner) Controller.Collapsed += () => { if (IsSpawned) CollapseRpc(); };
+            if (IsOwner)
+            {
+                Controller.Collapsed += () => { if (IsSpawned) CollapseRpc(); };
+                Controller.Noise += (kind, at) => MakeNoise(kind, at);
+            }
             if (IsServer) _playerId.Value = Controller.PlayerId;
             else Controller.PlayerId = _playerId.Value;
             _playerId.OnValueChanged += (_, v) => Controller.PlayerId = v;
@@ -74,6 +78,19 @@ namespace TrashPandas.Runtime.Net
         {
             if (rpc.Receive.SenderClientId != OwnerClientId) return;
             Squad.CarryDirector.Instance?.Tap(Controller, pickedIndex, ownerPosition);
+        }
+
+        /// <summary>Owner: a noise this raccoon made (the host's humans listen).</summary>
+        public void MakeNoise(Core.Raccoons.NoiseKind kind, Vector3 at)
+        {
+            if (IsServer) Squad.NoiseBus.Emit(kind, at);
+            else NoiseRpc(kind, at);
+        }
+
+        [Rpc(SendTo.Server)]
+        void NoiseRpc(Core.Raccoons.NoiseKind kind, Vector3 at, RpcParams rpc = default)
+        {
+            if (rpc.Receive.SenderClientId == OwnerClientId) Squad.NoiseBus.Emit(kind, at);
         }
 
         /// <summary>Owner → host: hold and release (throw).</summary>

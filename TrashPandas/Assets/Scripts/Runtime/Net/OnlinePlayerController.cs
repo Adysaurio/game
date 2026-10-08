@@ -21,6 +21,7 @@ namespace TrashPandas.Runtime.Net
         readonly DebugInputReader _reader = new DebugInputReader();
 
         readonly Squad.RaccoonHands _hands = new Squad.RaccoonHands();
+        float _nextRunNoise;
         uint _sequence;
         float _nextSend;
         bool? _armsCamera;
@@ -77,9 +78,10 @@ namespace TrashPandas.Runtime.Net
                     _cameraOnRaccoon = raccoon;
                     CameraRig.SetTarget(raccoon.transform, RaccoonCameraRadius, RaccoonLookHeight);
                 }
-                var move = DevAutomation.FleeMove(raccoon.transform.position)
+                var move = DevAutomation.SquadMove(raccoon.Controller) ?? DevAutomation.FleeMove(raccoon.transform.position)
                     ?? (DevAutomation.Bot == "hopflee" || DevAutomation.Bot == "mouthflee" ? new Vector2(0f, 1f) : _reader.CameraRelativeMove(CameraRig)); // dev bots
-                raccoon.Controller.SetInput(move, _reader.JumpPressed, _reader.JumpHeld, _reader.CrouchHeld || DevAutomation.FleeCrouchAt(raccoon.transform.position));
+                raccoon.Controller.SetInput(move, _reader.JumpPressed, _reader.JumpHeld, _reader.CrouchHeld || DevAutomation.FleeCrouchAt(raccoon.transform.position), _reader.RunHeld);
+                if (raccoon.Controller.IsRunning && Time.time >= _nextRunNoise) { _nextRunNoise = Time.time + 0.5f; raccoon.MakeNoise(Core.Raccoons.NoiseKind.Running, raccoon.transform.position); }
                 _hands.Tick(_reader, CameraRig, raccoon.Controller,
                     (index, at) => raccoon.TapRpc(index, at),
                     (dir, strength) => raccoon.ThrowRpc(dir, strength),
@@ -161,7 +163,7 @@ namespace TrashPandas.Runtime.Net
             }
             int? mine = snapshot.SlotOfClient(nm.LocalClientId);
             string hint = mine.HasValue ? DebugInputReader.HintFor(snapshot.PartsOf(mine.Value)) + "   E: hop out"
-                        : NetworkedRaccoon.LocalOwned ? "RACCOON  Mouse camera · WASD run · Space jump · Ctrl crouch · Click: grab loot with your mouth · E next to the coat: hop back in"
+                        : NetworkedRaccoon.LocalOwned ? "WASD move · Shift run (noisy) · C sneak · Space jump · Click grab/drop · Hold click + release: throw · Jump onto a raccoon: ride · bring loot to the DEN (van)"
                         : "Waiting for a seat…";
             string room = SessionHost.Instance && !string.IsNullOrEmpty(SessionHost.Instance.RoomCode) ? $"Room {SessionHost.Instance.RoomCode} · " : "";
             var lines = new[] { $"{room}ONLINE · {(nm.IsHost ? "host" : "client")}   {seats}", hint + "   F10: leave" };

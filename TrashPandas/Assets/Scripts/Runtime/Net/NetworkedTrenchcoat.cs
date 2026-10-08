@@ -45,6 +45,17 @@ namespace TrashPandas.Runtime.Net
             Instance = this;
             _burst.OnValueChanged += (_, burst) => { if (burst) Body.Explode(); };
             if (_burst.Value) Body.Explode();
+            if (Squad.GameMode.Raccoons)
+            {
+                // Concept v2: everyone starts as a raccoon; the coat waits (parked) for the events.
+                Squad.GameMode.ParkCoat(Body);
+                if (IsServer)
+                {
+                    // Wait until every client has loaded the scene, or their raccoons never reach them.
+                    _spawnSquadAt = Time.realtimeSinceStartup + 6f;
+                    NetworkManager.SceneManager.OnLoadEventCompleted += OnAllLoaded;
+                }
+            }
             if (!IsServer)
             {
                 Body.VisualOnly = true;
@@ -53,8 +64,36 @@ namespace TrashPandas.Runtime.Net
             }
         }
 
+        float _spawnSquadAt = float.MaxValue;
+        bool _squadSpawned;
+
+        void OnAllLoaded(string scene, UnityEngine.SceneManagement.LoadSceneMode mode, System.Collections.Generic.List<ulong> done, System.Collections.Generic.List<ulong> timedOut) => SpawnSquad();
+
+        void LateUpdate()
+        {
+            if (IsServer && !_squadSpawned && Time.realtimeSinceStartup >= _spawnSquadAt) SpawnSquad(); // fallback
+        }
+
+        /// <summary>Host, concept v2: a raccoon per player, popping out at the manhole by the den.</summary>
+        void SpawnSquad()
+        {
+            if (_squadSpawned || !IsServer) return;
+            _squadSpawned = true;
+            var roster = SessionHost.Instance ? SessionHost.Instance.Roster : null;
+            if (roster == null) return;
+            int n = 0;
+            for (int p = 0; p < 8; p++)
+            {
+                var client = roster.ClientOf(p);
+                if (!client.HasValue) continue;
+                roster.Slots?.Leave(p);
+                SpawnRaccoon(p, client.Value, Squad.GameMode.SpawnPoint(n++), Quaternion.Euler(0f, 180f, 0f));
+            }
+        }
+
         public override void OnNetworkDespawn()
         {
+            if (NetworkManager && NetworkManager.SceneManager != null) NetworkManager.SceneManager.OnLoadEventCompleted -= OnAllLoaded;
             if (Instance == this) Instance = null;
         }
 

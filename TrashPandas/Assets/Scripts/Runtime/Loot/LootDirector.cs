@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using TrashPandas.Core.Loot;
+using TrashPandas.Core.Raccoons;
 using TrashPandas.Core.Round;
 using TrashPandas.Runtime.Grabbing;
 using TrashPandas.Runtime.Net;
@@ -25,6 +26,10 @@ namespace TrashPandas.Runtime.Loot
         public Vector3[] ObjectiveSpotPositions = new Vector3[0];
         public int ObjectiveCount = 3;
         public float InfiltrationSeconds = 480f;
+        [Tooltip("The den (concept v2): bring loot here and it's safe.")]
+        public Vector3 DenCenter;
+        public float DenRadius = 1.6f;
+        public readonly DeliveryLedger Ledger = new DeliveryLedger();
 
         public static LootDirector Instance { get; private set; }
         public static int? SeedOverride; // dev automation
@@ -47,6 +52,7 @@ namespace TrashPandas.Runtime.Loot
 
         void Start()
         {
+            Squad.SquadBots.DenTarget = DenCenter;
             _items.AddRange(FindObjectsByType<LootItem>(FindObjectsInactive.Include, FindObjectsSortMode.None).OrderBy(i => i.name));
         }
 
@@ -54,6 +60,8 @@ namespace TrashPandas.Runtime.Loot
 
         void SetUpRound()
         {
+            Squad.SquadBots.DenTarget = DenCenter;
+            Ledger.Reset();
             _setUp = true;
             Random = new System.Random(SeedOverride ?? System.Environment.TickCount);
             Pocket.Reset();
@@ -103,8 +111,9 @@ namespace TrashPandas.Runtime.Loot
                 _offline.SecondsLeft = _clock.SecondsLeft(now);
                 float push = _clock.OvertimeSuspicion(now, Time.deltaTime);
                 if (push > 0f && SuspicionDirector.Instance) SuspicionDirector.Instance.AdjustSuspicion(push);
-                WatchStashing();
+                if (!Squad.GameMode.Raccoons) WatchStashing();
             }
+            if (Squad.GameMode.Raccoons) CheckDen();
             Publish();
         }
 
@@ -131,6 +140,40 @@ namespace TrashPandas.Runtime.Loot
             foreach (var pair in _gestures)
                 if (pair.Key && pair.Key.Grabbable != grabber.HeldLeft && pair.Key.Grabbable != grabber.HeldRight && pair.Key.Grabbable != grabber.HeldBoth)
                     pair.Value.Reset();
+        }
+
+        readonly Dictionary<int, RaccoonController> _byPlayer = new Dictionary<int, RaccoonController>();
+
+        /// <summary>Host/offline: raccoons reaching the den with loot deliver it (split among heavy-load carriers).</summary>
+        void CheckDen()
+        {
+            var carry = Squad.CarryDirector.Instance;
+            if (!carry) return;
+            _byPlayer.Clear();
+            foreach (var r in FindObjectsByType<RaccoonController>(FindObjectsSortMode.None)) if (r && r.PlayerId >= 0) _byPlayer[r.PlayerId] = r;
+            foreach (var pair in _byPlayer)
+            {
+                var g = carry.ItemOf(pair.Key);
+                if (!g) continue;
+                Vector3 d = pair.Value.transform.position - DenCenter;
+                d.y = 0f;
+                if (d.magnitude > DenRadius) continue;
+                var item = g.GetComponent<LootItem>();
+                if (!item) { carry.Drop(pair.Key, Vector3.zero); continue; } // a glass isn't loot
+                int index = carry.IndexOf(g);
+                var carriers = carry.CarriersOfItem(index).ToList();
+                carry.Consume(pair.Key);
+                int id = _items.IndexOf(item), share = item.Value / carriers.Count, extra = item.Value % carriers.Count;
+                for (int k = 0; k < carriers.Count; k++)
+                    Ledger.Deliver(carriers[k], id * 8 + k, share + (k < extra ? 1 : 0), k == 0 && item.IsObjective ? item.Objective : (ObjectiveId?)null);
+                item.SetState(LootState.Stashed);
+                _offline.Total = Ledger.Total;
+                if (item.IsObjective) _offline.ObjectivesDone |= (byte)(1 << (int)item.Objective);
+                _offline.StashSerial++;
+                _offline.LastStashValue = (short)item.Value;
+                _offline.LastStashAt = DenCenter + Vector3.up;
+                return; // one delivery per frame keeps the carry bookkeeping simple
+            }
         }
 
         /// <summary>Host/offline: an item goes in the pocket (from the arms, or a raccoon climbing back in with it).</summary>

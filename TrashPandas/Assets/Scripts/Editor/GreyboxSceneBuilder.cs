@@ -231,7 +231,7 @@ namespace TrashPandas.EditorTools
             Person("Cook_1", NpcKind.Guest, new Vector3(-16.5f, 0f, 4.5f), -60f, new Color(0.95f, 0.95f, 0.95f), skin, false);
             Person("Guest_House_0", NpcKind.Guest, new Vector3(-7.5f, 0f, 21.5f), 90f, outfits[n++ % outfits.Length], skin, false);
             Person("Guest_House_1", NpcKind.Guest, new Vector3(-6.3f, 0f, 22.5f), -120f, outfits[n++ % outfits.Length], skin, false);
-            Person("Chauffeur", NpcKind.Guest, new Vector3(23.5f, 0f, -1.5f), -90f, new Color(0.15f, 0.15f, 0.2f), skin, false);
+            Person("Chauffeur", NpcKind.Guest, new Vector3(19.5f, 0f, 11f), -90f, new Color(0.15f, 0.15f, 0.2f), skin, false);
             Person("Guest_Orchard_0", NpcKind.Guest, new Vector3(18f, 0f, -12f), 90f, outfits[n++ % outfits.Length], skin, false);
             Person("Guest_Orchard_1", NpcKind.Guest, new Vector3(19.2f, 0f, -12f), -90f, outfits[n++ % outfits.Length], skin, false);
 

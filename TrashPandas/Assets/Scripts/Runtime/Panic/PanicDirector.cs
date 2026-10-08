@@ -139,7 +139,7 @@ namespace TrashPandas.Runtime.Panic
             if (!_exitsPicked) PickExits();
             var suspicion = SuspicionDirector.Instance;
             if (Phase == RoundPhase.Infiltration && suspicion && suspicion.Caught) BeginPanic(suspicion);
-            else if (Phase == RoundPhase.Infiltration && suspicion && ArchRadius > 0f && suspicion.Coat)
+            else if (Phase == RoundPhase.Infiltration && suspicion && ArchRadius > 0f && suspicion.Coat && !Squad.GameMode.Raccoons)
             {
                 Vector3 d = suspicion.Coat.transform.position - ArchCenter;
                 d.y = 0f;
@@ -163,7 +163,15 @@ namespace TrashPandas.Runtime.Panic
             _outcome.Begin(_players, Time.time, TimeLimit);
             // The coat's pocket is shared out now; each raccoon only keeps its share if it escapes.
             var loot = TrashPandas.Runtime.Loot.LootDirector.Instance;
-            if (loot) Payout.SetShares(loot.Pocket.Split(_players));
+            if (loot && Squad.GameMode.Raccoons)
+            {
+                // v2: what reached the den is yours whatever happens now.
+                Payout.SharesAreSafe = true;
+                var delivered = new Dictionary<int, int>();
+                foreach (int p in _players) delivered[p] = loot.Ledger.Of(p);
+                Payout.SetShares(delivered);
+            }
+            else if (loot) Payout.SetShares(loot.Pocket.Split(_players));
 
             _chasers.Clear();
             

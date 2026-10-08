@@ -201,6 +201,14 @@ namespace TrashPandas.EditorTools
             director.LootSpots = s_lootSpots.ToArray();
             director.ObjectiveSpotIds = s_objectiveIds.ToArray();
             director.ObjectiveSpotPositions = s_objectivePositions.ToArray();
+            // The den (concept v2): a nest of rags by the catering van.
+            director.DenCenter = DenCenter;
+            var rags = Mat("Den", new Color(0.4f, 0.3f, 0.2f));
+            var grateMat = Mat("Grate", new Color(0.2f, 0.2f, 0.22f));
+            Visual(PrimitiveType.Cylinder, "Manhole", null, TrashPandas.Runtime.Squad.GameMode.Manhole + Vector3.up * 0.012f, new Vector3(1f, 0.01f, 1f), grateMat);
+            Visual(PrimitiveType.Cylinder, "Den", null, DenCenter + Vector3.up * 0.01f, new Vector3(3f, 0.01f, 3f), rags);
         }
+
+        public static readonly Vector3 DenCenter = new Vector3(23.4f, 0f, -1.2f);
     }
 }
