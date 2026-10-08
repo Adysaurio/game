@@ -75,6 +75,7 @@ namespace TrashPandas.Runtime.Net
             if (Bot == "heavyonline") return TrashPandas.Runtime.Squad.SquadBots.OnlineHeavyMove(r);
             return null;
         }
+        public static bool TowerHop => Array.IndexOf(Args, "-hopoff") >= 0;
         public static bool SquadRun => (Bot == "noisy" && Time.timeSinceLevelLoad > 4f) || (Bot == "towerhost" && Time.timeSinceLevelLoad > 24f);
         static bool s_noisyPlaced;
         /// <summary>Dev: -nointro, and the bots that test specific mechanics skip the intro.</summary>

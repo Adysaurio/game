@@ -97,14 +97,16 @@ namespace TrashPandas.Runtime.Squad
                 rider.DroppedFromAbove = true;
             }
             for (int i = 2; i < squad.Count; i++) if (squad[i]) squad[i].SetInput(Vector2.zero, false, false, false);
-            rider.SetInput(Vector2.zero, false, false, false);
+            bool hop = Net.DevAutomation.TowerHop && t > 4f && !s_hopped && rider.Mount;
+            if (hop) s_hopped = true;
+            rider.SetInput(Vector2.zero, hop, hop, false);
             bool walk = t > 2.5f;
             bool run = t > 6f;
             bottom.SetInput(walk ? new Vector2(0f, -1f) : Vector2.zero, false, false, false, run);
             if (Time.frameCount % 30 == 0)
                 Debug.Log($"[TOWER] t={t:F1} bottom={bottom.transform.position:F2} rider={rider.transform.position:F2} mounted={(rider.Mount == bottom)} riders={bottom.RidersAbove}");
         }
-        static bool s_dropped;
+        static bool s_dropped, s_hopped;
 
         // --- Online bots (one per machine) ----------------------------------------------------------
         static bool s_towerDropped;

@@ -83,6 +83,7 @@ namespace TrashPandas.Runtime.Raccoon
             }
             if (!Core.Raccoons.TowerRules.CanMount(top.Bottom.CarryingHeavy, top.Frozen || top.Bottom.Frozen, top.TowerSize, IsCaught(top) || IsCaught(top.Bottom))) return false;
             Mount = top;
+            _hopOff = false;
             DroppedFromAbove = false;
             _cc.enabled = false;
             _planar = Vector3.zero;
@@ -153,7 +154,8 @@ namespace TrashPandas.Runtime.Raccoon
             _runHeld = runHeld;
             if (Frozen || IsStunned) { _move = Vector2.zero; _jumpHeld = false; return; }
             _move = worldMove;
-            if (jumpPressed) _jump.Press(Time.time);
+            if (jumpPressed && !ReferenceEquals(Mount, null)) _hopOff = true; // riding: the jump rule (grounded) doesn't apply
+            else if (jumpPressed) _jump.Press(Time.time);
             _jumpHeld = jumpHeld;
             _crouchHeld = crouchHeld;
         }
@@ -179,7 +181,7 @@ namespace TrashPandas.Runtime.Raccoon
                 if (!Mount || !Mount.gameObject.activeInHierarchy) { Dismount(Vector3.zero); return; }
                 transform.position = Mount.HeadTop;
                 if (_move.sqrMagnitude > 0.01f) transform.rotation = Quaternion.RotateTowards(transform.rotation, Quaternion.LookRotation(new Vector3(_move.x, 0f, _move.y)), TurnSpeed * dt);
-                if (_jump.TryConsume(Time.time)) { Dismount(transform.forward * 1.5f + Vector3.up * JumpVelocity); }
+                if (_hopOff) { _hopOff = false; Dismount(transform.forward * 1.5f + Vector3.up * JumpVelocity); }
                 return;
             }
             float height = _crouchHeld ? CrouchHeight : StandHeight;
@@ -234,6 +236,7 @@ namespace TrashPandas.Runtime.Raccoon
         [System.NonSerialized] public bool AutoMount = true;
 
         float _noMountUntil;
+        bool _hopOff;
         bool _jumpedSinceGrounded;
         /// <summary>Dev bots that place a raccoon above another one.</summary>
         [System.NonSerialized] public bool DroppedFromAbove;
