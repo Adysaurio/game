@@ -174,6 +174,8 @@ namespace TrashPandas.Runtime.Loot
                     if (running) panicNow.Payout.AddShare(carriers[k], value); // banked during the RUN: still safe
                 }
                 item.SetState(LootState.Stashed);
+                Ui.DebugChecklist.Mark("deliver");
+                if (item.IsObjective) Ui.DebugChecklist.Mark("objective");
                 _offline.Total = Ledger.Total;
                 if (item.IsObjective) _offline.ObjectivesDone |= (byte)(1 << (int)item.Objective);
                 _offline.StashSerial++;

@@ -166,6 +166,7 @@ namespace TrashPandas.EditorTools
             squad.CameraRig = rig;
             squad.Coat = body;
             new GameObject("GrabHighlight").AddComponent<TrashPandas.Runtime.Raccoon.GrabHighlight>();
+            new GameObject("DebugChecklist").AddComponent<TrashPandas.Runtime.Ui.DebugChecklist>();
             var intro = new GameObject("RoundIntro");
             intro.AddComponent<NetworkObject>();
             intro.AddComponent<TrashPandas.Runtime.Squad.RoundIntro>().CameraRig = rig;

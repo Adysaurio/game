@@ -201,7 +201,7 @@ namespace TrashPandas.Runtime.Raccoon
                 if (!Mount || !Mount.gameObject.activeInHierarchy) { Dismount(Vector3.zero); return; }
                 transform.position = Mount.HeadTop;
                 if (_move.sqrMagnitude > 0.01f) transform.rotation = Quaternion.RotateTowards(transform.rotation, Quaternion.LookRotation(new Vector3(_move.x, 0f, _move.y)), TurnSpeed * dt);
-                if (_hopOff) { _hopOff = false; Dismount(transform.forward * 1.5f + Vector3.up * JumpVelocity); }
+                if (_hopOff) { _hopOff = false; Dismount(transform.forward * 1.5f + Vector3.up * JumpVelocity); Ui.DebugChecklist.Mark("hopoff"); }
                 return;
             }
             float height = _crouchHeld ? CrouchHeight : StandHeight;

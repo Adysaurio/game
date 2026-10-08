@@ -78,6 +78,7 @@ namespace TrashPandas.Runtime.Squad
             if (!raccoon || !_carry.ContainsKey(raccoon.PlayerId)) return;
             var g = _items[_carry[raccoon.PlayerId]];
             if (g.RequiresBothHands) { Drop(raccoon.PlayerId, Vector3.zero); return; } // you can't throw the cake
+            Ui.DebugChecklist.Mark("throw");
             var impact = g.GetComponent<ImpactNoise>();
             if (impact) impact.ThrownUntil = Time.time + 2f;
             Drop(raccoon.PlayerId, direction.normalized * Mathf.Lerp(3f, 10f, strength) + Vector3.up * 2.5f);

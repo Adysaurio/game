@@ -69,7 +69,7 @@ namespace TrashPandas.Runtime.Squad
             RoundIntro.Finished += OnIntroFinished;
         }
 
-        void OnIntroFinished() => Activate(_active);
+        void OnIntroFinished() { Activate(_active); Ui.DebugChecklist.Mark("intro"); }
 
         /// <summary>Take over the next raccoon that isn't caught (and isn't <paramref name="except"/>). Returns its player id or -1.</summary>
         public int ActivateNextFree(int except)
@@ -99,7 +99,7 @@ namespace TrashPandas.Runtime.Squad
                 for (int k = 1; k <= _raccoons.Count; k++)
                 {
                     int i = (_active + k) % _raccoons.Count;
-                    if (_raccoons[i] && !_raccoons[i].Frozen) { Activate(i); break; }
+                    if (_raccoons[i] && !_raccoons[i].Frozen) { Activate(i); Ui.DebugChecklist.Mark("switch"); break; }
                 }
             }
             if (Net.DevAutomation.Bot == "heavy") { SquadBots.HeavyTick(_raccoons); return; }
@@ -111,6 +111,7 @@ namespace TrashPandas.Runtime.Squad
                 if (i != _active) { r.SetInput(Vector2.zero, false, false, false); continue; }
                 Vector2 move = (Net.DevAutomation.Bot == "rescue" ? SquadBots.RescueMove(r) : null) ?? Net.DevAutomation.SquadMove(r) ?? _reader.CameraRelativeMove(CameraRig);
                 bool run = _reader.RunHeld || Net.DevAutomation.SquadRun;
+                if (_reader.JumpPressed) Ui.DebugChecklist.Mark("jump");
                 r.SetInput(move, _reader.JumpPressed, _reader.JumpHeld, _reader.CrouchHeld, run);
                 if (r.IsRunning && Time.time >= _nextRunNoise) { _nextRunNoise = Time.time + 0.5f; NoiseBus.Emit(NoiseKind.Running, r.transform.position); }
             }

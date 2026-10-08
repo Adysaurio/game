@@ -135,6 +135,7 @@ namespace TrashPandas.Runtime.Panic
                 if (snap.OutcomeOf(p) != PlayerOutcome.None)
                     stats.Add(new PlayerStats { Player = p, Loot = snap.LootOf(p), Hits = snap.TotalHitsOf(p), Rescues = snap.RescuesOf(p), Escaped = snap.OutcomeOf(p) == PlayerOutcome.Escaped, CaughtOrder = snap.CaughtOrderOf(p) });
             var awards = Awards.For(stats);
+            if (awards.Count > 0) DebugChecklist.Mark("awards");
             float ay = box.yMax + 8;
             foreach (var pair in awards)
             {

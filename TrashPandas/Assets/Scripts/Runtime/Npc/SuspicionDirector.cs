@@ -161,6 +161,7 @@ namespace TrashPandas.Runtime.Npc
                                 && !hit.collider.transform.IsChildOf(brain.Pawn.transform) && !hit.collider.GetComponentInParent<RaccoonController>();
                 if (!Core.Raccoons.NoiseModel.Hears(ear, at, radius, occluded)) continue;
                 brain.HeardNoise = at;
+                Ui.DebugChecklist.Mark("heard");
                 brain.HeardUntil = Time.time + 4f;
             }
         }

@@ -101,7 +101,7 @@ namespace TrashPandas.Runtime.Panic
         /// <summary>A thrown plate (or glass, or cake) hit a human: dazed for a moment.</summary>
         public void StunChaser(NpcPawn pawn, float seconds = -1f)
         {
-            foreach (var c in _chasers) if (c.Brain.Pawn == pawn) c.Mind.Stun(seconds > 0f ? seconds : ThrowStunSeconds);
+            foreach (var c in _chasers) if (c.Brain.Pawn == pawn) { c.Mind.Stun(seconds > 0f ? seconds : ThrowStunSeconds); Ui.DebugChecklist.Mark("daze"); }
         }
 
         public PlayerOutcome StatusOf(int player) => _outcome.StatusOf(player);
@@ -290,6 +290,7 @@ namespace TrashPandas.Runtime.Panic
                 {
                     r.CollapseTower(); // riders fall off here and keep playing
                     _outcome.MarkEscaped(p);
+                    Ui.DebugChecklist.Mark("escape");
                     TrashPandas.Runtime.Loot.LootDirector.Instance?.OnEscaped(p, Payout);
                     Payout.Escaped(p);
                     Remove(r);
@@ -368,6 +369,7 @@ namespace TrashPandas.Runtime.Panic
                         pawn.SetMood(o.State == PursuitState.Chase ? NpcPawn.MoodChasing : o.State == PursuitState.Search ? NpcPawn.MoodSearching : NpcPawn.MoodCalmAgain);
                         break;
                 }
+                if (c.Last == PursuitState.Chase && o.State == PursuitState.Search) Ui.DebugChecklist.Mark("lost"); // it lost sight of you
                 c.Last = o.State;
 
                 if (!o.Strike || !_grace.MayHit(now) || !_raccoonOf.TryGetValue(o.TargetId, out var target)) continue;
@@ -440,6 +442,7 @@ namespace TrashPandas.Runtime.Panic
             Vector3 at = CagePosition + new Vector3(-0.7f + (slot % 5) * 0.35f, 0.1f, 0f);
             r.CollapseTower();
             Freeze(r, at);
+            Ui.DebugChecklist.Mark("caged");
         }
 
         /// <summary>A free raccoon standing next to the cage for a moment opens it: everyone inside is back in the run.</summary>
@@ -464,6 +467,7 @@ namespace TrashPandas.Runtime.Panic
                 if (_outcome.StatusOf(p) != PlayerOutcome.Caught || !_outcome.Rescue(p)) continue;
                 _hits.Forget(p);
                 Payout.Rescued(p);
+                Ui.DebugChecklist.Mark("rescue");
                 if (_raccoonOf.TryGetValue(p, out var r)) Unfreeze(r);
             }
         }
