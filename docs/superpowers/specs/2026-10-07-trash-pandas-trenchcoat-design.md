@@ -266,3 +266,61 @@ Los sistemas se comunican por eventos (p. ej., `SuspicionSystem` escucha "puesto
 | Hueco del seto | 1 m de ancho × 0.5 m de alto | Los humanos no caben: es la ruta de escape segura |
 | Humanos | ~1.75 m (1.3 m sentados), radio 0.28 m | Línea de visión (ojos a ~1.6 m) y oclusión con mesas |
 | Velocidades | Señor 2.2 · mapache 4.4 · perseguidores 3.6 · gato en pánico 4.6 m/s | El balance de la persecución depende de las proporciones entre ellas |
+
+## 16. Etapa 3c-1: la boda grande (mapa con zonas, botín, objetivos y salidas al azar)
+
+> Agregado el 2026-10-07 tras el playtest del usuario: "no hay sistema de dificultad ni rejugabilidad… el mapa tiene que ser más grande y las salidas… no en lugares tan fáciles". Decisión: finca chica (~3× el jardín actual), partidas de 8–10 min. La dificultad y los NPC más listos (oído, memoria, cortar el paso) quedan para la 3c-2.
+
+### 16.1 El mapa (≈ 60 × 50 m)
+
+| Zona | Contenido | Por qué |
+|---|---|---|
+| **Entrada** (sur) | Arco de flores; es la **salida limpia** | Ganar sin RUN |
+| **Jardín de la ceremonia** (centro, el actual) | Mesas, invitados sentados y de pie, el pastel | Mucha gente y vista abierta: la zona más peligrosa |
+| **Carpa del catering / cocina** (oeste) | Meseros con ruta, comida, botellas | Botín medio, gente ocupada |
+| **Casa, planta baja** (norte) | Pasillo, sala con la **mesa de regalos**, baño | Botín caro, pocos testigos y pasillos estrechos. En la versión gris, la casa **no tiene techo**, para que la cámara no choque |
+| **Estacionamiento** (este) | La camioneta, coches y el chofer | Pocos testigos, pero el chofer vigila |
+| **Setos y huerto** (orillas) | Escondites y el hueco del seto | Rutas alternas |
+
+Los oradores de los eventos (la suegra, el mesero, el cura, la novia) y el gato se reparten por el mapa. El mesero recorre cocina → jardín → casa.
+
+### 16.2 Botín
+
+- **Objetos sueltos con valor** repartidos por zonas: carteras ($40), teléfonos ($60), cubiertos de plata ($15), botellas ($30), comida ($5). Unos **25 por ronda**, con posiciones al azar entre varios puntos posibles de cada zona.
+- **Guardar en la gabardina:** los brazos agarran el objeto y lo **acercan al pecho** ~0.5 s para meterlo en el **bolsillo de la gabardina** (botín compartido). Se oye y se ve "+$40".
+- **Mapache suelto:** carga **un** objeto en la boca. Si vuelve a la gabardina, el objeto pasa al bolsillo.
+- **En el RUN** el bolsillo se reparte en partes iguales entre los mapaches. Cada uno **cobra lo suyo solo si escapa**; si lo atrapan, lo pierde (y suelta lo que traía en la boca).
+- **Salida limpia:** si la gabardina sale por el arco de la entrada **con todos adentro**, todos cobran el bolsillo **×1.5**.
+
+### 16.3 Objetivos (3 por ronda)
+
+Cada ronda se sortean **3 objetivos** de esta lista, cada uno en uno de sus lugares posibles:
+
+| Objetivo | Valor | Detalle |
+|---|---|---|
+| El anillo de la novia | $300 | Lo trae la novia: hay que tomarlo durante su evento o cuando lo deja en su mesa |
+| El muñequito del pastel | $250 | Arriba del pastel: las piernas saltan y los brazos lo agarran |
+| El sobre más gordo | $200 | Mesa de regalos (casa) |
+| La botella de champán cara | $150 | Cocina o barra |
+| El ramo | $120 | Novia o mesa principal |
+| Las llaves de la camioneta | $100 | Chofer o tablero de la cocina |
+
+Un objetivo cuenta como cumplido cuando entra al bolsillo o cuando un mapache sale con él en la boca. El HUD muestra la lista con ✓.
+
+### 16.4 Salidas para el pánico (5 posibles, 3 abiertas)
+
+Puerta trasera de la cocina · ventana del baño (casa, hay que saltar) · camioneta del catering (estacionamiento) · hueco del seto del huerto (agachado) · alcantarilla detrás de la carpa.
+
+Cada ronda se abren **3 al azar, nunca dos de la misma zona**. Ninguna está a menos de **12 m del centro del jardín**. Siguen **ocultas hasta el RUN**, con su flecha flotante.
+
+### 16.5 Tiempo de la ronda
+
+La infiltración dura **8 min** (antes eran 4, pero el mapa creció). Al vencerse, la sospecha sube +10/s hasta forzar el RUN. El HUD muestra el reloj, y en el último minuto se pone rojo.
+
+### 16.6 Resultados
+
+La pantalla de resultados muestra, por jugador: escapó o lo atraparon, y su botín. Para el equipo: objetivos ✓/✗, si hubo salida limpia y el total. Por ahora el botín **no se guarda entre rondas** (la guarida es la etapa 5).
+
+### 16.7 Fuera de esta etapa
+
+Dificultad, NPC más listos (3c-2), guarida y progreso (5), arte, el chofer como orador de eventos, y la regla "el borracho no ve".

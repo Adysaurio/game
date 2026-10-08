@@ -71,6 +71,13 @@ namespace TrashPandas.Runtime.Input
             return new Vector2(world.x, world.z);
         }
 
+        bool _wasGrabOne, _latchedLeft;
+
+        /// <summary>Raccoon: left click picks up / spits out loot.</summary>
+        public bool MouthPressed(PlayerCameraRig rig) => M != null && M.leftButton.wasPressedThisFrame && !rig.CursorFreed;
+        /// <summary>Q is held this frame (HUD hint).</summary>
+        public bool StashHeld { get; private set; }
+
         public SlotInput ReadSlotInput(PlayerCameraRig rig, TrenchcoatBody body, float now)
         {
             if (JumpPressed) _lastJumpPressedAt = now;
@@ -84,9 +91,24 @@ namespace TrashPandas.Runtime.Input
                 GrabBoth = M != null && M.rightButton.isPressed && !rig.CursorFreed,
             };
 
+            // Q (hold) = put what you're carrying in the coat's pocket: the hand comes to the chest.
+            bool stash = Keyboard.current != null && Keyboard.current.qKey.isPressed && !rig.CursorFreed;
+            if (stash && !input.GrabBoth) input.GrabOne = true;
+
             ResolveAimPoint(rig, body, out input.AimPoint, out input.HasAimPoint);
-            input.PreferLeftHand = input.HasAimPoint &&
+            bool leftCloser = input.HasAimPoint &&
                 GrabTargeting.LeftHandCloser(input.AimPoint, body.ShoulderWorld(true), body.ShoulderWorld(false));
+            // The hand is chosen when you press and stays while you hold: sweeping the crosshair across the body
+            // must not switch hands (that dropped whatever you were carrying).
+            if (input.GrabOne && !_wasGrabOne) _latchedLeft = leftCloser;
+            input.PreferLeftHand = input.GrabOne ? _latchedLeft : leftCloser;
+            _wasGrabOne = input.GrabOne;
+            if (stash)
+            {
+                input.AimPoint = body.ChestWorld + body.transform.forward * 0.15f;
+                input.HasAimPoint = true;
+            }
+            StashHeld = stash;
             return input;
         }
 
@@ -131,7 +153,7 @@ namespace TrashPandas.Runtime.Input
             bool legs = (parts & BodyPart.Legs) != 0, arms = (parts & BodyPart.Arms) != 0, head = (parts & BodyPart.Head) != 0;
             var hint = "Mouse: camera   ";
             if (legs) hint += "WASD walk (camera-relative) · Space jump · Ctrl crouch   ";
-            if (arms) hint += "Aim with the crosshair · hold Left click: grab (closest hand) · Right click: both hands (big things) · release to throw   ";
+            if (arms) hint += "Aim with the crosshair · hold Left click: grab · Right click: both hands (big things) · release to throw · hold Q: put it in the pocket   ";
             if (head) hint += "Head looks where you look";
             return hint;
         }

@@ -25,11 +25,18 @@ namespace TrashPandas.Runtime.Net
         /// "hopgap" crouching through the hedge gap where humans can't follow.</summary>
         public static Vector2? FleeMove(Vector3 from)
         {
-            if (Bot != "hopflee" && Bot != "flee" && Bot != "hopgap") return null;
+            if (Bot != "hopflee" && Bot != "flee" && Bot != "hopgap" && Bot != "mouthflee" && Bot != "stashflee") return null;
             var pd = TrashPandas.Runtime.Panic.PanicDirector.Instance;
-            if (!pd || pd.Phase != TrashPandas.Runtime.Panic.RoundPhase.Panic || pd.Exits.Length < 2) return null;
-            Vector3 exit = Bot == "hopgap" ? pd.Exits[0] : pd.Exits[1];
-            if (Bot == "hopgap" && from.z > -7f) exit = new Vector3(0f, 0f, -7f); // line up with the gap first
+            if (!pd || pd.Phase != TrashPandas.Runtime.Panic.RoundPhase.Panic) return null;
+            if (Bot == "mouthflee" && !s_mouthTaken)
+            {
+                var loot = NearestLoot(from);
+                if (loot.HasValue) { var tl = loot.Value - from; return new Vector2(tl.x, tl.z).normalized; }
+            }
+            var open = pd.OpenExitPositions;
+            if (open.Count == 0) return null;
+            Vector3 exit = open[0];
+            foreach (var e in open) if (Vector3.Distance(e, from) < Vector3.Distance(exit, from)) exit = e;
             Vector3 to = exit - from;
             return new Vector2(to.x, to.z).normalized;
         }
@@ -50,6 +57,31 @@ namespace TrashPandas.Runtime.Net
         }
 
         public static bool FleeCrouchAt(Vector3 pos) => Bot == "hopgap" && FleeActive && pos.z < -6.3f;
+
+        static bool s_mouthTaken;
+
+        /// <summary>"mouthflee": in the panic, grab the nearest loot with the mouth, then run for an exit.</summary>
+        public static bool MouthBot(Vector3 raccoonPos)
+        {
+            if (Bot != "mouthflee" || s_mouthTaken || !FleeActive) return false;
+            var loot = NearestLoot(raccoonPos);
+            if (!loot.HasValue || Vector3.Distance(loot.Value, raccoonPos + Vector3.up * 0.3f) > 0.7f) return false;
+            s_mouthTaken = true;
+            Debug.Log($"[BOT] mouth click at {raccoonPos} loot {loot.Value}");
+            return true;
+        }
+
+        static Vector3? NearestLoot(Vector3 from)
+        {
+            var ld = TrashPandas.Runtime.Loot.LootDirector.Instance;
+            if (!ld) return null;
+            Vector3? best = null;
+            foreach (var item in ld.Items)
+                if (item && item.State == TrashPandas.Runtime.Loot.LootState.Active && !item.Grabbable.IsHeld && item.transform.position.y < 0.3f
+                    && (!best.HasValue || Vector3.Distance(item.transform.position, from) < Vector3.Distance(best.Value, from)))
+                    best = item.transform.position;
+            return best;
+        }
         static bool FleeActive
         {
             get
@@ -89,6 +121,18 @@ namespace TrashPandas.Runtime.Net
             int.TryParse(Value("-autostart"), out _autoStart);
             if (float.TryParse(Value("-quitafter"), System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out float q)) _quitAt = q;
             _telemetry = Args.Contains("-telemetry");
+            int td = Array.IndexOf(Args, "-topdown");
+            if (td >= 0)
+            {
+                // Dev: an orthographic bird's-eye camera over the whole estate (drawn on top of the game camera).
+                var cam = new GameObject("TopDownCamera").AddComponent<Camera>();
+                cam.orthographic = true;
+                cam.orthographicSize = td + 1 < Args.Length && float.TryParse(Args[td + 1], out var size) ? size : 31f;
+                cam.transform.SetPositionAndRotation(new Vector3(0f, 80f, 2f), Quaternion.Euler(90f, 0f, 0f));
+                cam.depth = 100;
+                cam.farClipPlane = 200f;
+                DontDestroyOnLoad(cam.gameObject);
+            }
             int s = Array.IndexOf(Args, "-shot");
             if (s >= 0 && s + 2 < Args.Length && float.TryParse(Args[s + 1], System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out float at))
             { _shotAt = at; _shotPath = Args[s + 2]; }
@@ -163,6 +207,21 @@ namespace TrashPandas.Runtime.Net
             if (ed) { var es = ed.Snapshot; panic += $" event={ed.Phase}#{es.Serial}:{ed.Current.Speaker} t={es.SecondsLeft:F1} result={es.ResultDelta:F0}[{es.HeadOutcome}{es.ArmsOutcome}{es.LegsOutcome}] tasks={ed.Current.Arms}/{ed.Current.Legs}"; }
             var rig = UnityEngine.Object.FindFirstObjectByType<TrashPandas.Runtime.Cameras.PlayerCameraRig>();
             if (rig) panic += $" cam={(rig.VirtualCamera.Follow ? rig.VirtualCamera.Follow.name : "-")}{(rig.InConversation ? "(talk)" : "")}";
+            var ld = TrashPandas.Runtime.Loot.LootDirector.Instance;
+            var pdx = TrashPandas.Runtime.Panic.PanicDirector.Instance;
+            if (pdx) panic += $" P0loot=${pdx.Snapshot.LootOf(0)} clean={pdx.Snapshot.CleanExit} openExits={string.Join(",", pdx.OpenExitPositions)}";
+            var mine = NetworkedRaccoon.LocalOwned;
+            if (ld && mine)
+            {
+                int carried = ld.Snapshot.MouthItemOf(mine.Controller.PlayerId);
+                if (carried >= 0 && carried < ld.Items.Count)
+                {
+                    var it = ld.Items[carried];
+                    var col = it.GetComponent<Collider>();
+                    panic += $" mouthGap={Vector3.Distance(it.transform.position, mine.transform.position + mine.transform.forward * 0.28f + Vector3.up * 0.32f):F2} mouthCollider={(col && col.enabled)}";
+                }
+            }
+            if (ld) { var ls = ld.Snapshot; panic += $" mouth0={ls.MouthItemOf(0)} pocket=${ls.Total} objectives={ls.ObjectivesPicked:X2}/{ls.ObjectivesDone:X2} clock={ls.SecondsLeft:F0}"; }
             return panic + $" suspicion={d.Suspicion:F1} caught={d.Caught} curious={curious} alarmed={alarmed} cat={cat} frame[missing={f.MissingParts} seen={f.CoatWitnessed} weird={f.SeenWeirdness:F2} hiss={f.CatHissing}] dt={Time.deltaTime:F3}";
         }
 

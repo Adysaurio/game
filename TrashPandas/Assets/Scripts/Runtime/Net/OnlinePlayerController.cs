@@ -60,7 +60,7 @@ namespace TrashPandas.Runtime.Net
                 if (Time.time - _caughtAt > 1.5f && pd && pd.Overview && !_spectating) { _spectating = true; CameraRig.SetTarget(pd.Overview, 16f, 0f); }
                 return;
             }
-            if ((DevAutomation.Bot == "hop" || DevAutomation.Bot == "hopflee" || DevAutomation.Bot == "hopgap") && slot.HasValue && Time.realtimeSinceStartup > _botHopAt) { _botHopAt = float.MaxValue; _coat.RequestLeaveRpc(); }
+            if ((DevAutomation.Bot == "hop" || DevAutomation.Bot == "hopflee" || DevAutomation.Bot == "hopgap" || DevAutomation.Bot == "mouthflee") && slot.HasValue && Time.realtimeSinceStartup > _botHopAt) { _botHopAt = float.MaxValue; _coat.RequestLeaveRpc(); }
             if (_reader.TogglePressed)
             {
                 if (slot.HasValue) _coat.RequestLeaveRpc();
@@ -76,8 +76,9 @@ namespace TrashPandas.Runtime.Net
                     CameraRig.SetTarget(raccoon.transform, RaccoonCameraRadius, RaccoonLookHeight);
                 }
                 var move = DevAutomation.FleeMove(raccoon.transform.position)
-                    ?? (DevAutomation.Bot == "hopflee" ? new Vector2(0f, 1f) : _reader.CameraRelativeMove(CameraRig)); // dev bots
+                    ?? (DevAutomation.Bot == "hopflee" || DevAutomation.Bot == "mouthflee" ? new Vector2(0f, 1f) : _reader.CameraRelativeMove(CameraRig)); // dev bots
                 raccoon.Controller.SetInput(move, _reader.JumpPressed, _reader.JumpHeld, _reader.CrouchHeld || DevAutomation.FleeCrouchAt(raccoon.transform.position));
+                if (_reader.MouthPressed(CameraRig) || DevAutomation.MouthBot(raccoon.transform.position)) raccoon.MouthRpc(raccoon.transform.position);
                 return;
             }
             if (_cameraOnRaccoon) { _cameraOnRaccoon = null; _armsCamera = null; }
@@ -155,7 +156,7 @@ namespace TrashPandas.Runtime.Net
             }
             int? mine = snapshot.SlotOfClient(nm.LocalClientId);
             string hint = mine.HasValue ? DebugInputReader.HintFor(snapshot.PartsOf(mine.Value)) + "   E: hop out"
-                        : NetworkedRaccoon.LocalOwned ? "RACCOON  Mouse camera · WASD run · Space jump · Ctrl crouch · E next to the coat: hop back in"
+                        : NetworkedRaccoon.LocalOwned ? "RACCOON  Mouse camera · WASD run · Space jump · Ctrl crouch · Click: grab loot with your mouth · E next to the coat: hop back in"
                         : "Waiting for a seat…";
             string room = SessionHost.Instance && !string.IsNullOrEmpty(SessionHost.Instance.RoomCode) ? $"Room {SessionHost.Instance.RoomCode} · " : "";
             var lines = new[] { $"{room}ONLINE · {(nm.IsHost ? "host" : "client")}   {seats}", hint + "   F10: leave" };

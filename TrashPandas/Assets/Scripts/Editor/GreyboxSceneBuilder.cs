@@ -18,7 +18,7 @@ using UnityEngine;
 namespace TrashPandas.EditorTools
 {
     /// <summary>Builds the greybox test scene deterministically. Safe to re-run.</summary>
-    public static class GreyboxSceneBuilder
+    public static partial class GreyboxSceneBuilder
     {
         const string ScenePath = "Assets/Scenes/Greybox_Trenchcoat.unity";
         const string MenuScenePath = "Assets/Scenes/Menu.unity";
@@ -83,7 +83,6 @@ namespace TrashPandas.EditorTools
             var pants = Mat("Pants", new Color(0.25f, 0.27f, 0.35f));
             var glass = Mat("Glass", new Color(0.7f, 0.85f, 1f));
             var plate = Mat("Plate", new Color(0.97f, 0.97f, 0.95f));
-            var wallet = Mat("Wallet", new Color(0.35f, 0.2f, 0.12f));
             var cake = Mat("Cake", new Color(1f, 0.92f, 0.8f));
 
             var raccoonPrefab = BuildRaccoonPrefab(fur);
@@ -95,7 +94,10 @@ namespace TrashPandas.EditorTools
             light.transform.rotation = Quaternion.Euler(45f, -30f, 0f);
             light.intensity = 1.2f;
 
-            Box("Ground", new Vector3(0f, -0.5f, 0f), new Vector3(40f, 1f, 40f), grass);
+            Box("Ground", new Vector3(0f, -0.5f, 2f), new Vector3(64f, 1f, 58f), grass);
+            s_lootSpots.Clear();
+            s_objectiveIds.Clear();
+            s_objectivePositions.Clear();
 
             // Tables: the coat can't fit under them; a crouched raccoon can (gap 0.75 m, raccoon crouch 0.3 m).
             for (int i = 0; i < 6; i++)
@@ -110,14 +112,19 @@ namespace TrashPandas.EditorTools
 
             // Things to grab: glasses, plates and wallets on every table; a two-hand cake on the far middle table.
             const float tableTop = 0.85f;
+
             for (int i = 0; i < 6; i++)
             {
                 var t = new Vector3(-6f + (i % 3) * 6f, 0f, 4f + (i / 3) * 5f);
                 Prop($"Glass_{i}a", PrimitiveType.Cylinder, t + new Vector3(-0.6f, tableTop + 0.1f, -0.35f), new Vector3(0.08f, 0.1f, 0.08f), glass, 0.2f, false);
                 Prop($"Glass_{i}b", PrimitiveType.Cylinder, t + new Vector3(0.5f, tableTop + 0.1f, -0.4f), new Vector3(0.08f, 0.1f, 0.08f), glass, 0.2f, false);
                 Prop($"Plate_{i}", PrimitiveType.Cylinder, t + new Vector3(0f, tableTop + 0.02f, -0.3f), new Vector3(0.28f, 0.015f, 0.28f), plate, 0.4f, false);
-                Prop($"Wallet_{i}", PrimitiveType.Cube, t + new Vector3(0.75f, tableTop + 0.03f, 0.2f), new Vector3(0.2f, 0.05f, 0.12f), wallet, 0.3f, false);
+                // Loot sits near the table ends, within reach of a coat standing beside it.
+                Spot(t + new Vector3(-0.8f, tableTop + 0.03f, -0.2f));
+                Spot(t + new Vector3(0.8f, tableTop + 0.03f, 0.2f));
             }
+            BuildEstate(wood, hedge);
+            BuildLoot();
             var cakeGo = Prop("Cake", PrimitiveType.Cylinder, new Vector3(0f, tableTop + 0.2f, 8.6f), new Vector3(0.5f, 0.2f, 0.5f), cake, 3f, true);
             Visual(PrimitiveType.Cylinder, "Tier2", cakeGo.transform, new Vector3(0f, 1.4f, 0f), new Vector3(0.65f, 0.6f, 0.65f), cake);
 
@@ -182,9 +189,6 @@ namespace TrashPandas.EditorTools
         /// the NavMesh surface, and the suspicion director + HUD (stage 3a).</summary>
         static void BuildWeddingPeople(TrenchcoatBody coat, Material skin)
         {
-            var tent = Mat("Tent", new Color(0.95f, 0.95f, 0.98f));
-            Box("CateringTent", new Vector3(-13f, 1.5f, 12f), new Vector3(4f, 3f, 3f), tent);
-
             var nav = new GameObject("Navigation").AddComponent<NavMeshSurface>();
             nav.collectObjects = CollectObjects.All;
             nav.useGeometry = NavMeshCollectGeometry.PhysicsColliders;
@@ -210,20 +214,33 @@ namespace TrashPandas.EditorTools
             // Social-event speakers (stage 3b). They're guests too: they see and react like everyone else.
             Person("MotherInLaw", NpcKind.Guest, new Vector3(-3f, 0f, 13f), 180f, new Color(0.55f, 0.3f, 0.65f), skin, false).SpeakerId = "MotherInLaw";
             Person("Priest", NpcKind.Guest, new Vector3(8f, 0f, 13f), 200f, new Color(0.08f, 0.08f, 0.1f), skin, false).SpeakerId = "Priest";
-            Person("Bride", NpcKind.Guest, new Vector3(12f, 0f, 4f), 250f, new Color(0.98f, 0.97f, 0.95f), skin, false).SpeakerId = "Bride";
+            Person("Bride", NpcKind.Guest, new Vector3(2.6f, 0f, 14.2f), 180f, new Color(0.98f, 0.97f, 0.95f), skin, false).SpeakerId = "Bride";
 
-            var waiter = Person("Waiter", NpcKind.Waiter, new Vector3(-12f, 0f, 9.5f), 0f, new Color(0.12f, 0.12f, 0.14f), skin, false);
+            // The rest of the estate (stage 3c-1): cooks, guests in the house, the chauffeur, a couple in the orchard.
+            Person("Cook_0", NpcKind.Guest, new Vector3(-20f, 0f, 10.5f), 90f, new Color(0.95f, 0.95f, 0.95f), skin, false);
+            Person("Cook_1", NpcKind.Guest, new Vector3(-16.5f, 0f, 4.5f), -60f, new Color(0.95f, 0.95f, 0.95f), skin, false);
+            Person("Guest_House_0", NpcKind.Guest, new Vector3(-7.5f, 0f, 21.5f), 90f, outfits[n++ % outfits.Length], skin, false);
+            Person("Guest_House_1", NpcKind.Guest, new Vector3(-6.3f, 0f, 22.5f), -120f, outfits[n++ % outfits.Length], skin, false);
+            Person("Chauffeur", NpcKind.Guest, new Vector3(23.5f, 0f, -1.5f), -90f, new Color(0.15f, 0.15f, 0.2f), skin, false);
+            Person("Guest_Orchard_0", NpcKind.Guest, new Vector3(18f, 0f, -12f), 90f, outfits[n++ % outfits.Length], skin, false);
+            Person("Guest_Orchard_1", NpcKind.Guest, new Vector3(19.2f, 0f, -12f), -90f, outfits[n++ % outfits.Length], skin, false);
+
+            var waiter = Person("Waiter", NpcKind.Waiter, new Vector3(-17f, 0f, 9.5f), 0f, new Color(0.12f, 0.12f, 0.14f), skin, false);
             waiter.SpeakerId = "Waiter";
+            // Kitchen → garden → the house → back through the garden.
             waiter.gameObject.AddComponent<NpcRoute>().Points = new[]
             {
-                new Vector3(-12f, 0f, 9.5f), new Vector3(-6f, 0f, 6.8f), new Vector3(0f, 0f, 6.8f), new Vector3(6f, 0f, 6.8f),
+                new Vector3(-17f, 0f, 9.5f), new Vector3(-6f, 0f, 6.8f), new Vector3(0f, 0f, 6.8f), new Vector3(6f, 0f, 6.8f),
+                new Vector3(3f, 0f, 16.5f), new Vector3(0f, 0f, 19.5f), new Vector3(-4f, 0f, 22.5f), new Vector3(0f, 0f, 16.5f),
                 new Vector3(6f, 0f, 1.8f), new Vector3(0f, 0f, 1.8f), new Vector3(-6f, 0f, 1.8f),
             };
 
             var cat = Person("Cat", NpcKind.Cat, new Vector3(4f, 0f, -4f), 0f, new Color(0.98f, 0.98f, 0.98f), skin, false);
             cat.gameObject.AddComponent<NpcRoute>().Points = new[]
             {
-                new Vector3(4f, 0f, -4f), new Vector3(9f, 0f, 1f), new Vector3(3f, 0f, 11.5f), new Vector3(-9f, 0f, 11.5f), new Vector3(-9f, 0f, 0f),
+                new Vector3(4f, 0f, -4f), new Vector3(18f, 0f, 0f), new Vector3(9f, 0f, 1f), new Vector3(3f, 0f, 11.5f), new Vector3(0f, 0f, 16.5f),
+                new Vector3(-3f, 0f, 22f), new Vector3(0f, 0f, 16.5f), new Vector3(-9f, 0f, 11.5f), new Vector3(-17f, 0f, 6f), new Vector3(-9f, 0f, 0f),
+                new Vector3(18f, 0f, -17f),
             };
 
             var director = new GameObject("SuspicionDirector");
@@ -250,13 +267,13 @@ namespace TrashPandas.EditorTools
 
             for (int i = 0; i < 3; i++)
             {
-                var broom = Weapon($"Broom_{i}", WeaponKind.Broom, new Vector3(-11f + i * 0.6f, 0.6f, 10f));
+                var broom = Weapon($"Broom_{i}", WeaponKind.Broom, i < 2 ? new Vector3(-14.8f, 0.6f, 3f + i * 0.6f) : new Vector3(-9f, 0.6f, 19f));
                 Visual(PrimitiveType.Cylinder, "Stick", broom.transform, new Vector3(0f, 0.6f, 0f), new Vector3(0.05f, 0.6f, 0.05f), wood);
                 Visual(PrimitiveType.Cube, "Bristles", broom.transform, new Vector3(0f, 1.25f, 0f), new Vector3(0.3f, 0.2f, 0.08f), straw);
             }
             for (int i = 0; i < 2; i++)
             {
-                var pan = Weapon($"Pan_{i}", WeaponKind.Pan, new Vector3(-14f + i * 1f, 0.1f, 10.2f));
+                var pan = Weapon($"Pan_{i}", WeaponKind.Pan, new Vector3(-21.5f + i * 1f, 0.1f, 10f));
                 Visual(PrimitiveType.Cylinder, "Pan", pan.transform, new Vector3(0f, 0.55f, 0f), new Vector3(0.35f, 0.02f, 0.35f), metal);
                 Visual(PrimitiveType.Cylinder, "Handle", pan.transform, new Vector3(0f, 0.25f, 0f), new Vector3(0.04f, 0.25f, 0.04f), metal);
             }
@@ -267,20 +284,19 @@ namespace TrashPandas.EditorTools
                 Visual(PrimitiveType.Cube, "Seat", chair.transform, new Vector3(0f, 0.45f, 0f), new Vector3(0.45f, 0.06f, 0.45f), chairMat);
                 Visual(PrimitiveType.Cube, "Back", chair.transform, new Vector3(0f, 0.75f, -0.2f), new Vector3(0.45f, 0.6f, 0.05f), chairMat);
             }
-            var tray = Weapon("Tray", WeaponKind.Tray, new Vector3(-12.5f, 0.05f, 8.8f));
+            var tray = Weapon("Tray", WeaponKind.Tray, new Vector3(-16f, 0.05f, 8.8f));
             Visual(PrimitiveType.Cylinder, "Tray", tray.transform, new Vector3(0f, 0.4f, 0f), new Vector3(0.45f, 0.015f, 0.45f), silver);
 
-            // Exits: hedge gap (crouch through), sewer grate, the catering van, the fountain.
+            // Five possible exits (spec §16.4), three open per round, one per zone at most:
+            // kitchen back door + sewer (kitchen), bathroom window (house), the van (parking), the orchard gap.
             var gold = Mat("Exit", new Color(1f, 0.82f, 0.2f));
-            var grate = Mat("Grate", new Color(0.2f, 0.2f, 0.22f));
-            var van = Mat("Van", new Color(0.92f, 0.92f, 0.95f));
-            var water = Mat("Water", new Color(0.45f, 0.7f, 0.95f));
-            Box("CateringVan", new Vector3(-17.5f, 1.1f, 14f), new Vector3(2.4f, 2.2f, 4.6f), van);
-            var fountain = Visual(PrimitiveType.Cylinder, "Fountain", null, new Vector3(16f, 0.35f, 8f), new Vector3(3f, 0.35f, 3f), water);
-            fountain.gameObject.AddComponent<BoxCollider>();
-            Visual(PrimitiveType.Cylinder, "SewerGrate", null, new Vector3(-15f, 0.01f, -5f), new Vector3(1.2f, 0.01f, 1.2f), grate);
-            var exits = new[] { new Vector3(0f, 0f, -9.6f), new Vector3(-15f, 0f, -5f), new Vector3(-15.6f, 0f, 14f), new Vector3(14f, 0f, 8f) };
-            var names = new[] { "Hedge gap (crouch!)", "Sewer", "Catering van", "Fountain" };
+            var exits = new[]
+            {
+                new Vector3(-25.2f, 0f, 8.2f), new Vector3(-20f, 0f, -4f), new Vector3(7f, 0f, 29.6f),
+                new Vector3(23.8f, 0f, 2f), new Vector3(20f, 0f, -23.2f),
+            };
+            var names = new[] { "Kitchen back door", "Sewer", "Bathroom window (jump!)", "Catering van", "Orchard gap (crouch!)" };
+            var zones = new[] { 1, 1, 2, 3, 4 };
             var markers = new GameObject[exits.Length];
             for (int i = 0; i < exits.Length; i++)
             {
@@ -309,8 +325,13 @@ namespace TrashPandas.EditorTools
             pd.Exits = exits;
             pd.ExitNames = names;
             pd.ExitMarkers = markers;
+            pd.ExitZoneIds = zones;
+            pd.GardenCenter = GardenCenter;
+            pd.ArchCenter = ArchCenter;
+            pd.ArchRadius = 1.8f;
             pd.Overview = overview;
             new GameObject("PanicHud").AddComponent<PanicHud>();
+            new GameObject("LootHud").AddComponent<TrashPandas.Runtime.Loot.LootHud>();
         }
 
         static PanicWeapon Weapon(string name, WeaponKind kind, Vector3 position)
