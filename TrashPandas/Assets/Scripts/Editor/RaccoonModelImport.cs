@@ -11,11 +11,14 @@ namespace TrashPandas.EditorTools
     public sealed class RaccoonModelImport : AssetPostprocessor
     {
         public const string ModelPath = "Assets/Art/Raccoon/Raccoon.fbx";
-        static readonly string[] Loops = { "Idle", "Walk", "Sneak", "Crawl", "Run", "Push", "Hang", "Carry", "Dance" };
+        static readonly string[] Loops = { "Idle", "Walk", "Sneak", "Crawl", "Run", "Push", "Hang", "Carry", "Dance", "Search" };
+        /// <summary>Other Meshy characters (the nemeses) get the same treatment.</summary>
+        public const string CharactersDir = "Assets/Art/Characters/";
+        static bool Ours(string path) => path == ModelPath || (path.StartsWith(CharactersDir) && path.EndsWith(".fbx"));
 
         void OnPreprocessModel()
         {
-            if (assetPath != ModelPath) return;
+            if (!Ours(assetPath)) return;
             var mi = (ModelImporter)assetImporter;
             mi.animationType = ModelImporterAnimationType.Generic;
             mi.importAnimation = true;
@@ -26,7 +29,7 @@ namespace TrashPandas.EditorTools
 
         void OnPreprocessAnimation()
         {
-            if (assetPath != ModelPath) return;
+            if (!Ours(assetPath)) return;
             var mi = (ModelImporter)assetImporter;
             var clips = mi.defaultClipAnimations;
             foreach (var c in clips)

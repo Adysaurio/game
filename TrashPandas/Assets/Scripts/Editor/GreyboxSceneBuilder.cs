@@ -545,6 +545,25 @@ namespace TrashPandas.EditorTools
             Visual(PrimitiveType.Sphere, "Bun", gh, new Vector3(0f, 0.2f, -0.06f), Vector3.one * 0.15f, grey);
             Visual(PrimitiveType.Cube, "Glasses", gh, new Vector3(0f, 0.02f, 0.15f), new Vector3(0.24f, 0.05f, 0.02f), black);
 
+            // Real models (Meshy, rigged) in place of the greybox costumes, where they exist.
+            bool anyModel = false;
+            foreach (var (artName, costume) in new[] { ("Planner", planner), ("PestControl", pest), ("Granny", granny) })
+            {
+                var m = AttachCharacterModel(artName, costume, pawn);
+                if (!m) continue;
+                anyModel = true;
+                foreach (Transform c in costume) if (c != m.transform && c.name != "Beam") c.gameObject.SetActive(false);
+                var part = costume.GetComponent<TrashPandas.Runtime.Panic.CostumePart>();
+                if (part && part.Linked) foreach (Transform c in part.Linked.transform) c.gameObject.SetActive(false);
+            }
+            if (anyModel)
+            {
+                var body = root.Find("Body");
+                if (body) body.gameObject.SetActive(false);
+                foreach (Transform c in head) c.gameObject.SetActive(false);
+                foreach (Transform c in head) if (c.GetComponent<Renderer>()) c.gameObject.SetActive(false);
+            }
+
             var go = new GameObject("NemesisDirector");
             go.AddComponent<NetworkObject>();
             var nd = go.AddComponent<TrashPandas.Runtime.Panic.NemesisDirector>();
@@ -812,8 +831,8 @@ namespace TrashPandas.EditorTools
             var inst = (GameObject)Object.Instantiate(model, visual);
             inst.name = "Model";
             inst.transform.localPosition = Vector3.zero;
-            inst.transform.localRotation = Quaternion.Euler(0f, 180f, 0f); // the model faces -Z
             inst.transform.localScale = Vector3.one * RaccoonModelScale;
+            FaceForward(inst.transform);
             foreach (var smr in inst.GetComponentsInChildren<SkinnedMeshRenderer>())
             {
                 smr.sharedMaterial = mat;
@@ -851,6 +870,67 @@ namespace TrashPandas.EditorTools
                 skins[p] = m;
             }
             look.Skins = skins;
+        }
+
+        /// <summary>
+        /// A Meshy character from Assets/Art/Characters/&lt;name&gt;/&lt;name&gt;.fbx (+ &lt;name&gt;.png): URP material, one animator
+        /// state per clip, driven by NpcModelAnimator. Returns null when the art isn't there (greybox stays).
+        /// </summary>
+        static GameObject AttachCharacterModel(string name, Transform parent, NpcPawn pawn)
+        {
+            string dir = TrashPandas.EditorTools.RaccoonModelImport.CharactersDir + name;
+            string fbx = $"{dir}/{name}.fbx";
+            AssetDatabase.ImportAsset(fbx, ImportAssetOptions.ForceSynchronousImport);
+            var model = AssetDatabase.LoadAssetAtPath<GameObject>(fbx);
+            if (!model) return null;
+            AssetDatabase.ImportAsset($"{dir}/{name}.png", ImportAssetOptions.ForceSynchronousImport);
+            var tex = AssetDatabase.LoadAssetAtPath<Texture2D>($"{dir}/{name}.png");
+            string matPath = $"{dir}/{name}.mat";
+            var mat = AssetDatabase.LoadAssetAtPath<Material>(matPath);
+            if (!mat) { mat = new Material(Shader.Find("Universal Render Pipeline/Lit")); AssetDatabase.CreateAsset(mat, matPath); }
+            mat.SetTexture("_BaseMap", tex);
+            mat.SetColor("_BaseColor", Color.white);
+            mat.SetFloat("_Smoothness", 0.15f);
+            EditorUtility.SetDirty(mat);
+            string ctrlPath = $"{dir}/{name}.controller";
+            AssetDatabase.DeleteAsset(ctrlPath);
+            var ctrl = UnityEditor.Animations.AnimatorController.CreateAnimatorControllerAtPath(ctrlPath);
+            var sm = ctrl.layers[0].stateMachine;
+            foreach (var clip in AssetDatabase.LoadAllAssetsAtPath(fbx).OfType<AnimationClip>().Where(c => !c.name.StartsWith("__preview__")))
+            {
+                var st = sm.AddState(clip.name);
+                st.motion = clip;
+                if (clip.name == "Idle") sm.defaultState = st;
+            }
+            var inst = (GameObject)Object.Instantiate(model, parent);
+            inst.name = "Model";
+            inst.transform.localPosition = Vector3.zero;
+            inst.transform.localScale = Vector3.one;
+            FaceForward(inst.transform);
+            foreach (var smr in inst.GetComponentsInChildren<SkinnedMeshRenderer>()) { smr.sharedMaterial = mat; smr.updateWhenOffscreen = true; }
+            var anim = inst.GetComponent<Animator>();
+            if (!anim) anim = inst.AddComponent<Animator>();
+            anim.runtimeAnimatorController = ctrl;
+            anim.applyRootMotion = false;
+            anim.cullingMode = AnimatorCullingMode.AlwaysAnimate;
+            inst.AddComponent<TrashPandas.Runtime.Npc.NpcModelAnimator>().Pawn = pawn;
+            return inst;
+        }
+
+        /// <summary>Turn a Meshy model so it looks along its parent's +Z (from the Head → headfront bones; models come axis-aligned).</summary>
+        static void FaceForward(Transform model)
+        {
+            model.localRotation = Quaternion.identity;
+            var bones = model.GetComponentsInChildren<Transform>();
+            var head = bones.FirstOrDefault(b => b.name == "Head");
+            var front = bones.FirstOrDefault(b => b.name == "headfront");
+            if (!head || !front || !model.parent) return;
+            Vector3 f = model.parent.InverseTransformDirection(front.position - head.position);
+            f.y = 0f;
+            if (f.sqrMagnitude < 1e-8f) return;
+            float yaw = Mathf.Round(Vector3.SignedAngle(f.normalized, Vector3.forward, Vector3.up) / 90f) * 90f;
+            model.localRotation = Quaternion.Euler(0f, yaw, 0f);
+            Debug.Log($"[GreyboxSceneBuilder] {model.parent.name}/{model.name} faces forward after a {yaw:F0}° turn");
         }
 
         static GameObject Prop(string name, PrimitiveType type, Vector3 position, Vector3 scale, Material mat, float mass, bool bothHands)

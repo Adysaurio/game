@@ -1,12 +1,14 @@
 """
-Blender (headless): merge the Meshy raccoon (rigged GLB) and its animation GLBs into one FBX for Unity.
-  blender -b --python tools/raccoon_to_fbx.py -- <art dir> <out fbx> <out texture png>
+Blender (headless): merge a Meshy character (rigged GLB) and its animation GLBs into one FBX for Unity.
+  blender -b --python tools/raccoon_to_fbx.py -- <art dir> <out fbx> <out texture png> [base glb name]
 Each art/raccoon/anim_<Name>.glb holds one clip on the same skeleton. Clips are renamed to <Name>,
 made in-place (no horizontal hips travel), and "Crawl" is the backward crawl played in reverse.
 """
 import bpy, sys, os, glob
 
-art, out_fbx, out_tex = sys.argv[-3:]
+args = sys.argv[sys.argv.index("--") + 1:]
+art, out_fbx, out_tex = args[:3]
+base_name = args[3] if len(args) > 3 else "raccoon_rigged.glb"
 bpy.ops.wm.read_factory_settings(use_empty=True)
 
 def import_glb(path):
@@ -14,7 +16,7 @@ def import_glb(path):
     bpy.ops.import_scene.gltf(filepath=path)
     return [o for o in bpy.data.objects if o not in before]
 
-base = import_glb(os.path.join(art, "raccoon_rigged.glb"))
+base = import_glb(os.path.join(art, base_name))
 for o in list(base):
     if o.name.startswith("Icosphere"):
         bpy.data.objects.remove(o)

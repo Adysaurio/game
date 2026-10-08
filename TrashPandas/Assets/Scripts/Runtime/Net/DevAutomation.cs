@@ -396,6 +396,15 @@ namespace TrashPandas.Runtime.Net
             var sqg = TrashPandas.Runtime.Squad.SquadController.Instance;
             var lookx = sqg && sqg.Active ? sqg.Active.GetComponent<TrashPandas.Runtime.Raccoon.RaccoonLook>() : null;
             if (lookx) panic += $" clip={lookx.CurrentClip} lean={lookx.Lean:F0} running={sqg.Active.IsRunning}";
+            if (lookx && lookx.Model)
+            {
+                // Is the model's face pointing where the raccoon walks? (0° = yes)
+                Transform hb = null, fb = null;
+                foreach (var t in lookx.Model.GetComponentsInChildren<Transform>()) { if (t.name == "Head") hb = t; if (t.name == "headfront") fb = t; }
+                var cc = sqg.Active.GetComponent<CharacterController>();
+                Vector3 vel = cc ? cc.velocity : Vector3.zero; vel.y = 0f;
+                if (hb && fb && vel.magnitude > 0.5f) { Vector3 face = fb.position - hb.position; face.y = 0f; panic += $" faceVsMove={Vector3.Angle(face, vel):F0}"; }
+            }
             int occupied = 0;
             var who = ""; foreach (var h in TrashPandas.Runtime.Squad.Hideout.All) if (h && h.Occupant) { occupied++; who += h.Occupant.PlayerId; }
             panic += $" occupied={occupied}:{who}";

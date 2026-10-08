@@ -25,3 +25,5 @@
 # Meshy/Higgsfield source downloads (re-downloadable; tools/raccoon_to_fbx.py builds Assets/Art/Raccoon from them)
 art/raccoon/*.glb
 art/raccoon/preview*.png
+art/nemesis/**/*.glb
+art/nemesis/*.png
