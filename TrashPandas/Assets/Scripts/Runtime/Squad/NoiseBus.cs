@@ -11,6 +11,7 @@ namespace TrashPandas.Runtime.Squad
         public static void Emit(NoiseKind kind, Vector3 at)
         {
             if (NoiseModel.Radius(kind) <= 0f) return;
+            if (Net.DevAutomation.Bot != null) UnityEngine.Debug.Log($"[NOISE] {kind} at {at:F1} t={Time.timeSinceLevelLoad:F1}");
             Heard?.Invoke(kind, at);
         }
     }

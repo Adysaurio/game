@@ -74,7 +74,7 @@ namespace TrashPandas.EditorTools
             Spot(new Vector3(5f, 0.05f, -5f));
             Spot(new Vector3(-9f, 0.05f, 13f));
             // The cake topper sits on the cake (jump + reach).
-            ObjectiveSpot(ObjectiveId.CakeTopper, new Vector3(0f, 1.52f, 8.6f));
+            ObjectiveSpot(ObjectiveId.CakeTopper, new Vector3(0f, 1.6f, 8.6f));
 
             // --- Kitchen (W): the catering tent, open toward the garden, back door on the far side.
             Box("Tent_N", new Vector3(-19f, 1.4f, 14f), new Vector3(10f, 2.8f, 0.2f), tent);
@@ -189,7 +189,7 @@ namespace TrashPandas.EditorTools
             var giant = Prop("Loot_GiantGift", PrimitiveType.Cube, new Vector3(3f, 0.4f, -2f), new Vector3(0.8f, 0.8f, 0.8f), gift, 8f, true).AddComponent<LootItem>();
             giant.Kind = LootKind.GiantGift;
             Objective(ObjectiveId.Ring, PrimitiveType.Sphere, new Vector3(0.09f, 0.09f, 0.09f));
-            Objective(ObjectiveId.CakeTopper, PrimitiveType.Capsule, new Vector3(0.1f, 0.12f, 0.1f));
+            Objective(ObjectiveId.CakeTopper, PrimitiveType.Cylinder, new Vector3(0.1f, 0.12f, 0.1f)); // a cylinder doesn't roll off
             Objective(ObjectiveId.Envelope, PrimitiveType.Cube, new Vector3(0.26f, 0.03f, 0.16f));
             Objective(ObjectiveId.Champagne, PrimitiveType.Cylinder, new Vector3(0.09f, 0.17f, 0.09f));
             Objective(ObjectiveId.Bouquet, PrimitiveType.Sphere, new Vector3(0.22f, 0.22f, 0.22f));
