@@ -124,6 +124,17 @@ namespace TrashPandas.Runtime.Net
         }
         public static bool TowerHop => Array.IndexOf(Args, "-hopoff") >= 0;
         public static bool SquadCrouch => Bot == "sneak";
+        static float s_nextGadget;
+        /// <summary>"gadgets": throw a pebble, then pop a smoke bomb.</summary>
+        public static bool GadgetBot(TrashPandas.Runtime.Raccoon.RaccoonController me, out TrashPandas.Core.Raccoons.Gadget g, out Vector3 aim)
+        {
+            g = TrashPandas.Core.Raccoons.Gadget.Pebble; aim = Vector3.forward;
+            if (Bot != "gadgets" || !me || Time.timeSinceLevelLoad < 3f || Time.time < s_nextGadget) return false;
+            s_nextGadget = Time.time + 2f;
+            g = Time.timeSinceLevelLoad < 7f ? TrashPandas.Core.Raccoons.Gadget.Pebble : TrashPandas.Core.Raccoons.Gadget.SmokeBomb;
+            aim = new Vector3(0f, 0f, 1f);
+            return true;
+        }
         static bool s_tunnelDone, s_canDone, s_linedUp;
         static float s_climbJumpAt = -1f;
         /// <summary>"climb": jump once lined up at the crate; Space again while hanging.</summary>
@@ -145,9 +156,9 @@ namespace TrashPandas.Runtime.Net
         public static bool SquadRun => Bot == "sprint" || (Bot == "noisy" && Time.timeSinceLevelLoad > 4f) || (Bot == "towerhost" && Time.timeSinceLevelLoad > 24f);
         static bool s_noisyPlaced;
         /// <summary>Dev: -nointro, and the bots that test specific mechanics skip the intro.</summary>
-        public static bool SkipIntro => Array.IndexOf(Args, "-nointro") >= 0 || Bot == "heavy" || Bot == "tower" || Bot == "flee" || Bot == "sneakflee" || Bot == "rescue" || Bot == "hideflee" || Bot == "push" || Bot == "climb";
+        public static bool SkipIntro => Array.IndexOf(Args, "-nointro") >= 0 || Bot == "heavy" || Bot == "tower" || Bot == "flee" || Bot == "sneakflee" || Bot == "rescue" || Bot == "hideflee" || Bot == "push" || Bot == "climb" || Bot == "gadgets";
         /// <summary>Bots built around the garden start (heavy, tower) keep spawning there.</summary>
-        public static bool SquadNearOrigin => Bot == "heavy" || Bot == "tower" || Bot == "flee" || Bot == "sneakflee" || Bot == "rescue" || Bot == "hideflee" || Bot == "push" || Bot == "climb";
+        public static bool SquadNearOrigin => Bot == "heavy" || Bot == "tower" || Bot == "flee" || Bot == "sneakflee" || Bot == "rescue" || Bot == "hideflee" || Bot == "push" || Bot == "climb" || Bot == "gadgets";
         public static bool SquadTap(TrashPandas.Runtime.Raccoon.RaccoonController r) =>
             (Bot == "fetch" && TrashPandas.Runtime.Squad.SquadBots.FetchTap(r)) || (Bot == "heavyonline" && TrashPandas.Runtime.Squad.SquadBots.OnlineHeavyTap(r));
         /// <summary>Bots that grab something specific (not what the highlight picked).</summary>

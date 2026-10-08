@@ -148,6 +148,14 @@ namespace TrashPandas.Runtime.Net
             list[index].Push(direction, Time.deltaTime * 3f); // RPCs arrive at tick rate, not frame rate
         }
 
+        /// <summary>Owner → host: throw a pebble / pop a smoke bomb.</summary>
+        [Rpc(SendTo.Server)]
+        public void UseGadgetRpc(byte gadget, Vector3 origin, Vector3 aim, RpcParams rpc = default)
+        {
+            if (rpc.Receive.SenderClientId != OwnerClientId || Vector3.Distance(origin, transform.position) > 3f) return;
+            Squad.GadgetDirector.Instance?.HostUse(Controller.PlayerId, (Core.Raccoons.Gadget)gadget, origin, aim);
+        }
+
         /// <summary>Host → owner: a friend opened the cage.</summary>
         [Rpc(SendTo.Owner)]
         public void UnfreezeRpc() => Controller.Frozen = false;

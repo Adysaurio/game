@@ -195,6 +195,7 @@ namespace TrashPandas.Runtime.Npc
         public bool CanSee(NpcPawn pawn, Vector3 target, Transform targetRoot, float range, float fov)
         {
             Vector3 eye = pawn.Eye;
+            if (Squad.GadgetDirector.InSmoke(eye)) return false; // coughing in the smoke
             if (!VisionCone.CanSee(eye, pawn.transform.forward, target, range, fov, false)) return false;
             Vector3 to = target - eye;
             float dist = to.magnitude;

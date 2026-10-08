@@ -32,6 +32,7 @@ namespace TrashPandas.Runtime.Squad
             if (!r) return false;
             if (r.HiddenInside) return true; // inside a pipe or a trash can
             if (DebugParked(r)) return true;
+            if (GadgetDirector.InSmoke(r.transform.position)) return true; // in a smoke cloud
             if (!ReferenceEquals(r.Mount, null) || r.RidersAbove > 0) return false; // a tower sticks out of anything
             Vector3 p = r.transform.position + Vector3.up * 0.1f;
             foreach (var h in s_all)

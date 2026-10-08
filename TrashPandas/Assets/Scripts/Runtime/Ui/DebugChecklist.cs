@@ -28,6 +28,8 @@ namespace TrashPandas.Runtime.Ui
             ("pipe", "Crawl through a drain pipe (E)"),
             ("trashcan", "Hide in a trash can or a bush (E), look around, hop out"),
             ("push", "Push something (walk into a crate / the gift)"),
+            ("pebble", "Throw a pebble to lure humans away (2, then Q)"),
+            ("smoke", "Pop a smoke bomb (3, then Q)"),
             ("secret", "Push the wardrobe to find a secret pipe"),
             ("ledge", "Jump at a crate edge and hang on"),
             ("climb", "Climb up from hanging (Space)"),
@@ -120,7 +122,7 @@ namespace TrashPandas.Runtime.Ui
             GUI.depth = -50; // on top of the exit labels and speech bubbles
             UiScale.Apply();
             float W = UiScale.Width;
-            _row ??= new GUIStyle(GUI.skin.label) { fontSize = 13 };
+            _row ??= new GUIStyle(GUI.skin.label) { fontSize = 11 };
             _title ??= new GUIStyle(GUI.skin.label) { fontSize = 15, fontStyle = FontStyle.Bold };
 
             if (Time.unscaledTime < _flashUntil && _flashLabel != null)
@@ -133,10 +135,10 @@ namespace TrashPandas.Runtime.Ui
             }
             if (!s_visible)
             {
-                GUI.Label(new Rect(W - 210, 92, 200, 20), $"F3: test checklist ({s_done.Count}/{Items.Length})", _row);
+                GUI.Label(new Rect(10, 176, 200, 20), $"F3: test checklist ({s_done.Count}/{Items.Length})", _row);
                 return;
             }
-            float w = 330f, h = 34f + Items.Length * 18f + 22f, x = W - w - 10f, y = 92f;
+            float w = 300f, h = 30f + Items.Length * 15f + 20f, x = 10f, y = 176f;
             GUI.color = new Color(0.05f, 0.05f, 0.07f, 0.88f);
             GUI.DrawTexture(new Rect(x, y, w, h), Texture2D.whiteTexture);
             GUI.color = Color.white;
@@ -146,8 +148,8 @@ namespace TrashPandas.Runtime.Ui
             {
                 bool done = s_done.Contains(item.key);
                 GUI.color = done ? new Color(0.5f, 1f, 0.55f) : new Color(0.85f, 0.85f, 0.85f);
-                GUI.Label(new Rect(x + 10, ry, w - 20, 18), (done ? "[x] " : "[  ] ") + item.label, _row);
-                ry += 18f;
+                GUI.Label(new Rect(x + 10, ry, w - 20, 16), (done ? "[x] " : "[  ] ") + item.label, _row);
+                ry += 15f;
             }
             GUI.color = new Color(0.7f, 0.7f, 0.7f);
             GUI.Label(new Rect(x + 10, ry + 2, w - 20, 18), "F3 hide · F4 start over", _row);
