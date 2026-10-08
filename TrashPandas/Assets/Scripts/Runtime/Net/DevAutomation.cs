@@ -67,6 +67,7 @@ namespace TrashPandas.Runtime.Net
             var loot = NearestLoot(raccoonPos);
             if (!loot.HasValue || Vector3.Distance(loot.Value, raccoonPos + Vector3.up * 0.3f) > 0.7f) return false;
             s_mouthTaken = true;
+            Debug.Log($"[BOT] mouth click at {raccoonPos} loot {loot.Value}");
             return true;
         }
 
@@ -76,7 +77,7 @@ namespace TrashPandas.Runtime.Net
             if (!ld) return null;
             Vector3? best = null;
             foreach (var item in ld.Items)
-                if (item && item.State == TrashPandas.Runtime.Loot.LootState.Active && !item.Grabbable.IsHeld && item.transform.position.y < 1.2f
+                if (item && item.State == TrashPandas.Runtime.Loot.LootState.Active && !item.Grabbable.IsHeld && item.transform.position.y < 0.3f
                     && (!best.HasValue || Vector3.Distance(item.transform.position, from) < Vector3.Distance(best.Value, from)))
                     best = item.transform.position;
             return best;
@@ -209,6 +210,17 @@ namespace TrashPandas.Runtime.Net
             var ld = TrashPandas.Runtime.Loot.LootDirector.Instance;
             var pdx = TrashPandas.Runtime.Panic.PanicDirector.Instance;
             if (pdx) panic += $" P0loot=${pdx.Snapshot.LootOf(0)} clean={pdx.Snapshot.CleanExit} openExits={string.Join(",", pdx.OpenExitPositions)}";
+            var mine = NetworkedRaccoon.LocalOwned;
+            if (ld && mine)
+            {
+                int carried = ld.Snapshot.MouthItemOf(mine.Controller.PlayerId);
+                if (carried >= 0 && carried < ld.Items.Count)
+                {
+                    var it = ld.Items[carried];
+                    var col = it.GetComponent<Collider>();
+                    panic += $" mouthGap={Vector3.Distance(it.transform.position, mine.transform.position + mine.transform.forward * 0.28f + Vector3.up * 0.32f):F2} mouthCollider={(col && col.enabled)}";
+                }
+            }
             if (ld) { var ls = ld.Snapshot; panic += $" mouth0={ls.MouthItemOf(0)} pocket=${ls.Total} objectives={ls.ObjectivesPicked:X2}/{ls.ObjectivesDone:X2} clock={ls.SecondsLeft:F0}"; }
             return panic + $" suspicion={d.Suspicion:F1} caught={d.Caught} curious={curious} alarmed={alarmed} cat={cat} frame[missing={f.MissingParts} seen={f.CoatWitnessed} weird={f.SeenWeirdness:F2} hiss={f.CatHissing}] dt={Time.deltaTime:F3}";
         }

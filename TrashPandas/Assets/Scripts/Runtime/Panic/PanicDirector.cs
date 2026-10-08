@@ -69,6 +69,7 @@ namespace TrashPandas.Runtime.Panic
             public bool IsCat => Brain.Pawn.Kind == NpcKind.Cat;
         }
 
+        public PlayerOutcome StatusOf(int player) => _outcome.StatusOf(player);
         public RoundPhase Phase => SimulationAuthority.IsOnline ? (RoundPhase)_phase.Value : _offlinePhase;
         public PanicSnapshot Snapshot => SimulationAuthority.IsOnline ? _snapshot.Value : _offlineSnapshot;
         byte OpenMask => SimulationAuthority.IsOnline ? _openExits.Value : _offlineOpenExits;
@@ -312,8 +313,8 @@ namespace TrashPandas.Runtime.Panic
         static void Freeze(RaccoonController r)
         {
             var net = r.GetComponent<NetworkedRaccoon>();
+            r.Frozen = true; // on the host too, so host-side checks see it
             if (SimulationAuthority.IsOnline && net && net.IsSpawned) net.FreezeRpc();
-            else r.Frozen = true;
         }
 
         void Remove(RaccoonController r)

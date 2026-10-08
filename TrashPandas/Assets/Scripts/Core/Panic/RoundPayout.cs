@@ -63,3 +63,12 @@ namespace TrashPandas.Core.Panic
             infiltrating && coatInArch && missingParts == 0 && pocketTotal > 0;
     }
 }
+
+namespace TrashPandas.Core.Panic
+{
+    public static class MouthRules
+    {
+        /// <summary>Only a raccoon that's still in play may pick things up (a caught one keeps nothing).</summary>
+        public static bool MayPickUp(bool infiltrating, PlayerOutcome status) => infiltrating || status == PlayerOutcome.Running;
+    }
+}

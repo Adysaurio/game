@@ -14,10 +14,16 @@ namespace TrashPandas.Runtime.Net
 
         public RaccoonController Controller { get; private set; }
 
+        /// <summary>Which player this raccoon is, for every machine (the host sets it before spawning).</summary>
+        readonly NetworkVariable<int> _playerId = new NetworkVariable<int>(-1);
+
         void Awake() => Controller = GetComponent<RaccoonController>();
 
         public override void OnNetworkSpawn()
         {
+            if (IsServer) _playerId.Value = Controller.PlayerId;
+            else Controller.PlayerId = _playerId.Value;
+            _playerId.OnValueChanged += (_, v) => Controller.PlayerId = v;
             Controller.enabled = IsOwner; // non-owners must not run gravity/CharacterController moves
             if (IsOwner) LocalOwned = this;
         }
@@ -28,7 +34,7 @@ namespace TrashPandas.Runtime.Net
 
         /// <summary>Owner → host: pick up / spit out loot with the mouth.</summary>
         [Rpc(SendTo.Server)]
-        public void MouthRpc() { if (Loot.LootDirector.Instance) Loot.LootDirector.Instance.ToggleMouth(Controller); }
+        public void MouthRpc(UnityEngine.Vector3 ownerPosition) { if (Loot.LootDirector.Instance) Loot.LootDirector.Instance.ToggleMouth(Controller, ownerPosition); }
 
         /// <summary>Host → owner: caught, no more control.</summary>
         [Rpc(SendTo.Owner)]

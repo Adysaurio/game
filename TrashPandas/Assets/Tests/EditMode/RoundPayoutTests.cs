@@ -88,3 +88,23 @@ namespace TrashPandas.Tests
         }
     }
 }
+
+namespace TrashPandas.Tests
+{
+    public class MouthRulesTests
+    {
+        [Test]
+        public void CaughtRaccoon_CantPickUpAgain()
+        {
+            Assert.IsFalse(TrashPandas.Core.Panic.MouthRules.MayPickUp(infiltrating: false, status: TrashPandas.Core.Panic.PlayerOutcome.Caught),
+                "a caught raccoon must not re-grab the objective it just dropped");
+        }
+
+        [Test]
+        public void RunningOrSneaking_CanPickUp()
+        {
+            Assert.IsTrue(TrashPandas.Core.Panic.MouthRules.MayPickUp(false, TrashPandas.Core.Panic.PlayerOutcome.Running));
+            Assert.IsTrue(TrashPandas.Core.Panic.MouthRules.MayPickUp(true, TrashPandas.Core.Panic.PlayerOutcome.None));
+        }
+    }
+}
