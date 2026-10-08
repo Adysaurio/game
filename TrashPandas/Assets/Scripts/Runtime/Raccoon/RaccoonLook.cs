@@ -230,6 +230,34 @@ namespace TrashPandas.Runtime.Raccoon
             foreach (var l in Lids) if (l) l.localScale = new Vector3(l.localScale.x, Mathf.Max(0.001f, lid) * 0.11f, l.localScale.z);
         }
 
+        static Cameras.PlayerCameraRig s_rig;
+        GUIStyle _tag;
+
+        /// <summary>On your own raccoon: "HIDDEN" when nobody can see you, "E: crawl" next to a pipe.</summary>
+        void OnGUI()
+        {
+            if (Squad.RoundIntro.Playing) return;
+            if (!s_rig) s_rig = FindFirstObjectByType<Cameras.PlayerCameraRig>();
+            if (!s_rig || !s_rig.VirtualCamera || s_rig.VirtualCamera.Follow != transform || !_raccoon || _raccoon.Crawling) return;
+            var cam = Camera.main;
+            if (!cam) return;
+            string text = null;
+            Color color = Color.white;
+            var spot = Squad.HidingSpot.SpotOf(_raccoon);
+            if (Squad.RaccoonPipe.Near(transform.position)) { text = "E: crawl"; color = new Color(0.6f, 0.9f, 1f); }
+            else if (spot.HasValue && Squad.HidingSpot.Hides(_raccoon)) { text = "HIDDEN"; color = new Color(0.5f, 1f, 0.6f); Ui.DebugChecklist.Mark("hide"); }
+            else if (spot == Squad.HidingKind.TrashCan) { text = "C: duck in"; color = new Color(1f, 0.9f, 0.5f); }
+            if (text == null) return;
+            Vector3 sp = cam.WorldToScreenPoint(transform.position + Vector3.up * 0.95f);
+            if (sp.z <= 0f) return;
+            Ui.UiScale.Apply();
+            Vector2 p = Ui.UiScale.FromScreen(sp);
+            _tag ??= new GUIStyle(GUI.skin.label) { fontSize = 15, fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleCenter };
+            GUI.color = color;
+            GUI.Label(new Rect(p.x - 70, p.y - 12, 140, 24), text, _tag);
+            GUI.color = Color.white;
+        }
+
         void UpdateBandana()
         {
             if (!Bandana || !_raccoon || _raccoon.PlayerId == _colorFor) return;

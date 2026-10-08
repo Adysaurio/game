@@ -51,8 +51,8 @@ namespace TrashPandas.Tests
         public void LooseRaccoon_AlarmsAfterNoticing_ThenCalmsDownInSteps()
         {
             var m = new GuestMind();
-            Assert.AreNotEqual(GuestState.Alarmed, Run(m, 0.4f, 0f, true), "a quick glimpse isn't enough");
-            Assert.AreEqual(GuestState.Alarmed, Run(m, 0.3f, 0f, true), "seen for ~0.6 s: alarmed");
+            Assert.AreNotEqual(GuestState.Alarmed, Run(m, 0.9f, 0f, true), "a glimpse isn't enough: the ? is filling");
+            Assert.AreEqual(GuestState.Alarmed, Run(m, 0.6f, 0f, true), "seen for ~1.4 s up close: alarmed");
             Assert.AreEqual(GuestState.Alarmed, Run(m, 3.5f, 0f, false), "stays alarmed a few seconds");
             Assert.AreEqual(GuestState.Curious, Run(m, 1f, 0f, false));
             Assert.AreEqual(GuestState.Calm, Run(m, 3f, 0f, false));
@@ -66,6 +66,28 @@ namespace TrashPandas.Tests
             Run(m, 0.5f, 0f, false); // out of sight again
             Run(m, 0.3f, 0f, true);  // glimpsed again, but the clock restarted
             Assert.AreNotEqual(GuestState.Alarmed, m.State);
+        }
+
+        [Test]
+        public void FarAwayOrSneaking_TakesLongerToNotice()
+        {
+            var m = new GuestMind();
+            for (int i = 0; i < 20; i++) m.Update(0.1f, 0f, true, noticeScale: 2f);
+            Assert.AreNotEqual(GuestState.Alarmed, m.State, "2 s at double the notice time");
+            for (int i = 0; i < 10; i++) m.Update(0.1f, 0f, true, noticeScale: 2f);
+            Assert.AreEqual(GuestState.Alarmed, m.State);
+        }
+
+        [Test]
+        public void Awareness_FillsWhileSeen_DrainsWhenYouHide()
+        {
+            var m = new GuestMind();
+            for (int i = 0; i < 7; i++) m.Update(0.1f, 0f, true);
+            float filled = m.Awareness;
+            Assert.Greater(filled, 0.4f);
+            Assert.AreEqual(GuestState.Curious, m.State, "a ? while it fills");
+            for (int i = 0; i < 5; i++) m.Update(0.1f, 0f, false);
+            Assert.Less(m.Awareness, filled, "hiding lets it drain");
         }
 
         [Test]

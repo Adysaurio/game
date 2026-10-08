@@ -38,6 +38,28 @@ namespace TrashPandas.Runtime.Raccoon
         public bool IsStunned => Time.time < _stunnedUntil;
         public bool IsRunning => _runHeld && !_crouchHeld && _planar.sqrMagnitude > 1f;
         public bool IsSneaking => _crouchHeld;
+        public float PlanarSpeed => _planar.magnitude;
+        /// <summary>Sneaking as far as this machine can tell (remote copies: moving slowly or standing still crouched is unknown, so assume yes).</summary>
+        public bool IsSneakingOrRemote => enabled ? _crouchHeld : true;
+
+        /// <summary>Inside a drain pipe: unseen, no control.</summary>
+        public bool Crawling { get; private set; }
+
+        public void SetRemoteCrawling(bool crawling) => Crawling = crawling;
+
+        public System.Collections.IEnumerator CrawlTo(Vector3 exit, float seconds)
+        {
+            Crawling = true;
+            if (!ReferenceEquals(Mount, null)) Dismount(Vector3.zero);
+            foreach (var rend in GetComponentsInChildren<Renderer>()) rend.enabled = false;
+            Ui.Sfx.Play(Ui.Sound.Throw, transform.position, 0.6f);
+            yield return new WaitForSeconds(seconds);
+            TeleportTo(exit);
+            foreach (var rend in GetComponentsInChildren<Renderer>()) rend.enabled = true;
+            Crawling = false;
+            Ui.Sfx.Play(Ui.Sound.Grab, exit, 0.8f);
+            Ui.DebugChecklist.Mark("pipe");
+        }
 
         // --- Raccoon towers ---------------------------------------------------------------------------
         /// <summary>The raccoon I'm standing on (null = on my own feet).</summary>
@@ -170,7 +192,7 @@ namespace TrashPandas.Runtime.Raccoon
 
         public void SetInput(Vector2 worldMove, bool jumpPressed, bool jumpHeld, bool crouchHeld, bool runHeld = false)
         {
-            if (Squad.RoundIntro.Playing) { _move = Vector2.zero; _runHeld = false; return; }
+            if (Squad.RoundIntro.Playing || Crawling) { _move = Vector2.zero; _runHeld = false; return; }
             _runHeld = runHeld;
             if (Frozen || IsStunned) { _move = Vector2.zero; _jumpHeld = false; return; }
             _move = worldMove;

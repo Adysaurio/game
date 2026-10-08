@@ -25,6 +25,8 @@ namespace TrashPandas.Runtime.Npc
         public float VisionFov = 120f;
         [Tooltip("How far a seated/standing guest strolls from where they started.")]
         public float WanderRadius = 2.5f;
+        [Tooltip("Extra suspicion drop per second while a raccoon hides and nobody is alarmed.")]
+        public float HideCalmRate = 4f;
 
         public static SuspicionDirector Instance { get; private set; }
         /// <summary>Set by the panic director: humans are no longer guests, they're chasers.</summary>
@@ -110,7 +112,7 @@ namespace TrashPandas.Runtime.Npc
                     Vector3 quarry = catQuarry;
                     if (!coatInPlay)
                         foreach (var r in _raccoons)
-                            if (r && Vector3.Distance(r.transform.position, pawn.transform.position) < Vector3.Distance(quarry, pawn.transform.position)) quarry = r.transform.position;
+                            if (r && !Squad.HidingSpot.Hides(r) && Vector3.Distance(r.transform.position, pawn.transform.position) < Vector3.Distance(quarry, pawn.transform.position)) quarry = r.transform.position;
                     brain.Cat.Update(dt, pawn.transform.position, quarry);
                     pawn.GoTo(brain.Cat.Destination);
                     pawn.SetMood((byte)brain.Cat.State);
@@ -122,13 +124,21 @@ namespace TrashPandas.Runtime.Npc
                 bool seesCoat = coatInPlay && Sees(pawn, coatTarget, Coat.transform);
                 RaccoonController seenRaccoon = null;
                 foreach (var r in _raccoons)
-                    if (r && Sees(pawn, r.transform.position + Vector3.up * 0.3f, r.transform)) { seenRaccoon = r; break; }
+                    if (r && !Squad.HidingSpot.Hides(r) && Sees(pawn, r.transform.position + Vector3.up * 0.3f, r.transform)) { seenRaccoon = r; break; }
+                // Far away or sneaking: the "?" fills slower; running in plain view: faster.
+                float noticeScale = 1f;
+                if (seenRaccoon)
+                {
+                    float dist = Vector3.Distance(pawn.Eye, seenRaccoon.transform.position);
+                    noticeScale = (1f + Mathf.Max(0f, dist - 3f) / 4f) * (seenRaccoon.IsSneaking ? 1.7f : 1f) * (seenRaccoon.IsRunning ? 0.7f : 1f);
+                }
 
                 float seen = seesCoat ? weirdness : 0f;
                 // A noise nearby: they turn, get curious ("?") and, if standing, go and have a look.
                 bool hearing = brain.HeardNoise.HasValue && now < brain.HeardUntil;
                 if (hearing) seen = Mathf.Max(seen, 0.35f);
-                var state = brain.Guest.Update(dt, seen, seenRaccoon);
+                var state = brain.Guest.Update(dt, seen, seenRaccoon, noticeScale);
+                pawn.SetAwareness(state == GuestState.Alarmed ? 0f : brain.Guest.Awareness);
                 // Only once the guest has actually registered the raccoon (not on a split-second glimpse).
                 if (seenRaccoon && state == GuestState.Alarmed) _model.ReportRaccoonSighting(brain.Id, now);
                 if (seenRaccoon) brain.LastSeenRaccoon = seenRaccoon.transform.position;
@@ -140,6 +150,11 @@ namespace TrashPandas.Runtime.Npc
                 else brain.Stroll(dt, state);
             }
 
+            // Someone hiding (and nobody spotting a raccoon): the wedding calms down faster.
+            bool anyHidden = false, anySeen = false;
+            foreach (var r in _raccoons) if (r && Squad.HidingSpot.SpotOf(r).HasValue && Squad.HidingSpot.Hides(r)) anyHidden = true;
+            foreach (var brain in _brains) if (brain.Guest != null && brain.Guest.State == GuestState.Alarmed) anySeen = true;
+            if (anyHidden && !anySeen && _model.Value > 0f) _model.Adjust(-HideCalmRate * dt);
             LastFrame = frame;
             _model.Tick(dt, frame);
             Publish();

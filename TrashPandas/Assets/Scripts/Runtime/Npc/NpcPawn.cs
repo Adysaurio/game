@@ -23,6 +23,17 @@ namespace TrashPandas.Runtime.Npc
         public Transform Hand;
 
         readonly NetworkVariable<byte> _mood = new NetworkVariable<byte>();
+        readonly NetworkVariable<byte> _awareness = new NetworkVariable<byte>();
+        byte _offlineAwareness;
+        /// <summary>0..1: how full this guest's "?" is (replicated, for the HUD).</summary>
+        public float Awareness => (SimulationAuthority.IsOnline ? _awareness.Value : _offlineAwareness) / 255f;
+
+        public void SetAwareness(float a)
+        {
+            byte v = (byte)Mathf.RoundToInt(Mathf.Clamp01(a) * 255f);
+            _offlineAwareness = v;
+            if (IsSpawned && IsServer && System.Math.Abs(_awareness.Value - v) > 6) _awareness.Value = v;
+        }
         byte _offlineMood;
         NavMeshAgent _agent;
         Vector3? _lookAt;

@@ -106,6 +106,7 @@ namespace TrashPandas.EditorTools
                 var table = new GameObject($"Table_{i}");
                 table.transform.position = pos;
                 Box("Top", pos + new Vector3(0f, 0.8f, 0f), new Vector3(2f, 0.1f, 1.2f), wood).transform.SetParent(table.transform, true);
+                Tablecloth(table.transform, pos, new Vector2(2f, 1.2f), 0.85f);
                 foreach (var leg in new[] { new Vector3(-0.9f, 0f, -0.5f), new Vector3(0.9f, 0f, -0.5f), new Vector3(-0.9f, 0f, 0.5f), new Vector3(0.9f, 0f, 0.5f) })
                     Box("Leg", pos + leg + new Vector3(0f, 0.375f, 0f), new Vector3(0.08f, 0.75f, 0.08f), wood).transform.SetParent(table.transform, true);
             }
@@ -297,6 +298,9 @@ namespace TrashPandas.EditorTools
             {
                 var t = new Vector3(-6f + (i % 3) * 6f, 0f, 4f + (i / 3) * 5f);
                 var chair = Weapon($"Chair_{i}", WeaponKind.Chair, t + new Vector3(1.4f, 0f, -0.9f));
+                var underChair = chair.gameObject.AddComponent<TrashPandas.Runtime.Squad.HidingSpot>();
+                underChair.Kind = TrashPandas.Runtime.Squad.HidingKind.UnderTablecloth;
+                underChair.Size = new Vector3(0.55f, 0.45f, 0.55f);
                 Visual(PrimitiveType.Cube, "Seat", chair.transform, new Vector3(0f, 0.45f, 0f), new Vector3(0.45f, 0.06f, 0.45f), chairMat);
                 Visual(PrimitiveType.Cube, "Back", chair.transform, new Vector3(0f, 0.75f, -0.2f), new Vector3(0.45f, 0.6f, 0.05f), chairMat);
             }

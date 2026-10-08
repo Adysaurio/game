@@ -19,6 +19,7 @@ namespace TrashPandas.Runtime.Net
         readonly NetworkVariable<int> _playerId = new NetworkVariable<int>(-1);
 
         /// <summary>Player id of the raccoon I'm standing on (-1 = none). The owner writes it.</summary>
+        readonly NetworkVariable<bool> _crawling = new NetworkVariable<bool>(false, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Owner);
         readonly NetworkVariable<int> _mountedOn = new NetworkVariable<int>(-1, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Owner);
 
         void Awake() => Controller = GetComponent<RaccoonController>();
@@ -30,7 +31,13 @@ namespace TrashPandas.Runtime.Net
             {
                 int m = Controller.Mount ? Controller.Mount.PlayerId : -1;
                 if (_mountedOn.Value != m) _mountedOn.Value = m;
+                if (_crawling.Value != Controller.Crawling) _crawling.Value = Controller.Crawling;
                 return;
+            }
+            if (Controller.Crawling != _crawling.Value)
+            {
+                Controller.SetRemoteCrawling(_crawling.Value);
+                foreach (var rend in GetComponentsInChildren<Renderer>()) rend.enabled = !_crawling.Value;
             }
             RaccoonController mount = null;
             if (_mountedOn.Value >= 0)

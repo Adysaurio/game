@@ -120,6 +120,15 @@ namespace TrashPandas.Runtime.Npc
                 Vector2 p = UiScale.FromScreen(sp);
                 GUI.color = color;
                 GUI.Label(new Rect(p.x - 40, p.y - 18, 80, 36), icon, _icon);
+                // The "?" fills up while they see you: hide before it's full.
+                float aw = pawn.Awareness;
+                if (icon == "?" && aw > 0.02f)
+                {
+                    GUI.color = new Color(0f, 0f, 0f, 0.6f);
+                    GUI.DrawTexture(new Rect(p.x - 18, p.y + 16, 36, 6), Texture2D.whiteTexture);
+                    GUI.color = Color.Lerp(new Color(1f, 0.9f, 0.3f), new Color(1f, 0.25f, 0.2f), aw);
+                    GUI.DrawTexture(new Rect(p.x - 17, p.y + 17, 34 * aw, 4), Texture2D.whiteTexture);
+                }
             }
             GUI.color = Color.white;
 

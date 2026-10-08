@@ -72,6 +72,19 @@ namespace TrashPandas.Runtime.Net
             }
             if (Bot == "fetch") return TrashPandas.Runtime.Squad.SquadBots.FetchMove(r);
             if (Bot == "flee" || Bot == "sneakflee") return FleeMove(r.transform.position) ?? Vector2.zero;
+            if (Bot == "hideflee")
+            {
+                // On RUN: dive into the nearest bush and stay there.
+                var pdh = TrashPandas.Runtime.Panic.PanicDirector.Instance;
+                if (!pdh || pdh.Phase != TrashPandas.Runtime.Panic.RoundPhase.Panic) return Vector2.zero;
+                Vector3? best = null;
+                foreach (var h in TrashPandas.Runtime.Squad.HidingSpot.All)
+                    if (h && h.Kind == TrashPandas.Runtime.Squad.HidingKind.Bush && (!best.HasValue || Vector3.Distance(h.transform.position, r.transform.position) < Vector3.Distance(best.Value, r.transform.position)))
+                        best = h.transform.position;
+                if (!best.HasValue) return Vector2.zero;
+                Vector3 d = best.Value - r.transform.position; d.y = 0f;
+                return d.magnitude < 0.3f ? Vector2.zero : TrashPandas.Runtime.Squad.SquadBots.Steer(r.transform.position, best.Value);
+            }
             if (Bot == "lureflee")
             {
                 // Walk into the party until spotted, then run for an exit.
@@ -88,9 +101,9 @@ namespace TrashPandas.Runtime.Net
         public static bool SquadRun => Bot == "sprint" || (Bot == "noisy" && Time.timeSinceLevelLoad > 4f) || (Bot == "towerhost" && Time.timeSinceLevelLoad > 24f);
         static bool s_noisyPlaced;
         /// <summary>Dev: -nointro, and the bots that test specific mechanics skip the intro.</summary>
-        public static bool SkipIntro => Array.IndexOf(Args, "-nointro") >= 0 || Bot == "heavy" || Bot == "tower" || Bot == "flee" || Bot == "sneakflee" || Bot == "rescue";
+        public static bool SkipIntro => Array.IndexOf(Args, "-nointro") >= 0 || Bot == "heavy" || Bot == "tower" || Bot == "flee" || Bot == "sneakflee" || Bot == "rescue" || Bot == "hideflee";
         /// <summary>Bots built around the garden start (heavy, tower) keep spawning there.</summary>
-        public static bool SquadNearOrigin => Bot == "heavy" || Bot == "tower" || Bot == "flee" || Bot == "sneakflee" || Bot == "rescue";
+        public static bool SquadNearOrigin => Bot == "heavy" || Bot == "tower" || Bot == "flee" || Bot == "sneakflee" || Bot == "rescue" || Bot == "hideflee";
         public static bool SquadTap(TrashPandas.Runtime.Raccoon.RaccoonController r) =>
             (Bot == "fetch" && TrashPandas.Runtime.Squad.SquadBots.FetchTap(r)) || (Bot == "heavyonline" && TrashPandas.Runtime.Squad.SquadBots.OnlineHeavyTap(r));
         /// <summary>Bots that grab something specific (not what the highlight picked).</summary>
@@ -237,6 +250,8 @@ namespace TrashPandas.Runtime.Net
             var ld = TrashPandas.Runtime.Loot.LootDirector.Instance;
             var pdx = TrashPandas.Runtime.Panic.PanicDirector.Instance;
             if (pdx) panic += $" chasers[{pdx.ChaserStates}]";
+            var sqx = TrashPandas.Runtime.Squad.SquadController.Instance;
+            if (sqx && sqx.Active) panic += $" hidden={TrashPandas.Runtime.Squad.HidingSpot.Hides(sqx.Active)} spot={TrashPandas.Runtime.Squad.HidingSpot.SpotOf(sqx.Active)}";
             if (pdx) panic += $" P0loot=${pdx.Snapshot.LootOf(0)} clean={pdx.Snapshot.CleanExit} openExits={string.Join(",", pdx.OpenExitPositions)}";
             var mine = NetworkedRaccoon.LocalOwned;
             if (ld && mine)

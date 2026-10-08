@@ -311,7 +311,7 @@ namespace TrashPandas.Runtime.Panic
                 if (pawn && suspicion)
                     foreach (var t in _targets)
                     {
-                        if (!_raccoonOf.TryGetValue(t.Id, out var rr) || rr.Frozen) continue;
+                        if (!_raccoonOf.TryGetValue(t.Id, out var rr) || rr.Frozen || Squad.HidingSpot.Hides(rr)) continue;
                         float range = rr.IsSneaking ? PanicSightRange * 0.5f : PanicSightRange;
                         if (suspicion.CanSee(pawn, rr.transform.position + Vector3.up * 0.3f, rr.transform, range, PanicFov)) sees.Add(t);
                     }

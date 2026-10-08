@@ -93,6 +93,7 @@ namespace TrashPandas.EditorTools
             Spot(new Vector3(-20.2f, 0.93f, 6.8f));
             Spot(new Vector3(-17.8f, 0.93f, 7.2f));
             ObjectiveSpot(ObjectiveId.Champagne, new Vector3(-19f, 1.0f, 7.1f));
+            BuildCover(hedge);
             Visual(PrimitiveType.Cylinder, "SewerGrate", null, new Vector3(-20f, 0.01f, -4f), new Vector3(1.2f, 0.01f, 1.2f), grate);
 
             // --- House (N): no roof (greybox), front door S, living room W with the gift table, hall + bathroom E.
@@ -151,7 +152,104 @@ namespace TrashPandas.EditorTools
         /// <summary>A plain table (no legs to trip on, the coat can't go under it).</summary>
         static void Table(string name, Vector3 at, Vector2 size, float height, Material mat)
         {
-            Box(name, at + new Vector3(0f, height / 2f, 0f), new Vector3(size.x, height, size.y), mat);
+            if (height < 0.7f) { Box(name, at + new Vector3(0f, height / 2f, 0f), new Vector3(size.x, height, size.y), mat); return; }
+            // A real table: top + legs (a raccoon fits underneath) + a tablecloth down to the floor.
+            var root = new GameObject(name).transform;
+            root.position = at;
+            Box("Top", at + new Vector3(0f, height - 0.05f, 0f), new Vector3(size.x, 0.1f, size.y), mat).transform.SetParent(root, true);
+            foreach (var sx in new[] { -1f, 1f })
+                foreach (var sz in new[] { -1f, 1f })
+                    Box("Leg", at + new Vector3(sx * (size.x / 2f - 0.08f), (height - 0.1f) / 2f, sz * (size.y / 2f - 0.08f)), new Vector3(0.07f, height - 0.1f, 0.07f), mat).transform.SetParent(root, true);
+            Tablecloth(root, at, size, height);
+        }
+
+        static Material s_cloth;
+
+        /// <summary>A white skirt down to the floor (visual only) and a hiding spot underneath.</summary>
+        static void Tablecloth(Transform table, Vector3 at, Vector2 size, float height)
+        {
+            s_cloth ??= Mat("Tablecloth", new Color(0.98f, 0.98f, 0.96f));
+            float h = height - 0.04f;
+            Visual(PrimitiveType.Cube, "ClothFront", table, table.InverseTransformPoint(at + new Vector3(0f, h / 2f, -size.y / 2f - 0.02f)), new Vector3(size.x + 0.04f, h, 0.02f), s_cloth);
+            Visual(PrimitiveType.Cube, "ClothBack", table, table.InverseTransformPoint(at + new Vector3(0f, h / 2f, size.y / 2f + 0.02f)), new Vector3(size.x + 0.04f, h, 0.02f), s_cloth);
+            Visual(PrimitiveType.Cube, "ClothLeft", table, table.InverseTransformPoint(at + new Vector3(-size.x / 2f - 0.02f, h / 2f, 0f)), new Vector3(0.02f, h, size.y + 0.04f), s_cloth);
+            Visual(PrimitiveType.Cube, "ClothRight", table, table.InverseTransformPoint(at + new Vector3(size.x / 2f + 0.02f, h / 2f, 0f)), new Vector3(0.02f, h, size.y + 0.04f), s_cloth);
+            var spot = new GameObject("UnderTable").AddComponent<TrashPandas.Runtime.Squad.HidingSpot>();
+            spot.transform.SetParent(table, false);
+            spot.transform.position = at;
+            spot.Kind = TrashPandas.Runtime.Squad.HidingKind.UnderTablecloth;
+            spot.Size = new Vector3(size.x, height - 0.1f, size.y);
+        }
+
+        static Material s_bush, s_can, s_pipe;
+
+        static void Bush(Vector3 at, float r = 0.9f)
+        {
+            s_bush ??= Mat("Bush", new Color(0.22f, 0.5f, 0.24f));
+            var root = new GameObject("Bush").transform;
+            root.position = at;
+            Visual(PrimitiveType.Sphere, "Leaves", root, new Vector3(0f, r * 0.55f, 0f), new Vector3(r * 2f, r * 1.3f, r * 2f), s_bush);
+            Visual(PrimitiveType.Sphere, "Leaves2", root, new Vector3(r * 0.45f, r * 0.45f, r * 0.3f), new Vector3(r * 1.3f, r, r * 1.3f), s_bush);
+            var spot = root.gameObject.AddComponent<TrashPandas.Runtime.Squad.HidingSpot>();
+            spot.Kind = TrashPandas.Runtime.Squad.HidingKind.Bush;
+            spot.Size = new Vector3(r * 1.8f, r * 1.2f, r * 1.8f);
+        }
+
+        static void TrashCan(Vector3 at)
+        {
+            s_can ??= Mat("TrashCan", new Color(0.45f, 0.5f, 0.52f));
+            var root = new GameObject("TrashCan").transform;
+            root.position = at;
+            Visual(PrimitiveType.Cylinder, "Can", root, new Vector3(0f, 0.42f, 0f), new Vector3(0.6f, 0.42f, 0.6f), s_can);
+            var lid = Visual(PrimitiveType.Cylinder, "Lid", root, new Vector3(0.15f, 0.9f, 0f), new Vector3(0.64f, 0.03f, 0.64f), s_can);
+            lid.localRotation = Quaternion.Euler(0f, 0f, 25f); // ajar: a raccoon's door
+            var spot = root.gameObject.AddComponent<TrashPandas.Runtime.Squad.HidingSpot>();
+            spot.Kind = TrashPandas.Runtime.Squad.HidingKind.TrashCan;
+            spot.Size = new Vector3(0.75f, 0.9f, 0.75f);
+        }
+
+        /// <summary>Two pipe mouths that lead into each other (raccoon shortcut, E to crawl).</summary>
+        static void Pipe(Vector3 a, float yawA, Vector3 b, float yawB)
+        {
+            s_pipe ??= Mat("Pipe", new Color(0.3f, 0.36f, 0.32f));
+            var ends = new Transform[2];
+            var at = new[] { a, b };
+            var yaw = new[] { yawA, yawB };
+            for (int i = 0; i < 2; i++)
+            {
+                var mouth = new GameObject($"PipeMouth_{(i == 0 ? "A" : "B")}").transform;
+                mouth.SetPositionAndRotation(at[i], Quaternion.Euler(0f, yaw[i], 0f));
+                var tube = Visual(PrimitiveType.Cylinder, "Tube", mouth, new Vector3(0f, 0.3f, -0.3f), new Vector3(0.6f, 0.4f, 0.6f), s_pipe);
+                tube.localRotation = Quaternion.Euler(90f, 0f, 0f);
+                var hole = Visual(PrimitiveType.Cylinder, "Hole", mouth, new Vector3(0f, 0.3f, 0.11f), new Vector3(0.48f, 0.01f, 0.48f), Mat("PipeHole", new Color(0.05f, 0.05f, 0.05f)));
+                hole.localRotation = Quaternion.Euler(90f, 0f, 0f);
+                ends[i] = mouth;
+            }
+            ends[0].gameObject.AddComponent<TrashPandas.Runtime.Squad.RaccoonPipe>().OtherEnd = ends[1];
+            ends[1].gameObject.AddComponent<TrashPandas.Runtime.Squad.RaccoonPipe>().OtherEnd = ends[0];
+        }
+
+        /// <summary>Playtest: "faltan bushes o lugares donde esconderte, pasadizos". Cover, hiding spots and raccoon shortcuts.</summary>
+        static void BuildCover(Material hedge)
+        {
+            // From the manhole toward the garden: a bush trail across the parking edge.
+            foreach (var p in new[] { new Vector3(22f, 0f, -9f), new Vector3(18.5f, 0f, -6.5f), new Vector3(15f, 0f, -4f), new Vector3(12f, 0f, -1.5f) }) Bush(p, 0.85f);
+            // Garden edges and corners.
+            foreach (var p in new[] { new Vector3(-9.5f, 0f, 1.5f), new Vector3(-9.5f, 0f, 9.5f), new Vector3(9.5f, 0f, 1f), new Vector3(7.5f, 0f, 14.5f), new Vector3(-6.5f, 0f, 15f), new Vector3(-3.5f, 0f, -5.5f), new Vector3(4.5f, 0f, -6.5f) }) Bush(p, 0.9f);
+            // Kitchen and house front.
+            foreach (var p in new[] { new Vector3(-13f, 0f, 1f), new Vector3(-13f, 0f, 13.5f), new Vector3(-2.8f, 0f, 17.2f), new Vector3(3.2f, 0f, 17.2f) }) Bush(p, 0.8f);
+            // Orchard (around the giant gift).
+            foreach (var p in new[] { new Vector3(22f, 0f, -17f), new Vector3(26f, 0f, -19.5f), new Vector3(20f, 0f, -21f) }) Bush(p, 1f);
+            // Low hedges in the garden to break sightlines.
+            Box("LowHedge_W", new Vector3(-8.6f, 0.35f, 5.5f), new Vector3(0.6f, 0.7f, 3f), hedge);
+            Box("LowHedge_E", new Vector3(8.6f, 0.35f, 6.5f), new Vector3(0.6f, 0.7f, 3f), hedge);
+            Box("LowHedge_S", new Vector3(0f, 0.35f, -1.2f), new Vector3(3.5f, 0.7f, 0.6f), hedge);
+            // Trash cans.
+            foreach (var p in new[] { new Vector3(-23f, 0f, 3.2f), new Vector3(-15.2f, 0f, 1.2f), new Vector3(20.5f, 0f, -9.5f), new Vector3(28.5f, 0f, 5.5f), new Vector3(10.8f, 0f, 19f) }) TrashCan(p);
+            // Raccoon pipes: parking ↔ garden, kitchen ↔ living room, orchard ↔ entrance.
+            Pipe(new Vector3(25.5f, 0f, -10.5f), 180f, new Vector3(-11.5f, 0f, 5f), 90f);
+            Pipe(new Vector3(-23.3f, 0f, 12f), 90f, new Vector3(-9.4f, 0f, 26.5f), 90f);
+            Pipe(new Vector3(14f, 0f, -22.5f), 0f, new Vector3(-6f, 0f, -21f), 0f);
         }
 
         /// <summary>The 27 loose loot items plus the 6 objectives (only 3 are used each round).</summary>
@@ -186,7 +284,7 @@ namespace TrashPandas.EditorTools
             }
             // Heavy loot: needs two raccoons (concept v2). Not shuffled with the loose loot (LootDirector skips it).
             var gift = Mat("GiantGift", new Color(0.85f, 0.25f, 0.45f));
-            var giant = Prop("Loot_GiantGift", PrimitiveType.Cube, new Vector3(3f, 0.4f, -2f), new Vector3(0.8f, 0.8f, 0.8f), gift, 8f, true).AddComponent<LootItem>();
+            var giant = Prop("Loot_GiantGift", PrimitiveType.Cube, new Vector3(24f, 0.4f, -17.5f), new Vector3(0.8f, 0.8f, 0.8f), gift, 8f, true).AddComponent<LootItem>();
             giant.Kind = LootKind.GiantGift;
             Objective(ObjectiveId.Ring, PrimitiveType.Sphere, new Vector3(0.09f, 0.09f, 0.09f));
             Objective(ObjectiveId.CakeTopper, PrimitiveType.Cylinder, new Vector3(0.1f, 0.12f, 0.1f)); // a cylinder doesn't roll off
