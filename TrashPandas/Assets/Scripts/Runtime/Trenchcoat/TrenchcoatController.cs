@@ -240,7 +240,9 @@ namespace TrashPandas.Runtime.Trenchcoat
             if (selected >= 0) _possession.TrySelect(selected);
             if (_reader.CyclePressed) _possession.CycleNext();
             if (_reader.TogglePressed) Toggle(now);
-            if ((Net.DevAutomation.Bot == "hop" || Net.DevAutomation.Bot == "hopflee" || Net.DevAutomation.Bot == "hopgap" || Net.DevAutomation.Bot == "mouthflee") && !_botHopped && Time.timeSinceLevelLoad > Net.DevAutomation.HopAt) { _botHopped = true; Toggle(now); } // dev automation
+            if ((Net.DevAutomation.Bot == "hop" || Net.DevAutomation.Bot == "hopflee" || Net.DevAutomation.Bot == "hopgap" || Net.DevAutomation.Bot == "mouthflee"
+                 || (Net.DevAutomation.Bot == "stashflee" && TrashPandas.Runtime.Loot.LootDirector.Instance && TrashPandas.Runtime.Loot.LootDirector.Instance.Snapshot.Total > 0))
+                && !_botHopped && Time.timeSinceLevelLoad > Net.DevAutomation.HopAt) { _botHopped = true; Toggle(now); } // dev automation
             if (_reader.RecordPressed) ToggleRecording(now);
             UpdateCoatCamera();
             if (UnityEngine.InputSystem.Keyboard.current?.f1Key.wasPressedThisFrame == true) _showHelp = !_showHelp;
@@ -260,7 +262,7 @@ namespace TrashPandas.Runtime.Trenchcoat
             if (_possession.ActiveIsOutside)
             {
                 if (!_raccoon) { Body.SetIntent(default); return; }
-                bool dashBot = Net.DevAutomation.Bot == "hop" || Net.DevAutomation.Bot == "hopflee" || Net.DevAutomation.Bot == "mouthflee";
+                bool dashBot = Net.DevAutomation.Bot == "hop" || Net.DevAutomation.Bot == "hopflee" || Net.DevAutomation.Bot == "mouthflee" || Net.DevAutomation.Bot == "stashflee";
                 var raccoonMove = Net.DevAutomation.FleeMove(_raccoon.transform.position)
                     ?? (dashBot ? new Vector2(0f, 1f) : _reader.CameraRelativeMove(CameraRig)); // dev bots
                 _raccoon.SetInput(raccoonMove, _reader.JumpPressed, _reader.JumpHeld, _reader.CrouchHeld || Net.DevAutomation.FleeCrouchAt(_raccoon.transform.position));
@@ -271,7 +273,7 @@ namespace TrashPandas.Runtime.Trenchcoat
             {
                 var live = TrashPandas.Core.Events.ConversationInput.Filter(_reader.ReadSlotInput(CameraRig, Body, now), engaged);
                 if (Net.DevAutomation.Bot == "walk") live.Move = new Vector2(0f, 1f); // dev automation
-                if (Net.DevAutomation.Bot == "stash" || Net.DevAutomation.Bot == "stashout") BotStash(ref live);
+                if (Net.DevAutomation.Bot == "stash" || Net.DevAutomation.Bot == "stashout" || Net.DevAutomation.Bot == "stashflee") BotStash(ref live);
                 if (Net.DevAutomation.Bot == "walkgrab") { live.Move = Body.transform.position.z < 2.6f ? new Vector2(0f, 1f) : Vector2.zero; live.GrabOne = true; }
                 if (Net.DevAutomation.Bot == "tocat") live.Move = TowardCat();
                 _inputs[_possession.ActivePlayerId] = live; // you always override your own ghost

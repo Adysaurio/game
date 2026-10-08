@@ -25,7 +25,7 @@ namespace TrashPandas.Runtime.Net
         /// "hopgap" crouching through the hedge gap where humans can't follow.</summary>
         public static Vector2? FleeMove(Vector3 from)
         {
-            if (Bot != "hopflee" && Bot != "flee" && Bot != "hopgap" && Bot != "mouthflee") return null;
+            if (Bot != "hopflee" && Bot != "flee" && Bot != "hopgap" && Bot != "mouthflee" && Bot != "stashflee") return null;
             var pd = TrashPandas.Runtime.Panic.PanicDirector.Instance;
             if (!pd || pd.Phase != TrashPandas.Runtime.Panic.RoundPhase.Panic) return null;
             if (Bot == "mouthflee" && !s_mouthTaken)
