@@ -21,7 +21,7 @@ namespace TrashPandas.Runtime.Raccoon
         readonly List<GrabCandidate> _candidates = new List<GrabCandidate>();
         MaterialPropertyBlock _block;
         Renderer[] _lit;
-        GUIStyle _arrow;
+        GUIStyle _arrow, _hint;
 
         void Awake() => _block = new MaterialPropertyBlock();
         void OnEnable() => Instance = this;
@@ -81,6 +81,7 @@ namespace TrashPandas.Runtime.Raccoon
             _arrow ??= new GUIStyle(GUI.skin.label) { fontSize = 22, fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleCenter };
             GUI.color = new Color(1f, 0.85f, 0.25f);
             GUI.Label(new Rect(p.x - 20, p.y - 20, 40, 40), "▼", _arrow);
+            GUI.Label(new Rect(p.x - 40, p.y - 40, 80, 22), Current.RequiresBothHands ? "click (2 needed)" : "click", _hint ??= new GUIStyle(GUI.skin.label) { fontSize = 12, fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleCenter });
             GUI.color = Color.white;
         }
     }

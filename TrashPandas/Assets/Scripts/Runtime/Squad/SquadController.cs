@@ -35,6 +35,7 @@ namespace TrashPandas.Runtime.Squad
         int _active;
         float _nextRunNoise;
         GUIStyle _help;
+        float _helpUntil = 20f;
 
         void Awake()
         {
@@ -89,6 +90,7 @@ namespace TrashPandas.Runtime.Squad
 
         void Update()
         {
+            if (UnityEngine.InputSystem.Keyboard.current?.f1Key.wasPressedThisFrame == true) _helpUntil = _helpUntil > Time.time ? 0f : Time.time + 30f;
             if (_raccoons.Count == 0 || RoundIntro.Playing) return;
             if (_reader.CyclePressed)
             {
@@ -126,15 +128,21 @@ namespace TrashPandas.Runtime.Squad
             UiScale.Apply();
             _help ??= new GUIStyle(GUI.skin.label) { fontSize = 14, wordWrap = true };
             float W = UiScale.Width, H = UiScale.Height;
-            GUI.color = new Color(0f, 0f, 0f, 0.5f);
-            GUI.DrawTexture(new Rect(8, H - 52, W - 16, 44), Texture2D.whiteTexture);
-            GUI.color = Color.white;
             if (Active && Active.Mount)
             {
                 GUI.color = new Color(1f, 0.85f, 0.3f);
                 GUI.Label(new Rect(0, H - 84, W, 28), "RIDING — Space: hop off", new GUIStyle(_help) { fontSize = 20, fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleCenter });
                 GUI.color = Color.white;
             }
+            // "Text is evil": the full control list only at the start (or on F1); then just a reminder.
+            if (Time.time > _helpUntil)
+            {
+                GUI.Label(new Rect(16, H - 30, 300, 22), "F1: controls · Tab: switch raccoon", _help);
+                return;
+            }
+            GUI.color = new Color(0f, 0f, 0f, 0.5f);
+            GUI.DrawTexture(new Rect(8, H - 52, W - 16, 44), Texture2D.whiteTexture);
+            GUI.color = Color.white;
             GUI.Label(new Rect(16, H - 50, W - 32, 42),
                 $"RACCOON {ActivePlayerId + 1}/{_raccoons.Count}   WASD move · Shift run (noisy) · C sneak · Space jump · Click grab/drop · Hold click + release: throw · Jump onto a raccoon: ride (Space: hop off) · E use\n" +
                 "[DEBUG] Tab: switch raccoon (the others wait where you left them)", _help);

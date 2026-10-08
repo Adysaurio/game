@@ -71,6 +71,13 @@ namespace TrashPandas.Runtime.Net
             }
 
             if (Squad.RoundIntro.Playing) { _cameraOnRaccoon = null; return; } // everyone watches the same intro
+            if (raccoon && !raccoon.Controller.Frozen && _spectating)
+            {
+                // Freed from the cage: back to your own raccoon.
+                _spectating = false;
+                _caughtAt = -1f;
+                _cameraOnRaccoon = null;
+            }
             if (raccoon && !slot.HasValue)
             {
                 if (CameraRig.InConversation) { CameraRig.EndConversation(restore: false); _eventCamera = false; _cameraOnRaccoon = null; }
