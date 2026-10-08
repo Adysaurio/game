@@ -271,6 +271,35 @@ namespace TrashPandas.Runtime.Net
             if (Args.Contains("-debugmode")) { UnityEngine.SceneManagement.SceneManager.LoadScene("Greybox_Trenchcoat"); return; }
             if (Args.Contains("-autohost-local")) await SessionHost.Instance.HostAsync(new LocalConnector());
             else if (Args.Contains("-autojoin-local")) await SessionHost.Instance.JoinAsync(new LocalConnector(), LocalConnector.DefaultAddress);
+            else if (Args.Contains("-autohost-relay") || Args.Contains("-autojoin-relay"))
+            {
+                // Real internet test: the host writes its room code to a file, the joiner reads it.
+                bool hosting = Args.Contains("-autohost-relay");
+                int i = Array.IndexOf(Args, hosting ? "-autohost-relay" : "-autojoin-relay");
+                string codeFile = i + 1 < Args.Length ? Args[i + 1] : "relay-code.txt";
+                try
+                {
+                    if (hosting)
+                    {
+                        string code = await SessionHost.Instance.HostAsync(new RelayConnector());
+                        System.IO.File.WriteAllText(codeFile, code);
+                        Log($"relay host code {code}");
+                    }
+                    else
+                    {
+                        string code = null;
+                        for (int t = 0; t < 120 && string.IsNullOrEmpty(code); t++)
+                        {
+                            if (System.IO.File.Exists(codeFile)) code = System.IO.File.ReadAllText(codeFile).Trim();
+                            if (string.IsNullOrEmpty(code)) await System.Threading.Tasks.Task.Delay(500);
+                        }
+                        Log($"relay joining {code}");
+                        await SessionHost.Instance.JoinAsync(new RelayConnector(), code);
+                        Log("relay joined");
+                    }
+                }
+                catch (Exception e) { Log($"relay FAILED: {e.Message} | {e.InnerException?.Message}"); }
+            }
         }
 
         void Update()
