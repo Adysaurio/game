@@ -83,7 +83,7 @@ namespace TrashPandas.Runtime.Loot
                 GUI.color = secs <= 60 ? new Color(1f, 0.35f, 0.3f, 0.75f + 0.25f * Mathf.PingPong(Time.time * 2f, 1f)) : Color.white;
                 _clockBig ??= new GUIStyle(GUI.skin.label) { fontSize = 24, fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleCenter };
                 _goal ??= new GUIStyle(GUI.skin.label) { fontSize = 13, alignment = TextAnchor.MiddleCenter };
-                GUI.Label(new Rect(cx, 44, cw, 28), $"⏱ {secs / 60}:{secs % 60:00}", _clockBig);
+                GUI.Label(new Rect(cx, 44, cw, 28), $"TIME {secs / 60}:{secs % 60:00}", _clockBig);
                 GUI.color = open ? new Color(0.5f, 1f, 0.55f) : new Color(1f, 0.9f, 0.6f);
                 GUI.Label(new Rect(cx, 70, cw, 18), goal, _goal);
                 GUI.color = Color.white;

@@ -129,6 +129,28 @@ namespace TrashPandas.Runtime.Net
         }
         /// <summary>Dev: exits open from the start (escape tests without delivering the objectives).</summary>
         public static bool UnlockExits => Debug.isDebugBuild && Array.IndexOf(Args, "-unlockexits") >= 0;
+        static bool s_peelTestDone, s_bonkTestDone;
+        /// <summary>Dev tests: "-peeltest" drops a peel on the nemesis' route, "-bonktest" throws a pebble at her.</summary>
+        public static void GadgetTests()
+        {
+            if (!Debug.isDebugBuild || Time.timeSinceLevelLoad < 4f) return;
+            var gd = TrashPandas.Runtime.Squad.GadgetDirector.Instance;
+            var nd = TrashPandas.Runtime.Panic.NemesisDirector.Instance;
+            if (!gd || !nd || !nd.Pawn) return;
+            if (!s_peelTestDone && Array.IndexOf(Args, "-peeltest") >= 0)
+            {
+                s_peelTestDone = true;
+                Vector3 ahead = nd.Pawn.transform.position + nd.Pawn.Velocity.normalized * 0.3f;
+                gd.DevPeelAt(new Vector3(ahead.x, nd.Pawn.transform.position.y, ahead.z));
+            }
+            if (!s_bonkTestDone && Array.IndexOf(Args, "-bonktest") >= 0)
+            {
+                s_bonkTestDone = true;
+                Vector3 her = nd.Pawn.transform.position;
+                Vector3 from = her + new Vector3(4f, 0.6f, 0f);
+                gd.HostUse(0, TrashPandas.Core.Raccoons.Gadget.Pebble, from, new Vector3(-0.95f, -0.3f, 0f));
+            }
+        }
         public static bool TowerHop => Array.IndexOf(Args, "-hopoff") >= 0;
         public static bool SquadCrouch => Bot == "sneak";
         static float s_nextGadget;
@@ -138,7 +160,8 @@ namespace TrashPandas.Runtime.Net
             g = TrashPandas.Core.Raccoons.Gadget.Pebble; aim = Vector3.forward;
             if (Bot != "gadgets" || !me || Time.timeSinceLevelLoad < 3f || Time.time < s_nextGadget) return false;
             s_nextGadget = Time.time + 2f;
-            g = Time.timeSinceLevelLoad < 7f ? TrashPandas.Core.Raccoons.Gadget.Pebble : TrashPandas.Core.Raccoons.Gadget.SmokeBomb;
+            float tl = Time.timeSinceLevelLoad;
+            g = tl < 6f ? TrashPandas.Core.Raccoons.Gadget.Pebble : tl < 9f ? TrashPandas.Core.Raccoons.Gadget.Banana : TrashPandas.Core.Raccoons.Gadget.SmokeBomb;
             aim = new Vector3(0f, 0f, 1f);
             return true;
         }

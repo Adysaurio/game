@@ -443,6 +443,8 @@ namespace TrashPandas.Runtime.Raccoon
         /// <summary>Bumping into light things knocks them about (Astro Bot: every touch gets a reaction).</summary>
         /// <summary>Paws on something and shoving it (for the pose).</summary>
         public bool Pushing => Time.time < _pushingUntil;
+        /// <summary>On its feet on the ground (not crawling, hanging, riding): banana peels get it.</summary>
+        public bool IsGroundedForPeel => _cc && _cc.enabled && _cc.isGrounded && !Crawling && !Hanging && ReferenceEquals(Mount, null);
         float _pushingUntil;
 
         void OnControllerColliderHit(ControllerColliderHit hit)

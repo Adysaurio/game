@@ -81,8 +81,11 @@ namespace TrashPandas.Runtime.Squad
             Ui.DebugChecklist.Mark("throw");
             var impact = g.GetComponent<ImpactNoise>();
             if (impact) impact.ThrownUntil = Time.time + 2f;
-            Drop(raccoon.PlayerId, direction.normalized * Mathf.Lerp(3f, 10f, strength) + Vector3.up * 2.5f);
+            Drop(raccoon.PlayerId, ThrowVelocity(direction, strength));
         }
+
+        /// <summary>How hard a held thing flies (also drawn as the aim arc while you charge).</summary>
+        public static Vector3 ThrowVelocity(Vector3 direction, float strength) => direction.normalized * Mathf.Lerp(3f, 10f, strength) + Vector3.up * 2.5f;
 
         /// <summary>Let go (caught, a second click, pulled apart). Heavy things fall when fewer than two hold them.</summary>
         public void Drop(int player, Vector3 velocity)

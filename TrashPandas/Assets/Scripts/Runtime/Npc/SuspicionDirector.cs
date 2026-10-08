@@ -118,6 +118,7 @@ namespace TrashPandas.Runtime.Npc
             {
                 var pawn = brain.Pawn;
                 if (pawn.Kind == NpcKind.Nemesis) continue; // driven by the nemesis director
+                if (pawn.SpeakerId == "Alien") { pawn.SetMood(0); brain.Stroll(dt, GuestState.Calm); continue; } // it doesn't care about raccoons
                 if (brain.Cat != null)
                 {
                     Vector3 quarry = catQuarry;

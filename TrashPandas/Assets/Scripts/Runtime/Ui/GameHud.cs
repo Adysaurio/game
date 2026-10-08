@@ -24,6 +24,63 @@ namespace TrashPandas.Runtime.Ui
         Texture2D _mapTex;
         int _renderedFrames;
         Gadget _selected = Gadget.Pebble;
+        bool _aiming;
+        float _nextScroll;
+
+        static string Name(Gadget g) => g == Gadget.Pebble ? "pebble" : g == Gadget.SmokeBomb ? "smoke bomb" : "banana";
+
+        // --- Tips: one line at the right moment, once each ("text is evil": short, and only when it matters) ---
+        static readonly System.Collections.Generic.HashSet<string> s_tipsShown = new System.Collections.Generic.HashSet<string>();
+        string _tip;
+        float _tipUntil;
+        int[] _lastCounts = new int[3];
+        bool _countsKnown;
+
+        public void Tip(string key, string text)
+        {
+            if (key != null && !s_tipsShown.Add(key)) return;
+            _tip = text;
+            _tipUntil = Time.time + 6f;
+        }
+
+        void TickTips(Raccoon.RaccoonController me, GadgetDirector gd)
+        {
+            if (!me || RoundIntro.Playing) return;
+            var pd = PanicDirector.Instance;
+            var nd = Panic.NemesisDirector.Instance;
+            float sinceStart = Time.timeSinceLevelLoad;
+            if (sinceStart > 9f) Tip("tools", "TOOLS: 2 pebble · 3 smoke · 4 banana — HOLD Q to aim (look up = farther), let go to throw");
+            if (pd && pd.Phase == RoundPhase.Panic) Tip("run", "Bonk them with a pebble, drop a banana in their path — or hide (E) till they calm down");
+            if (nd && nd.Pawn && pd && pd.Phase == RoundPhase.Infiltration && Vector3.Distance(nd.Pawn.transform.position, me.transform.position) < 12f)
+                Tip("lure", "Psst — throw a pebble FAR away (hold Q, look up): the noise sends her to look");
+            var carry = CarryDirector.Instance;
+            if (carry && carry.IsCarrying(me.PlayerId)) Tip("carry", "Click: drop it · HOLD click to aim a throw, let go to throw it (bonks people too)");
+            if (gd)
+            {
+                for (int i = 0; i < 3; i++)
+                {
+                    int c = gd.Snapshot.Count(me.PlayerId, (Gadget)i);
+                    if (_countsKnown && c > _lastCounts[i]) Tip(null, $"+{c - _lastCounts[i]} {Name((Gadget)i)}{(c - _lastCounts[i] > 1 ? "s" : "")}!");
+                    _lastCounts[i] = c;
+                }
+                _countsKnown = true;
+            }
+        }
+
+        GUIStyle _tipStyle;
+        void DrawTip()
+        {
+            if (_tip == null || Time.time > _tipUntil) return;
+            float W = UiScale.Width, H = UiScale.Height;
+            _tipStyle ??= new GUIStyle(GUI.skin.label) { fontSize = 16, fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleCenter, wordWrap = true };
+            float a = Mathf.Clamp01((_tipUntil - Time.time) * 2f);
+            var r = new Rect((W - 640f) / 2f, H - 210f, 640f, 40f);
+            GUI.color = new Color(0.1f, 0.06f, 0.02f, 0.85f * a);
+            GUI.DrawTexture(r, Texture2D.whiteTexture);
+            GUI.color = new Color(1f, 0.92f, 0.6f, a);
+            GUI.Label(r, _tip, _tipStyle);
+            GUI.color = Color.white;
+        }
         GUIStyle _small, _label, _count, _icon;
         static Texture2D s_round;
 
@@ -84,15 +141,35 @@ namespace TrashPandas.Runtime.Ui
             {
                 if (k.digit2Key.wasPressedThisFrame) _selected = Gadget.Pebble;
                 if (k.digit3Key.wasPressedThisFrame) _selected = Gadget.SmokeBomb;
+                if (k.digit4Key.wasPressedThisFrame) _selected = Gadget.Banana;
             }
-            if (m != null && Mathf.Abs(m.scroll.ReadValue().y) > 0.1f) _selected = _selected == Gadget.Pebble ? Gadget.SmokeBomb : Gadget.Pebble;
-            var me = Me;
-            if (k != null && k.qKey.wasPressedThisFrame && me && GadgetDirector.Instance && !RoundIntro.Playing)
+            if (m != null && Mathf.Abs(m.scroll.ReadValue().y) > 0.1f && Time.time > _nextScroll)
             {
-                var cam = Camera.main;
-                GadgetDirector.Instance.Use(me, _selected, cam ? cam.transform.forward : me.transform.forward);
+                _nextScroll = Time.time + 0.15f;
+                _selected = (Gadget)(((int)_selected + (m.scroll.ReadValue().y < 0f ? 1 : 2)) % 3);
             }
-            if (Net.DevAutomation.GadgetBot(me, out var g, out var aim) && GadgetDirector.Instance) GadgetDirector.Instance.Use(me, g, aim);
+            var me = Me;
+            var gd = GadgetDirector.Instance;
+            var cam = Camera.main;
+            Vector3 look = cam ? cam.transform.forward : me ? me.transform.forward : Vector3.forward;
+            bool canUse = me && gd && !RoundIntro.Playing && !me.Frozen && !me.HiddenInside && gd.Snapshot.Count(me.PlayerId, _selected) > 0;
+            // Hold Q: the arc shows where it'll land (look up = farther). Release: throw.
+            if (k != null && k.qKey.wasPressedThisFrame && me && gd && !RoundIntro.Playing && gd.Snapshot.Count(me.PlayerId, _selected) == 0)
+                Tip("empty", $"No {Name(_selected)}s left — grab more around the estate");
+            if (k != null && k.qKey.isPressed && canUse)
+            {
+                _aiming = true;
+                AimArc.Show(GadgetDirector.Origin(me), GadgetThrow.Velocity(_selected, look), _selected == Gadget.Banana ? new Color(1f, 0.9f, 0.2f) : _selected == Gadget.SmokeBomb ? new Color(0.75f, 0.6f, 1f) : Color.white);
+            }
+            if (_aiming && k != null && !k.qKey.isPressed)
+            {
+                _aiming = false;
+                if (canUse) gd.Use(me, _selected, look);
+            }
+            if (Net.DevAutomation.GadgetBot(me, out var g, out var aim) && gd) gd.Use(me, g, aim);
+            if (me && Debug.isDebugBuild && System.Array.IndexOf(System.Environment.GetCommandLineArgs(), "-aimshot") >= 0)
+                AimArc.Show(GadgetDirector.Origin(me), GadgetThrow.Velocity(Gadget.Banana, look + Vector3.up * 0.25f), new Color(1f, 0.9f, 0.2f)); // dev: screenshot of the aim
+            TickTips(me, gd);
         }
 
         void OnGUI()
@@ -105,6 +182,7 @@ namespace TrashPandas.Runtime.Ui
             _icon ??= new GUIStyle(GUI.skin.label) { fontSize = 26, alignment = TextAnchor.MiddleCenter, fontStyle = FontStyle.Bold };
             DrawMinimap();
             DrawItemBar();
+            DrawTip();
             DrawNemesisCard();
         }
 
@@ -235,7 +313,7 @@ namespace TrashPandas.Runtime.Ui
         void DrawItemBar()
         {
             float W = UiScale.Width, H = UiScale.Height;
-            float slot = 58f, gap = 14f, w = slot * 3 + gap * 4, h = 92f, x = (W - w) / 2f, y = H - h - 58f;
+            float slot = 58f, gap = 14f, w = slot * 4 + gap * 5, h = 92f, x = (W - w) / 2f, y = H - h - 58f;
             // A wooden plank.
             GUI.color = new Color(0.36f, 0.22f, 0.11f, 0.95f);
             GUI.DrawTexture(new Rect(x, y, w, h), Texture2D.whiteTexture);
@@ -253,8 +331,9 @@ namespace TrashPandas.Runtime.Ui
             DrawSlot(new Rect(x + gap, y + 8, slot, slot), "1", carried ? (lootItem ? "$" : "•") : "", carried ? (lootItem ? lootItem.Label : carried.name) : "paws free", false, -1);
             DrawSlot(new Rect(x + gap * 2 + slot, y + 8, slot, slot), "2", "●", "Pebble", _selected == Gadget.Pebble, gd ? gd.Snapshot.Count(pid, Gadget.Pebble) : 0);
             DrawSlot(new Rect(x + gap * 3 + slot * 2, y + 8, slot, slot), "3", "◍", "Smoke bomb", _selected == Gadget.SmokeBomb, gd ? gd.Snapshot.Count(pid, Gadget.SmokeBomb) : 0);
+            DrawSlot(new Rect(x + gap * 4 + slot * 3, y + 8, slot, slot), "4", ")", "Banana", _selected == Gadget.Banana, gd ? gd.Snapshot.Count(pid, Gadget.Banana) : 0);
             GUI.color = new Color(1f, 0.9f, 0.7f);
-            GUI.Label(new Rect(x, y - 18, w, 16), "Q: use tool · wheel / 2-3: pick", _label);
+            GUI.Label(new Rect(x, y - 18, w, 16), "HOLD Q: aim · let go: throw · 2-4 / wheel: pick", _label);
             GUI.color = Color.white;
         }
 

@@ -48,11 +48,14 @@ namespace TrashPandas.Runtime.Npc
             new[] { "COME HERE, YOU!", "*SLIPPER INCOMING*", "FILTHY CRITTERS!" },
         };
 
+        static readonly string[] AlienLines = { "*beep boop*", "take me to your raccoon", "delicious earth cake", "I come in peace (for the cake)", "fellow trash beings!", "this ritual is strange", "*probes the punch bowl*" };
+
         /// <summary>A line that fits the mood, stable for a few seconds per person.</summary>
         static string PanicLine(NpcPawn pawn, byte mood)
         {
             int seed = pawn.name.GetHashCode() ^ (int)(Time.time / 3.5f);
             string Pick(string[] lines) => lines[(seed & 0x7fffffff) % lines.Length];
+            if (pawn.SpeakerId == "Alien") return ((int)(Time.time / 3.5f) % 2 == 0) ? Pick(AlienLines) : null;
             if (pawn.Kind == NpcKind.Nemesis && TrashPandas.Runtime.Panic.NemesisDirector.Instance)
             {
                 int k = (int)TrashPandas.Runtime.Panic.NemesisDirector.Instance.Kind;
@@ -118,7 +121,7 @@ namespace TrashPandas.Runtime.Npc
                 var pawn = brain.Pawn;
                 if (!pawn) continue;
                 string icon = null; Color color = Color.white;
-                if (pawn.Mood >= NpcPawn.MoodChasing || pawn.Kind == NpcKind.Nemesis)
+                if (pawn.Mood >= NpcPawn.MoodChasing || pawn.Kind == NpcKind.Nemesis || pawn.SpeakerId == "Alien")
                 {
                     // The RUN: little speech bubbles with personality (Goose-style reactions).
                     string line = PanicLine(pawn, pawn.Mood);

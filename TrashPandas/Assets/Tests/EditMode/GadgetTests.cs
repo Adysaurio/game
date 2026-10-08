@@ -11,6 +11,33 @@ namespace TrashPandas.Tests
             var k = GadgetKit.Starting();
             Assert.AreEqual(3, k.Count(Gadget.Pebble));
             Assert.AreEqual(1, k.Count(Gadget.SmokeBomb));
+            Assert.AreEqual(2, k.Count(Gadget.Banana));
+        }
+
+        [Test]
+        public void LookingUp_ThrowsFarther()
+        {
+            var level = GadgetThrow.Velocity(Gadget.Pebble, new UnityEngine.Vector3(0f, 0f, 1f));
+            var up = GadgetThrow.Velocity(Gadget.Pebble, new UnityEngine.Vector3(0f, 0.5f, 0.86f));
+            var down = GadgetThrow.Velocity(Gadget.Pebble, new UnityEngine.Vector3(0f, -0.4f, 0.9f));
+            Assert.Greater(GadgetThrow.FlatRange(up), GadgetThrow.FlatRange(level));
+            Assert.Greater(GadgetThrow.FlatRange(level), GadgetThrow.FlatRange(down));
+            Assert.Greater(level.z, 0f, "forward");
+        }
+
+        [Test]
+        public void BananasAreTossedShort_PebblesFly()
+        {
+            var aim = new UnityEngine.Vector3(0f, 0f, 1f);
+            Assert.Greater(GadgetThrow.FlatRange(GadgetThrow.Velocity(Gadget.Pebble, aim)), GadgetThrow.FlatRange(GadgetThrow.Velocity(Gadget.Banana, aim)));
+        }
+
+        [Test]
+        public void Peel_SlipsWhoeverStepsOnIt()
+        {
+            Assert.IsTrue(BananaPeel.Slips(new UnityEngine.Vector3(1f, 0f, 1f), new UnityEngine.Vector3(1.3f, 0f, 1.1f), moving: true));
+            Assert.IsFalse(BananaPeel.Slips(new UnityEngine.Vector3(1f, 0f, 1f), new UnityEngine.Vector3(2f, 0f, 1f), true), "too far");
+            Assert.IsFalse(BananaPeel.Slips(new UnityEngine.Vector3(1f, 0f, 1f), new UnityEngine.Vector3(1.1f, 0f, 1f), moving: false), "standing still on it is fine");
         }
 
         [Test]

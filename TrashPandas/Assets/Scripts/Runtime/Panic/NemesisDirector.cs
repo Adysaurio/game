@@ -94,9 +94,13 @@ namespace TrashPandas.Runtime.Panic
             var sd = SuspicionDirector.Instance;
             if (!sd || sd.Suspended) return;
             Pawn.SetSpeed(BaseSpeed * Profile.Speed); // (after a RUN calms down)
+            if (Time.time < _stunnedUntil) { Pawn.Stop(); Pawn.SetMood(NpcPawn.MoodStunned); return; }
             if (!_portrait) TickInfiltration(sd);
         }
         bool _portrait;
+        float _stunnedUntil;
+        /// <summary>Bonked or slipped (before the RUN): seeing stars for a moment.</summary>
+        public void Stun(float seconds) => _stunnedUntil = Mathf.Max(_stunnedUntil, Time.time + seconds);
 
         /// <summary>You hear them before you see them (Mr. X): heels / boots / a cane, louder as they get close.</summary>
         void Footsteps()

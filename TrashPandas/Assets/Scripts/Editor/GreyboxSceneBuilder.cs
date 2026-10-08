@@ -261,6 +261,7 @@ namespace TrashPandas.EditorTools
             };
 
             BuildNemesis(skin);
+            BuildSillyStuff();
 
             var director = new GameObject("SuspicionDirector");
             director.AddComponent<NetworkObject>();
@@ -380,6 +381,102 @@ namespace TrashPandas.EditorTools
             var weapon = go.AddComponent<PanicWeapon>();
             weapon.Kind = kind;
             return weapon;
+        }
+
+        /// <summary>
+        /// Irreverent nonsense (playtest: "no hay cosas irreverentes o graciosas sin sentido"): an alien guest nobody
+        /// questions, a dancing hot dog mascot you can ride inside, and tool pickups lying around (bananas!).
+        /// </summary>
+        static void BuildSillyStuff()
+        {
+            // The alien: green, big black eyes, antennae. It doesn't report raccoons; it has its own agenda.
+            var alien = Person("Alien", NpcKind.Guest, new Vector3(5f, 0f, -1.5f), 200f, new Color(0.35f, 0.75f, 0.35f), Mat("AlienSkin", new Color(0.55f, 0.9f, 0.45f)), false);
+            alien.SpeakerId = "Alien";
+            var eye = Mat("AlienEye", new Color(0.02f, 0.02f, 0.03f));
+            Visual(PrimitiveType.Sphere, "EyeL", alien.Head, new Vector3(-0.08f, 0.02f, 0.13f), new Vector3(0.1f, 0.13f, 0.05f), eye);
+            Visual(PrimitiveType.Sphere, "EyeR", alien.Head, new Vector3(0.08f, 0.02f, 0.13f), new Vector3(0.1f, 0.13f, 0.05f), eye);
+            var antenna = Mat("Antenna", new Color(0.3f, 0.7f, 0.3f));
+            Visual(PrimitiveType.Cylinder, "AntennaL", alien.Head, new Vector3(-0.07f, 0.22f, 0f), new Vector3(0.02f, 0.1f, 0.02f), antenna);
+            Visual(PrimitiveType.Cylinder, "AntennaR", alien.Head, new Vector3(0.07f, 0.22f, 0f), new Vector3(0.02f, 0.1f, 0.02f), antenna);
+            var bulb = Mat("AntennaBulb", new Color(1f, 0.35f, 0.8f));
+            Visual(PrimitiveType.Sphere, "BulbL", alien.Head, new Vector3(-0.07f, 0.33f, 0f), Vector3.one * 0.06f, bulb);
+            Visual(PrimitiveType.Sphere, "BulbR", alien.Head, new Vector3(0.07f, 0.33f, 0f), Vector3.one * 0.06f, bulb);
+            alien.gameObject.AddComponent<NpcRoute>().Points = new[] { new Vector3(5f, 0f, -1.5f), new Vector3(2f, 0f, 3f), new Vector3(9f, 0f, 2.5f), new Vector3(6f, 0f, -6f) };
+
+            // The hot dog mascot: dances around the garden; hop inside and ride along.
+            var dog = new GameObject("HotDogMascot");
+            dog.transform.position = new Vector3(-4f, 0f, -0.5f);
+            var col = dog.AddComponent<CapsuleCollider>();
+            col.height = 2f; col.radius = 0.45f; col.center = new Vector3(0f, 1f, 0f); col.isTrigger = true;
+            var body = new GameObject("Body").transform;
+            body.SetParent(dog.transform, false);
+            var bun = Mat("Bun", new Color(0.88f, 0.65f, 0.35f));
+            var sausage = Mat("Sausage", new Color(0.75f, 0.3f, 0.2f));
+            var mustard = Mat("Mustard", new Color(1f, 0.85f, 0.1f));
+            Visual(PrimitiveType.Capsule, "BunBack", body, new Vector3(0f, 1f, -0.18f), new Vector3(0.7f, 0.95f, 0.3f), bun);
+            Visual(PrimitiveType.Capsule, "Sausage", body, new Vector3(0f, 1.1f, 0.02f), new Vector3(0.45f, 1.05f, 0.45f), sausage);
+            Visual(PrimitiveType.Cube, "Mustard", body, new Vector3(0f, 1.15f, 0.24f), new Vector3(0.08f, 1.2f, 0.03f), mustard);
+            var white = Mat("MascotEye", Color.white);
+            Visual(PrimitiveType.Sphere, "EyeL", body, new Vector3(-0.1f, 1.7f, 0.2f), Vector3.one * 0.16f, white);
+            Visual(PrimitiveType.Sphere, "EyeR", body, new Vector3(0.1f, 1.7f, 0.2f), Vector3.one * 0.16f, white);
+            var pupil = Mat("MascotPupil", new Color(0.05f, 0.05f, 0.05f));
+            Visual(PrimitiveType.Sphere, "PupilL", body, new Vector3(-0.1f, 1.7f, 0.27f), Vector3.one * 0.06f, pupil);
+            Visual(PrimitiveType.Sphere, "PupilR", body, new Vector3(0.1f, 1.7f, 0.27f), Vector3.one * 0.06f, pupil);
+            Visual(PrimitiveType.Cube, "Smile", body, new Vector3(0f, 1.48f, 0.23f), new Vector3(0.18f, 0.03f, 0.03f), pupil);
+            Transform Arm(string n, float x)
+            {
+                var pivot = new GameObject(n).transform;
+                pivot.SetParent(body, false);
+                pivot.localPosition = new Vector3(x, 1.25f, 0f);
+                Visual(PrimitiveType.Capsule, n + "Mesh", pivot, new Vector3(Mathf.Sign(x) * 0.25f, 0f, 0f), new Vector3(0.12f, 0.25f, 0.12f), bun).localRotation = Quaternion.Euler(0f, 0f, 90f);
+                return pivot;
+            }
+            var hide = dog.AddComponent<TrashPandas.Runtime.Squad.MascotHideout>();
+            hide.Body = body;
+            hide.ArmL = Arm("ArmL", -0.3f);
+            hide.ArmR = Arm("ArmR", 0.3f);
+            hide.Route = new[] { new Vector3(-4f, 0f, -0.5f), new Vector3(3f, 0f, 0f), new Vector3(9f, 0f, 1.5f), new Vector3(3f, 0f, 6.8f), new Vector3(-5f, 0f, 6.8f), new Vector3(-9f, 0f, 1f) };
+            dog.AddComponent<NetworkObject>();
+            var nt = dog.AddComponent<NetworkTransform>();
+            nt.SyncScaleX = nt.SyncScaleY = nt.SyncScaleZ = false;
+            IgnoreForNavigation(dog);
+
+            // Tools lying around: pebble piles, banana bunches, smoke bombs (they come back after a while).
+            void Pickup(string name, TrashPandas.Core.Raccoons.Gadget kind, int amount, Vector3 at)
+            {
+                var root = new GameObject(name);
+                root.transform.position = at;
+                var vis = new GameObject("Visual").transform;
+                vis.SetParent(root.transform, false);
+                vis.localPosition = Vector3.up * 0.45f;
+                switch (kind)
+                {
+                    case TrashPandas.Core.Raccoons.Gadget.Pebble:
+                        var stone = Mat("Pebbles", new Color(0.62f, 0.62f, 0.65f));
+                        for (int i = 0; i < 4; i++) Visual(PrimitiveType.Sphere, "Stone", vis, new Vector3((i % 2) * 0.14f - 0.07f, (i / 2) * 0.1f, (i % 3) * 0.06f - 0.06f), Vector3.one * 0.14f, stone);
+                        break;
+                    case TrashPandas.Core.Raccoons.Gadget.Banana:
+                        var yellow = Mat("BananaBunch", new Color(1f, 0.85f, 0.15f));
+                        for (int i = 0; i < 4; i++) Visual(PrimitiveType.Capsule, "Banana", vis, new Vector3(i * 0.07f - 0.1f, 0f, 0f), new Vector3(0.08f, 0.17f, 0.08f), yellow).localRotation = Quaternion.Euler(0f, 0f, -20f + i * 12f);
+                        break;
+                    default:
+                        Visual(PrimitiveType.Sphere, "Bomb", vis, Vector3.zero, Vector3.one * 0.26f, Mat("SmokeBomb", new Color(0.4f, 0.32f, 0.55f)));
+                        Visual(PrimitiveType.Cylinder, "Fuse", vis, new Vector3(0f, 0.16f, 0f), new Vector3(0.03f, 0.05f, 0.03f), Mat("Fuse", new Color(0.9f, 0.5f, 0.2f)));
+                        break;
+                }
+                var p = root.AddComponent<TrashPandas.Runtime.Squad.GadgetPickup>();
+                p.Kind = kind;
+                p.Amount = amount;
+                p.Visual = vis;
+            }
+            Pickup("Pickup_Pebbles_Garden", TrashPandas.Core.Raccoons.Gadget.Pebble, 3, new Vector3(-2f, 0f, -4.5f));
+            Pickup("Pickup_Pebbles_Orchard", TrashPandas.Core.Raccoons.Gadget.Pebble, 3, new Vector3(12f, 0f, -12f));
+            Pickup("Pickup_Pebbles_House", TrashPandas.Core.Raccoons.Gadget.Pebble, 3, new Vector3(-12f, 0f, 16f));
+            Pickup("Pickup_Bananas_Kitchen", TrashPandas.Core.Raccoons.Gadget.Banana, 2, new Vector3(-19f, 0f, 6f));
+            Pickup("Pickup_Bananas_Garden", TrashPandas.Core.Raccoons.Gadget.Banana, 2, new Vector3(10f, 0f, 4.5f));
+            Pickup("Pickup_Bananas_Parking", TrashPandas.Core.Raccoons.Gadget.Banana, 2, new Vector3(21f, 0f, -4f));
+            Pickup("Pickup_Smoke_Shed", TrashPandas.Core.Raccoons.Gadget.SmokeBomb, 1, new Vector3(-10f, 0f, -6f));
+            Pickup("Pickup_Smoke_Lawn", TrashPandas.Core.Raccoons.Gadget.SmokeBomb, 1, new Vector3(6f, 0f, -10f));
         }
 
         /// <summary>Tonight's antagonist: one body, three costumes (the director shows the one picked this round).</summary>

@@ -46,6 +46,28 @@ namespace TrashPandas.Runtime.Npc
         float _baseSpeed;
         void Awake() { _agent = GetComponent<NavMeshAgent>(); _baseSpeed = _agent ? _agent.speed : 1f; }
 
+        /// <summary>Banana peel: legs up, flat on the back, then back on their feet (host; the transform syncs).</summary>
+        public void Slip(float seconds)
+        {
+            if (!_slipping) StartCoroutine(SlipRoutine(seconds));
+        }
+        bool _slipping;
+        System.Collections.IEnumerator SlipRoutine(float seconds)
+        {
+            _slipping = true;
+            Stop();
+            bool rot = _agent && _agent.enabled;
+            if (rot) { _agent.updateRotation = false; _agent.isStopped = true; }
+            Quaternion up = transform.rotation, down = up * Quaternion.Euler(-80f, 0f, 0f);
+            for (float t = 0f; t < 0.18f; t += Time.deltaTime) { transform.rotation = Quaternion.Slerp(up, down, t / 0.18f); yield return null; }
+            transform.rotation = down;
+            yield return new UnityEngine.WaitForSeconds(Mathf.Max(0.2f, seconds - 0.6f));
+            for (float t = 0f; t < 0.4f; t += Time.deltaTime) { transform.rotation = Quaternion.Slerp(down, up, t / 0.4f); yield return null; }
+            transform.rotation = up;
+            if (rot && _agent) { _agent.updateRotation = true; _agent.isStopped = false; }
+            _slipping = false;
+        }
+
         /// <summary>The RUN cooled down: back to a stroll.</summary>
         public void CalmDown()
         {

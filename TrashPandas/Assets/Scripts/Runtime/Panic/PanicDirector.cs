@@ -287,6 +287,7 @@ namespace TrashPandas.Runtime.Panic
                     _chasers.Add(new Chaser { Brain = brain, Mind = nm, IsNemesis = true });
                     continue;
                 }
+                if (brain.Pawn.SpeakerId == "Alien") continue; // just vibing
                 if (nemesis && !IsHelper(nemesis.Kind, brain.Pawn))
                 {
                     brain.Pawn.SetMood((byte)Core.Npc.GuestState.Alarmed);
@@ -611,6 +612,9 @@ namespace TrashPandas.Runtime.Panic
             _offlineSnapshot = snap;
             if (IsSpawned && IsServer && !snap.Equals(_snapshot.Value)) _snapshot.Value = snap;
         }
+
+        /// <summary>A raccoon stepped on a banana peel: whoops.</summary>
+        public static void SlipRaccoon(RaccoonController r) => Push(r, r.transform.forward * 3f, 1f);
 
         static void Push(RaccoonController r, Vector3 impulse, float stun)
         {

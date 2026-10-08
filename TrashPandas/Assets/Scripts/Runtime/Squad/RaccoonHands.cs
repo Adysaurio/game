@@ -23,6 +23,9 @@ namespace TrashPandas.Runtime.Squad
             var highlight = GrabHighlight.Instance ? GrabHighlight.Instance.Refresh(rig, raccoon, carrying) : null;
             float now = Time.time;
             if (reader.ClickPressed(rig)) _click.Press(now);
+            float charge = _click.Charge(now);
+            if (carrying && charge > 0f && rig.OutputCamera)
+                Ui.AimArc.Show(raccoon.transform.position + Vector3.up * 0.8f, CarryDirector.ThrowVelocity(rig.OutputCamera.transform.forward, charge), new Color(1f, 0.6f, 0.3f));
             if (reader.ClickReleased(rig) || botTap)
             {
                 var outcome = botTap ? new ClickOutcome { Kind = ClickResult.Tap } : _click.Release(now);
