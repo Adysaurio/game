@@ -76,6 +76,7 @@ namespace TrashPandas.Runtime.Input
             }
             var stick = Pad.Move;
             if (stick.sqrMagnitude > 0f) { x = stick.x; y = stick.y; }
+            if (Net.DevAutomation.HoldKeys(out float bx, out float by)) { x = bx; y = by; } // dev bots that "press" WASD
             rig.GroundAxes(out var forward, out var right);
             Vector3 world = Vector3.ClampMagnitude(right * x + forward * y, 1f);
             return new Vector2(world.x, world.z);

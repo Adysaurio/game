@@ -917,20 +917,15 @@ namespace TrashPandas.EditorTools
             return inst;
         }
 
-        /// <summary>Turn a Meshy model so it looks along its parent's +Z (from the Head → headfront bones; models come axis-aligned).</summary>
+        /// <summary>
+        /// Meshy models come in facing +X (their "headfront" bone does NOT point at the face — trusting it made the
+        /// raccoon crab-walk): turn them a quarter so they look along the parent's +Z. Verified in game with the
+        /// "keyd" bot (moving right must show the right-hand profile, not the face).
+        /// </summary>
+        public static float MeshyYaw = -90f;
         static void FaceForward(Transform model)
         {
-            model.localRotation = Quaternion.identity;
-            var bones = model.GetComponentsInChildren<Transform>();
-            var head = bones.FirstOrDefault(b => b.name == "Head");
-            var front = bones.FirstOrDefault(b => b.name == "headfront");
-            if (!head || !front || !model.parent) return;
-            Vector3 f = model.parent.InverseTransformDirection(front.position - head.position);
-            f.y = 0f;
-            if (f.sqrMagnitude < 1e-8f) return;
-            float yaw = Mathf.Round(Vector3.SignedAngle(f.normalized, Vector3.forward, Vector3.up) / 90f) * 90f;
-            model.localRotation = Quaternion.Euler(0f, yaw, 0f);
-            Debug.Log($"[GreyboxSceneBuilder] {model.parent.name}/{model.name} faces forward after a {yaw:F0}° turn");
+            model.localRotation = Quaternion.Euler(0f, MeshyYaw, 0f);
         }
 
         static GameObject Prop(string name, PrimitiveType type, Vector3 position, Vector3 scale, Material mat, float mass, bool bothHands)
