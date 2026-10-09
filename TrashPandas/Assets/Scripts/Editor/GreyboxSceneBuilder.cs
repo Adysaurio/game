@@ -832,7 +832,7 @@ namespace TrashPandas.EditorTools
             inst.name = "Model";
             inst.transform.localPosition = Vector3.zero;
             inst.transform.localScale = Vector3.one * RaccoonModelScale;
-            FaceForward(inst.transform);
+            inst.transform.localRotation = Quaternion.Euler(0f, RaccoonYaw, 0f); // our own Blender rig (tools/rig_raccoon.py)
             foreach (var smr in inst.GetComponentsInChildren<SkinnedMeshRenderer>())
             {
                 smr.sharedMaterial = mat;
@@ -923,6 +923,8 @@ namespace TrashPandas.EditorTools
         /// "keyd" bot (moving right must show the right-hand profile, not the face).
         /// </summary>
         public static float MeshyYaw = -90f;
+        /// <summary>Our Blender-rigged raccoon (faces -Y in Blender, exported -Z forward / Y up).</summary>
+        public static float RaccoonYaw = 0f;
         static void FaceForward(Transform model)
         {
             model.localRotation = Quaternion.Euler(0f, MeshyYaw, 0f);

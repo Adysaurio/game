@@ -36,7 +36,7 @@ ModelImporter:
       takeName: Armature|Carry
       internalID: 457055690975431395
       firstFrame: 0
-      lastFrame: 156
+      lastFrame: 30
       wrapMode: 0
       orientationOffsetY: 0
       level: 0
@@ -65,7 +65,7 @@ ModelImporter:
       takeName: Armature|Cheer
       internalID: 1010934096438218682
       firstFrame: 0
-      lastFrame: 224
+      lastFrame: 30
       wrapMode: 0
       orientationOffsetY: 0
       level: 0
@@ -94,7 +94,7 @@ ModelImporter:
       takeName: Armature|Crawl
       internalID: -4424181212379913186
       firstFrame: 0
-      lastFrame: 23
+      lastFrame: 24
       wrapMode: 0
       orientationOffsetY: 0
       level: 0
@@ -123,7 +123,7 @@ ModelImporter:
       takeName: Armature|Dance
       internalID: 5567560465902106206
       firstFrame: 0
-      lastFrame: 196
+      lastFrame: 40
       wrapMode: 0
       orientationOffsetY: 0
       level: 0
@@ -152,7 +152,7 @@ ModelImporter:
       takeName: Armature|Hang
       internalID: 1227577430105836932
       firstFrame: 0
-      lastFrame: 48
+      lastFrame: 40
       wrapMode: 0
       orientationOffsetY: 0
       level: 0
@@ -181,7 +181,7 @@ ModelImporter:
       takeName: Armature|Idle
       internalID: -8945691123924629249
       firstFrame: 0
-      lastFrame: 96
+      lastFrame: 60
       wrapMode: 0
       orientationOffsetY: 0
       level: 0
@@ -210,7 +210,7 @@ ModelImporter:
       takeName: Armature|Jump
       internalID: 1079665108409675491
       firstFrame: 0
-      lastFrame: 45
+      lastFrame: 18
       wrapMode: 0
       orientationOffsetY: 0
       level: 0
@@ -239,94 +239,7 @@ ModelImporter:
       takeName: Armature|Push
       internalID: 2255707603342613374
       firstFrame: 0
-      lastFrame: 192
-      wrapMode: 0
-      orientationOffsetY: 0
-      level: 0
-      cycleOffset: 0
-      loop: 0
-      hasAdditiveReferencePose: 0
-      loopTime: 1
-      loopBlend: 0
-      loopBlendOrientation: 0
-      loopBlendPositionY: 0
-      loopBlendPositionXZ: 0
-      keepOriginalOrientation: 0
-      keepOriginalPositionY: 1
-      keepOriginalPositionXZ: 0
-      heightFromFeet: 0
-      mirror: 0
-      bodyMask: 01000000010000000100000001000000010000000100000001000000010000000100000001000000010000000100000001000000u
-      curves: []
-      events: []
-      transformMask: []
-      maskType: 3
-      maskSource: {instanceID: 0}
-      additiveReferencePoseFrame: 0
-    - serializedVersion: 16
-      name: Run
-      takeName: Armature|Run
-      internalID: -7551964380084998518
-      firstFrame: 0
-      lastFrame: 14
-      wrapMode: 0
-      orientationOffsetY: 0
-      level: 0
-      cycleOffset: 0
-      loop: 0
-      hasAdditiveReferencePose: 0
-      loopTime: 1
-      loopBlend: 0
-      loopBlendOrientation: 0
-      loopBlendPositionY: 0
-      loopBlendPositionXZ: 0
-      keepOriginalOrientation: 0
-      keepOriginalPositionY: 1
-      keepOriginalPositionXZ: 0
-      heightFromFeet: 0
-      mirror: 0
-      bodyMask: 01000000010000000100000001000000010000000100000001000000010000000100000001000000010000000100000001000000u
-      curves: []
-      events: []
-      transformMask: []
-      maskType: 3
-      maskSource: {instanceID: 0}
-      additiveReferencePoseFrame: 0
-    - serializedVersion: 16
-      name: Sneak
-      takeName: Armature|Sneak
-      internalID: -8112269819449055677
-      firstFrame: 0
-      lastFrame: 68
-      wrapMode: 0
-      orientationOffsetY: 0
-      level: 0
-      cycleOffset: 0
-      loop: 0
-      hasAdditiveReferencePose: 0
-      loopTime: 1
-      loopBlend: 0
-      loopBlendOrientation: 0
-      loopBlendPositionY: 0
-      loopBlendPositionXZ: 0
-      keepOriginalOrientation: 0
-      keepOriginalPositionY: 1
-      keepOriginalPositionXZ: 0
-      heightFromFeet: 0
-      mirror: 0
-      bodyMask: 01000000010000000100000001000000010000000100000001000000010000000100000001000000010000000100000001000000u
-      curves: []
-      events: []
-      transformMask: []
-      maskType: 3
-      maskSource: {instanceID: 0}
-      additiveReferencePoseFrame: 0
-    - serializedVersion: 16
-      name: Walk
-      takeName: Armature|Walk
-      internalID: 8349542763059015795
-      firstFrame: 0
-      lastFrame: 100
+      lastFrame: 30
       wrapMode: 0
       orientationOffsetY: 0
       level: 0
