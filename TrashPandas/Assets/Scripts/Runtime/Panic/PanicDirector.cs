@@ -170,7 +170,7 @@ namespace TrashPandas.Runtime.Panic
             get
             {
                 var l = TrashPandas.Runtime.Loot.LootDirector.Instance;
-                return Squad.GameMode.Raccoons && l && Core.Round.Getaway.PartyOver(l.Snapshot.SecondsLeft);
+                return Squad.GameMode.Raccoons && l && Core.Round.Getaway.PartyOver(l.Snapshot.SecondsLeft, l.Snapshot.ObjectivesPicked);
             }
         }
 
