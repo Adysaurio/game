@@ -131,6 +131,8 @@ namespace TrashPandas.Runtime.Squad
             // Dev "-sidecam": watch the active raccoon from the side (to judge the gait).
             if (active && Debug.isDebugBuild && System.Array.IndexOf(System.Environment.GetCommandLineArgs(), "-sidecam") >= 0)
                 CameraRig.Orbit.HorizontalAxis.Value = Mathf.DeltaAngle(0f, active.transform.eulerAngles.y + 90f);
+            if (active && Debug.isDebugBuild && System.Array.IndexOf(System.Environment.GetCommandLineArgs(), "-chasecam") >= 0)
+                CameraRig.Orbit.HorizontalAxis.Value = Mathf.DeltaAngle(0f, active.transform.eulerAngles.y);
             Ui.GameHud.SquadAiming = _hands.Aiming;
             if (active)
                 _hands.Tick(_reader, CameraRig, active,

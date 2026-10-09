@@ -177,14 +177,14 @@ namespace TrashPandas.Runtime.Raccoon
                     float mSxz = 1f + _squash * 0.08f - _stretch * 0.04f;
                     Visual.localScale = new Vector3(mSxz, mSy, mSxz);
                     // Running: a low forward lean, paws reaching for the ground (the gallop).
-                    float lean = 55f * _runK * (moving ? 1f : 0f);
+                    float lean = 40f * _runK * (moving ? 1f : 0f);
                     _leanK = Mathf.MoveTowards(_leanK, lean, dt * 160f);
                     _crouchK = Mathf.MoveTowards(_crouchK, !riding && _sneakK > 0.5f && _runK < 0.5f ? 1f : 0f, dt * 6f);
                     Visual.localPosition = new Vector3(0f, -0.07f * _crouchK, -0.05f * _leanK / 42f);
                     Visual.localRotation = Quaternion.Euler(_leanK + (moving ? Mathf.Sin(_phase * 2f) * 5f * _runK : 0f), 0f, sway * 0.4f);
                 }
                 PlayModelClip(planar, moving, riding);
-                BuildGait(planar, moving && _clip == "Idle", dt);
+                BuildGait(planar, moving && _clip == "Move", dt);
                 Crouch();
                 UpdateBandana();
                 return;
@@ -324,7 +324,7 @@ namespace TrashPandas.Runtime.Raccoon
         /// <summary>Sneaking (moving or not): a real crouch — knees bent, back forward, head up — instead of squashing.</summary>
         void Crouch()
         {
-            if (_crouchK <= 0.001f || !_hips || _clip != "Idle") return;
+            if (_crouchK <= 0.001f || !_hips || (_clip != "Idle" && _clip != "Move")) return;
             Transform body = Model.transform;
             Vector3 right = body.right;
             float k = _crouchK;
@@ -411,13 +411,19 @@ namespace TrashPandas.Runtime.Raccoon
             if (r && r.Hanging) clip = "Hang";
             else if (r && r.Crawling) { clip = "Crawl"; speed = 1.6f; }
             else if (riding) clip = "Idle";
-            else if (airborne) { clip = "Jump"; speed = 1.4f; }
+            else if (airborne) { clip = "Jump"; speed = 1f; }
             else if (r && r.Pushing) clip = "Push";
-            else if (moving) { clip = "Idle"; speed = 0.6f; } // walk / sneak / gallop: our own gait on the bones (BuildGait)
+            else if (moving) { clip = "Move"; speed = 0f; } // walk / sneak / gallop: a still neutral pose + our own gait on the bones
             else if (r && r.Emote == 1) clip = "Dance";
             else if (r && r.Emote == 2) clip = "Cheer";
             else clip = "Idle";
-            if (clip != _clip)
+            if (clip != _clip && clip == "Move")
+            {
+                // The idle's first frame, frozen: looking straight ahead, feet under the body.
+                _clip = clip;
+                Model.Play("Idle", 0, 0f);
+            }
+            else if (clip != _clip)
             {
                 _clip = clip;
                 _clipSince = Time.time;

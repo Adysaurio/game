@@ -23,9 +23,9 @@ namespace TrashPandas.Runtime.Raccoon
         public float Deceleration = 40f;
         public float AirControl = 0.5f;
         public float TurnSpeed = 720f;
-        public float JumpVelocity = 5.5f;
-        public float Gravity = -20f;
-        public float FallGravityMultiplier = 2f;
+        public float JumpVelocity = 4.7f;
+        public float Gravity = -13f;
+        public float FallGravityMultiplier = 1.6f;
         public float JumpCutMultiplier = 2.5f;
         public float ClimbSpeed = 2.5f;
         public float StandHeight = 0.6f;

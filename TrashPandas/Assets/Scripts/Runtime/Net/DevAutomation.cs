@@ -58,6 +58,11 @@ namespace TrashPandas.Runtime.Net
         public static Vector2? SquadMove(TrashPandas.Runtime.Raccoon.RaccoonController r)
         {
             if (Bot == "walk" || Bot == "sneak" || Bot == "sprint") return new Vector2(Mathf.Sin(Time.time * 0.6f), Mathf.Cos(Time.time * 0.6f));
+            if (Bot == "dash" || Bot == "stroll")
+            {
+                // Straight west along the open road (like holding W with the camera behind: see -chasecam).
+                return new Vector2(-1f, 0f);
+            }
             if (Bot == "noisy")
             {
                 // Behind the two guests chatting west of the garden (they face each other, not us): run around.
@@ -209,12 +214,12 @@ namespace TrashPandas.Runtime.Net
             if (Bot == "canhide" && !s_canDone && !r.InCan && TrashPandas.Runtime.Squad.Hideout.Near(r.transform.position)) { s_canDone = true; return true; }
             return false;
         }
-        public static bool SquadRun => Bot == "sprint" || (Bot == "noisy" && Time.timeSinceLevelLoad > 4f) || (Bot == "towerhost" && Time.timeSinceLevelLoad > 24f);
+        public static bool SquadRun => Bot == "sprint" || Bot == "dash" || (Bot == "noisy" && Time.timeSinceLevelLoad > 4f) || (Bot == "towerhost" && Time.timeSinceLevelLoad > 24f);
         static bool s_noisyPlaced;
         /// <summary>Dev: -nointro, and the bots that test specific mechanics skip the intro.</summary>
-        public static bool SkipIntro => Array.IndexOf(Args, "-nointro") >= 0 || Bot == "heavy" || Bot == "tower" || Bot == "flee" || Bot == "sneakflee" || Bot == "rescue" || Bot == "hideflee" || Bot == "push" || Bot == "climb" || Bot == "gadgets";
+        public static bool SkipIntro => Array.IndexOf(Args, "-nointro") >= 0 || Bot == "dash" || Bot == "heavy" || Bot == "tower" || Bot == "flee" || Bot == "sneakflee" || Bot == "rescue" || Bot == "hideflee" || Bot == "push" || Bot == "climb" || Bot == "gadgets";
         /// <summary>Bots built around the garden start (heavy, tower) keep spawning there.</summary>
-        public static bool SquadNearOrigin => Bot == "heavy" || Bot == "tower" || Bot == "flee" || Bot == "sneakflee" || Bot == "rescue" || Bot == "hideflee" || Bot == "push" || Bot == "climb" || Bot == "gadgets";
+        public static bool SquadNearOrigin => Bot == "dash" || Bot == "heavy" || Bot == "tower" || Bot == "flee" || Bot == "sneakflee" || Bot == "rescue" || Bot == "hideflee" || Bot == "push" || Bot == "climb" || Bot == "gadgets";
         public static bool SquadTap(TrashPandas.Runtime.Raccoon.RaccoonController r) =>
             (Bot == "fetch" && TrashPandas.Runtime.Squad.SquadBots.FetchTap(r)) || (Bot == "heavyonline" && TrashPandas.Runtime.Squad.SquadBots.OnlineHeavyTap(r));
         /// <summary>Bots that grab something specific (not what the highlight picked).</summary>
@@ -395,7 +400,7 @@ namespace TrashPandas.Runtime.Net
             if (pdx) panic += $" alert={pdx.Alert01:F2}";
             var sqg = TrashPandas.Runtime.Squad.SquadController.Instance;
             var lookx = sqg && sqg.Active ? sqg.Active.GetComponent<TrashPandas.Runtime.Raccoon.RaccoonLook>() : null;
-            if (lookx) panic += $" clip={lookx.CurrentClip} lean={lookx.Lean:F0} running={sqg.Active.IsRunning}";
+            if (lookx) panic += $" clip={lookx.CurrentClip} lean={lookx.Lean:F0} running={sqg.Active.IsRunning} visualPitch={(lookx.Visual ? lookx.Visual.localEulerAngles.x : -1):F0} rootVsMove={Vector3.Angle(sqg.Active.transform.forward, Vector3.ProjectOnPlane(sqg.Active.GetComponent<CharacterController>().velocity, Vector3.up)):F0}";
             if (lookx && lookx.Model)
             {
                 // Is the model's face pointing where the raccoon walks? (0° = yes)
