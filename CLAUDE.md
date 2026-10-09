@@ -52,6 +52,11 @@ tools/unity-run.sh TrashPandas.EditorTools.BuildScripts.BuildMac        # → Bu
 tools/unity-run.sh TrashPandas.EditorTools.BuildScripts.BuildWindows    # → Builds/windows
 ```
 
+On **Windows** (PowerShell): `.\tools\unity-test.ps1` and `.\tools\unity-run.ps1 <Method>` (same methods; Unity is
+looked up in `C:\Program Files\Unity\Hub\Editor\<version>\Editor\Unity.exe`). The built Windows app is
+`Builds\windows\TrashPandas.exe` and takes the same dev flags. The Blender scripts run with
+`"C:\Program Files\Blender Foundation\Blender 5.2\blender.exe" -b --python ...`.
+
 Dev flags for the built app (`Builds/mac/TrashPandas.app/Contents/MacOS/TrashPandas`):
 `-debugmode` (straight into debug mode), `-batchmode -nographics -telemetry -quitafter N -logFile <path>` (headless
 with a status line every 0.5 s), `-shot <seconds> <png>` (windowed screenshot), `-bot <name>`, `-nointro`,
